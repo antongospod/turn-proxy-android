@@ -107,6 +107,8 @@
             android:textSize="10sp"
             android:textStyle="bold" />
 
+        <Button android:id="@+id/btnSettings" style="?android:attr/buttonStyleSmall" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="4dp" android:text="SETTINGS" android:textSize="10sp" android:backgroundTint="#00796B"/>
+
         <Button android:id="@+id/btnCopyLogs" style="?android:attr/buttonStyleSmall" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="COPY" android:textSize="10sp" android:backgroundTint="#455A64"/>
         <Button android:id="@+id/btnClearLogs" style="?android:attr/buttonStyleSmall" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:text="CLEAR" android:textSize="10sp" android:backgroundTint="#455A64"/>
     </LinearLayout>

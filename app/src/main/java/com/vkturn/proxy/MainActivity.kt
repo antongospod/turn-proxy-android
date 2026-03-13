@@ -119,6 +119,14 @@ class MainActivity : AppCompatActivity() {
             tvLogs.text = "Консоль очищена."
         }
 
+        // --- ДОБАВЛЕННЫЙ КОД ДЛЯ КНОПКИ "НАСТРОЙКИ" ---
+        val btnSettings = findViewById<Button>(R.id.btnSettings)
+        btnSettings.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+        // ----------------------------------------------
+
         btnToggle.setOnClickListener {
             if (!ProxyService.isRunning) {
                 // Сохранение перед стартом
