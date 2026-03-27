@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -9,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.vkturn.proxy"
-        minSdk = 23
-        targetSdk = 28
-        versionCode = 2
-        versionName = "1.1.0"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 3
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,7 +22,10 @@ android {
         resources.excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         jniLibs.useLegacyPackaging = true
     }
-    // ---------------------------------
+
+    buildFeatures {
+        compose = true
+    }
 
     buildTypes {
         release {
@@ -33,10 +37,8 @@ android {
         }
     }
 
-    // Отключаем проверку lint для релизных сборок, чтобы сборка release не падала из‑за ExpiredTargetSdkVersion
     lint {
         checkReleaseBuilds = false
-        // при желании можно только отключить конкретное правило:
         disable += "ExpiredTargetSdkVersion"
     }
 
@@ -50,16 +52,27 @@ android {
 }
 
 dependencies {
-    // SSH и Корутины
     implementation("com.github.mwiede:jsch:0.2.17")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Стандартные библиотеки Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    // Явно пиним M3 1.4.0-alpha10+ для WavyProgressIndicator и ExperimentalMaterial3ExpressiveApi
+    implementation("androidx.compose.material3:material3:1.4.0-alpha10")
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
