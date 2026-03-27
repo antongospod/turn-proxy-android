@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.vkturn.proxy.ui.screens
+package com.freeturn.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,9 +57,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.vkturn.proxy.data.SshConfig
-import com.vkturn.proxy.viewmodel.MainViewModel
-import com.vkturn.proxy.viewmodel.SshConnectionState
+import com.freeturn.app.data.SshConfig
+import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.SshConnectionState
 
 @Composable
 fun SshSetupScreen(
@@ -269,12 +269,6 @@ private fun FormSection(
         shape = MaterialTheme.shapes.large
     ) {
         Text("Подключиться", style = MaterialTheme.typography.labelLarge)
-    }
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        TextButton(onClick = { /* show help info */ }) {
-            Text("Как получить SSH-доступ к серверу?")
-        }
     }
 }
 

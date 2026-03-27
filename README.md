@@ -1,4 +1,4 @@
-# VK TURN Proxy Android
+# FREETURN Proxy Android
 
 Android-приложение на основе [vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy).
 

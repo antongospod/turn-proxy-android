@@ -1,4 +1,4 @@
-package com.vkturn.proxy.ui.screens
+package com.freeturn.app.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -161,7 +161,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(12.dp))
 
                 TextButton(onClick = onSkip) {
-                    Text("У меня уже есть настройки")
+                    Text("Пропустить настройки")
                 }
 
                 Spacer(Modifier.height(24.dp))

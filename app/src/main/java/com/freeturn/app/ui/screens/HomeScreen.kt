@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.vkturn.proxy.ui.screens
+package com.freeturn.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -41,8 +40,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,19 +72,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.vkturn.proxy.ui.theme.StatusGreen
-import com.vkturn.proxy.ui.theme.StatusGreenDark
-import com.vkturn.proxy.ui.theme.StatusRed
-import com.vkturn.proxy.viewmodel.MainViewModel
-import com.vkturn.proxy.viewmodel.ProxyState
-import com.vkturn.proxy.viewmodel.ServerState
-import com.vkturn.proxy.viewmodel.SshConnectionState
+import com.freeturn.app.ui.theme.StatusGreen
+import com.freeturn.app.ui.theme.StatusGreenDark
+import com.freeturn.app.ui.theme.StatusRed
+import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.viewmodel.ServerState
+import com.freeturn.app.viewmodel.SshConnectionState
 
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
-    onNavigateToSshSetup: () -> Unit,
-    onNavigateToClientSetup: () -> Unit
+    onNavigateToSshSetup: () -> Unit
 ) {
     val context = LocalContext.current
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
@@ -97,7 +93,6 @@ fun HomeScreen(
     val logs by viewModel.logs.collectAsStateWithLifecycle()
 
     var showBottomSheet by rememberSaveable { mutableStateOf(false) }
-    var showOverflowMenu by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -106,28 +101,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("VK TURN Proxy") },
                 actions = {
-                    IconButton(onClick = { showOverflowMenu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Меню")
-                    }
-                    DropdownMenu(
-                        expanded = showOverflowMenu,
-                        onDismissRequest = { showOverflowMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Настройки сервера") },
-                            leadingIcon = { Icon(Icons.Filled.Settings, null, Modifier.size(18.dp)) },
-                            onClick = { showOverflowMenu = false; onNavigateToSshSetup() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Настройки клиента") },
-                            leadingIcon = { Icon(Icons.Filled.Settings, null, Modifier.size(18.dp)) },
-                            onClick = { showOverflowMenu = false; onNavigateToClientSetup() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Все настройки") },
-                            leadingIcon = { Icon(Icons.Filled.Info, null, Modifier.size(18.dp)) },
-                            onClick = { showOverflowMenu = false; showBottomSheet = true }
-                        )
+                    // Кнопка «Детали и логи» через иконку — без ••• меню
+                    IconButton(onClick = { showBottomSheet = true }) {
+                        Icon(Icons.Filled.Info, contentDescription = "Детали")
                     }
                 }
             )
@@ -264,7 +240,6 @@ fun HomeScreen(
             SettingsBottomSheet(
                 viewModel = viewModel,
                 onNavigateToSshSetup = { showBottomSheet = false; onNavigateToSshSetup() },
-                onNavigateToClientSetup = { showBottomSheet = false; onNavigateToClientSetup() },
                 onDismiss = { showBottomSheet = false }
             )
         }
@@ -337,7 +312,6 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 private fun SettingsBottomSheet(
     viewModel: MainViewModel,
     onNavigateToSshSetup: () -> Unit,
-    onNavigateToClientSetup: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -448,10 +422,7 @@ private fun SettingsBottomSheet(
 
         // ── Клиент ────────────────────────────────────────────────────────
         ListItem(
-            headlineContent = { Text("Клиент", style = MaterialTheme.typography.titleSmall) },
-            trailingContent = {
-                TextButton(onClick = onNavigateToClientSetup) { Text("Изменить") }
-            }
+            headlineContent = { Text("Клиент", style = MaterialTheme.typography.titleSmall) }
         )
         Divider()
 

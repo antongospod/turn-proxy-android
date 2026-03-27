@@ -1,4 +1,4 @@
-package com.vkturn.proxy
+package com.freeturn.app
 
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell

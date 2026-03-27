@@ -1,4 +1,4 @@
-package com.vkturn.proxy.ui.theme
+package com.freeturn.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -28,7 +28,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun VkTurnProxyTheme(
+fun FreeTurnTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Material You dynamic color — enabled on Android 12+
     dynamicColor: Boolean = true,
