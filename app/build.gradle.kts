@@ -1,17 +1,16 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
-    namespace = "com.vkturn.proxy"
+    namespace = "com.freeturn.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.vkturn.proxy"
+        applicationId = "com.freeturn.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 3
         versionName = "2.0.0"
 
@@ -46,14 +45,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    compileSdkMinor = 1
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 
 dependencies {
-    implementation("com.github.mwiede:jsch:0.2.17")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.github.mwiede:jsch:2.27.9")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

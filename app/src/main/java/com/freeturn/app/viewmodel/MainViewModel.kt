@@ -1,15 +1,15 @@
-package com.vkturn.proxy.viewmodel
+package com.freeturn.app.viewmodel
 
 import android.app.Application
 import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.vkturn.proxy.ProxyService
-import com.vkturn.proxy.SSHManager
-import com.vkturn.proxy.data.AppPreferences
-import com.vkturn.proxy.data.ClientConfig
-import com.vkturn.proxy.data.SshConfig
+import com.freeturn.app.ProxyService
+import com.freeturn.app.SSHManager
+import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.SshConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -215,11 +215,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startProxy(context: Context) {
         if (ProxyService.isRunning) return
+
+        // Сброс предыдущей ошибки перед повторной попыткой
+        if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
+
+        // Валидация конфига до запуска
+        val cfg = clientConfig.value
+        if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
+            setErrorWithAutoReset("Не заполнены настройки клиента")
+            return
+        }
+        if (cfg.isRawMode && cfg.rawCommand.isBlank()) {
+            setErrorWithAutoReset("Не задана raw-команда")
+            return
+        }
+
         _proxyState.value = ProxyState.Starting
 
         viewModelScope.launch {
             // Write to legacy SharedPreferences so ProxyService can read them
-            val cfg = clientConfig.value
             context.getSharedPreferences("ProxyPrefs", Context.MODE_PRIVATE).edit().apply {
                 putString("peer", cfg.serverAddress)
                 putString("link", cfg.vkLink)
@@ -234,9 +248,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ProxyService.logBuffer.clear()
             context.startForegroundService(Intent(context, ProxyService::class.java))
 
-            delay(1500)
-            _proxyState.value = if (ProxyService.isRunning) ProxyState.Running
-                                 else ProxyState.Error("Не удалось запустить прокси")
+            // Ждём запуска: проверяем логи на ошибку или успех вместо простого isRunning
+            delay(2500)
+            val logText = ProxyService.logBuffer.joinToString("\n").lowercase()
+            when {
+                !ProxyService.isRunning ->
+                    setErrorWithAutoReset("Прокси не запустился")
+                logText.contains("ошибка") || logText.contains("error") || logText.contains("fatal") ->
+                    setErrorWithAutoReset("Ошибка запуска — проверьте настройки")
+                else ->
+                    _proxyState.value = ProxyState.Running
+            }
+        }
+    }
+
+    private fun setErrorWithAutoReset(message: String) {
+        _proxyState.value = ProxyState.Error(message)
+        viewModelScope.launch {
+            delay(3500)
+            if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
         }
     }
 

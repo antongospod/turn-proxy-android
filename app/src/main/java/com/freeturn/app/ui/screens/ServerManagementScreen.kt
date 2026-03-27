@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.vkturn.proxy.ui.screens
+package com.freeturn.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -54,16 +53,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.vkturn.proxy.ui.theme.StatusGreen
-import com.vkturn.proxy.viewmodel.MainViewModel
-import com.vkturn.proxy.viewmodel.ServerState
-import com.vkturn.proxy.viewmodel.SshConnectionState
+import com.freeturn.app.ui.theme.StatusGreen
+import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.ServerState
+import com.freeturn.app.viewmodel.SshConnectionState
 
 @Composable
 fun ServerManagementScreen(
     viewModel: MainViewModel,
-    onContinue: () -> Unit,
-    onBack: () -> Unit
+    onContinue: () -> Unit
 ) {
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
     val serverState by viewModel.serverState.collectAsStateWithLifecycle()
@@ -82,12 +80,7 @@ fun ServerManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Управление сервером") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Назад")
-                    }
-                },
+                title = { Text("Сервер") },
                 actions = {
                     SshStatusBadge(sshState = sshState, ip = sshConfig.ip)
                 }
@@ -179,7 +172,7 @@ fun ServerManagementScreen(
             ) {
                 Icon(Icons.Filled.CloudDownload, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Установить / Обновить vk‑turn‑proxy")
+                Text("Установить / Обновить")
             }
 
             Button(
@@ -187,9 +180,8 @@ fun ServerManagementScreen(
                     viewModel.saveProxyServerConfig(proxyListen, proxyConnect)
                     viewModel.startServer()
                 },
-                enabled = isConnected && !isWorking
-                        && serverKnown?.installed == true
-                        && serverKnown?.running == false,
+                enabled = (isConnected && !isWorking
+                        && serverKnown?.installed == true) && !serverKnown.running,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -227,7 +219,7 @@ fun ServerManagementScreen(
                 ) {
                     Text("Продолжить настройку клиента")
                     Spacer(Modifier.width(8.dp))
-                    Icon(Icons.Filled.ArrowForward, null)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                 }
             }
 

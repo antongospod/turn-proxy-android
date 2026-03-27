@@ -1,4 +1,4 @@
-package com.vkturn.proxy
+package com.freeturn.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

@@ -1,4 +1,4 @@
-package com.vkturn.proxy.data
+package com.freeturn.app.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore

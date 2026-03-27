@@ -1,4 +1,4 @@
-package com.vkturn.proxy.ui.theme
+package com.freeturn.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
