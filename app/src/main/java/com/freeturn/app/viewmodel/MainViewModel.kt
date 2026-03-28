@@ -57,6 +57,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = AppPreferences(application)
     private val sshManager = SSHManager()
 
+    /**
+     * Конфиг, с которым было выполнено последнее успешное SSH-подключение.
+     * Хранит пароль в памяти, не зависит от асинхронного чтения EncryptedSharedPreferences.
+     * Все операции с сервером используют его вместо sshConfig.value.
+     */
+    @Volatile private var activeSshConfig: SshConfig? = null
+
     private val _sshState = MutableStateFlow<SshConnectionState>(SshConnectionState.Disconnected)
     val sshState: StateFlow<SshConnectionState> = _sshState.asStateFlow()
 
@@ -141,9 +148,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             if (result.trim() == "OK") {
                 // При первом подключении сохраняем отпечаток хоста
+                val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
                 if (config.hostFingerprint.isEmpty()) {
                     sshManager.lastSeenFingerprint?.let { prefs.saveSshFingerprint(it) }
                 }
+                // Кешируем полный конфиг (включая пароль) в памяти, чтобы
+                // installServer/startServer/stopServer не зависели от EncryptedSharedPreferences
+                activeSshConfig = config.copy(hostFingerprint = fp)
                 HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
                 _sshState.value = SshConnectionState.Connected(config.ip)
                 checkServerState(config)
@@ -155,14 +166,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reconnectSsh() {
-        val cfg = sshConfig.value
+        val cfg = activeSshConfig ?: sshConfig.value
         if (cfg.ip.isNotEmpty()) connectSsh(cfg)
     }
 
     // ── Server management ──────────────────────────────────────────────────
 
     fun checkServerState(config: SshConfig? = null) {
-        val cfg = config ?: sshConfig.value
+        val cfg = config ?: activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
         _serverState.value = ServerState.Checking
 
@@ -188,7 +199,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun fetchServerVersion(config: SshConfig? = null) {
-        val cfg = config ?: sshConfig.value
+        val cfg = config ?: activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
         val cmd = """
             cd /opt/vk-turn 2>/dev/null &&
@@ -204,7 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun installServer() {
-        val cfg = sshConfig.value
+        val cfg = activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
         _serverState.value = ServerState.Working("Установка vk-turn-proxy...")
 
@@ -246,7 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startServer() {
-        val cfg = sshConfig.value
+        val cfg = activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
         _serverState.value = ServerState.Working("Запуск сервера...")
 
@@ -269,7 +280,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopServer() {
-        val cfg = sshConfig.value
+        val cfg = activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
         _serverState.value = ServerState.Working("Остановка сервера...")
 
