@@ -67,8 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
 
-    private val _logs = MutableStateFlow<List<String>>(emptyList())
-    val logs: StateFlow<List<String>> = _logs.asStateFlow()
+    val logs: StateFlow<List<String>> = ProxyService.logs
 
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
@@ -98,15 +97,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isInitialized.value = true
         }
 
-        ProxyService.onLogReceived = { msg ->
-            _logs.value = (_logs.value + msg).takeLast(200)
+        viewModelScope.launch {
+            ProxyService.proxyFailed.collect {
+                setErrorWithAutoReset("Прокси упал ${ProxyService.MAX_RESTARTS} раз — проверьте настройки")
+            }
         }
-        ProxyService.onProxyFailed = {
-            setErrorWithAutoReset("Прокси упал ${ProxyService.MAX_RESTARTS} раз — проверьте настройки")
-        }
-        _logs.value = ProxyService.logBuffer.toList()
 
-        if (ProxyService.isRunning) _proxyState.value = ProxyState.Running
+        // Сбрасываем состояние когда сервис остановился (нормальный выход, не краш)
+        viewModelScope.launch {
+            ProxyService.isRunning.collect { running ->
+                if (!running && _proxyState.value == ProxyState.Running) {
+                    _proxyState.value = ProxyState.Idle
+                }
+            }
+        }
+
+        if (ProxyService.isRunning.value) _proxyState.value = ProxyState.Running
 
         _customKernelExists.value =
             File(getApplication<Application>().filesDir, "custom_vkturn").exists()
@@ -253,7 +259,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Local proxy ────────────────────────────────────────────────────────
 
     fun startProxy(context: Context) {
-        if (ProxyService.isRunning) return
+        if (ProxyService.isRunning.value) return
 
         // Сброс предыдущей ошибки перед повторной попыткой
         if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
@@ -284,19 +290,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 putString("rawCmd", cfg.rawCommand)
             }
 
-            ProxyService.logBuffer.clear()
+            ProxyService.logs.value = emptyList()
             context.startForegroundService(Intent(context, ProxyService::class.java))
 
             // Ждём запуска: проверяем логи на ошибку или успех вместо простого isRunning
             delay(2500)
-            val logText = ProxyService.logBuffer.joinToString("\n").lowercase()
+            // Если proxyFailed уже обработал ошибку — не дублируем
+            if (_proxyState.value is ProxyState.Error) return@launch
+            val logText = ProxyService.logs.value.joinToString("\n").lowercase()
             when {
-                !ProxyService.isRunning ->
+                !ProxyService.isRunning.value ->
                     setErrorWithAutoReset("Прокси не запустился")
                 logText.contains("panic") || logText.contains("fatal") ||
                 logText.contains("rate limit") || logText.contains("критическая") -> {
                     context.stopService(Intent(context, ProxyService::class.java))
-                    setErrorWithAutoReset("Ошибка запуска — проверьте настройки")
+                    val errorLine = ProxyService.logs.value
+                        .lastOrNull { line ->
+                            val l = line.lowercase()
+                            l.contains("error") || l.contains("ошибка") ||
+                            l.contains("panic") || l.contains("fatal") ||
+                            l.contains("критическая")
+                        }
+                    setErrorWithAutoReset(errorLine ?: "Ошибка запуска — проверьте настройки")
                 }
                 else ->
                     _proxyState.value = ProxyState.Running
@@ -333,8 +348,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearLogs() {
-        ProxyService.logBuffer.clear()
-        _logs.value = emptyList()
+        ProxyService.logs.value = emptyList()
     }
 
     // ── Custom kernel ──────────────────────────────────────────────────────
@@ -364,8 +378,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        ProxyService.onLogReceived = null
-        ProxyService.onProxyFailed = null
         sshManager.disconnect()
     }
 }

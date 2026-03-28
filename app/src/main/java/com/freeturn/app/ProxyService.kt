@@ -15,23 +15,23 @@ import androidx.core.app.NotificationCompat
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.random.Random
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 class ProxyService : Service() {
 
     companion object {
         const val MAX_RESTARTS = 8
-        var isRunning = false
-        var restartCount = 0
-        val logBuffer = mutableListOf<String>()
-        var onLogReceived: ((String) -> Unit)? = null
-        var onProxyFailed: (() -> Unit)? = null
+        val isRunning = MutableStateFlow(false)
+        val logs = MutableStateFlow<List<String>>(emptyList())
+        val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
         fun addLog(msg: String) {
-            if (logBuffer.size > 200) logBuffer.removeAt(0)
-            logBuffer.add(msg)
-            onLogReceived?.invoke(msg)
+            logs.update { (it + msg).takeLast(200) }
         }
     }
 
@@ -41,8 +41,8 @@ class ProxyService : Service() {
     @Volatile private var sessionKillScheduled = false
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    // Игнорируем первый onAvailable (текущая сеть при регистрации)
     @Volatile private var networkInitialized = false
+    private var restartCount = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -53,7 +53,7 @@ class ProxyService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (isRunning) return START_STICKY
+        if (isRunning.value) return START_STICKY
 
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
             .setContentTitle("VK TURN Proxy")
@@ -62,13 +62,14 @@ class ProxyService : Service() {
             .build()
         startForeground(1, notification)
 
-        isRunning = true
+        isRunning.value = true
         userStopped = false
         restartCount = 0
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
-        wakeLock?.acquire()
+        @Suppress("WakelockTimeout")
+        wakeLock?.acquire() // foreground service сам управляет временем жизни; release() в onDestroy()
 
         registerNetworkCallback()
 
@@ -124,27 +125,28 @@ class ProxyService : Service() {
                 .start()
             process = proc
 
-            val reader = BufferedReader(InputStreamReader(proc.inputStream))
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                val l = line ?: continue
-                addLog(l)
+            BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val l = line ?: continue
+                    addLog(l)
 
-                // Session Killer: обнаружение ошибки квоты → сброс сессии
-                if (!sessionKillScheduled && isQuotaError(l)) {
-                    sessionKillScheduled = true
-                    addLog(">>> QUOTA ERROR — сброс сессии через 2с")
-                    handler.postDelayed({
-                        sessionKillScheduled = false
-                        if (!userStopped) {
-                            restartCount = 0  // сброс бэкоффа — квота не краш
-                            process?.destroy()
-                        }
-                    }, 2_000)
+                    // Session Killer: обнаружение ошибки квоты → сброс сессии
+                    if (!sessionKillScheduled && isQuotaError(l)) {
+                        sessionKillScheduled = true
+                        addLog(">>> QUOTA ERROR — сброс сессии через 2с")
+                        handler.postDelayed({
+                            sessionKillScheduled = false
+                            if (!userStopped) {
+                                restartCount = 0  // сброс бэкоффа — квота не краш
+                                process?.destroy()
+                            }
+                        }, 2_000)
+                    }
                 }
             }
 
-            exitCode = proc.waitFor()
+            exitCode = if (proc.waitFor(5, TimeUnit.MINUTES)) proc.exitValue() else -1
             addLog("=== ПРОЦЕСС ОСТАНОВЛЕН (Код: $exitCode) ===")
 
         } catch (e: Exception) {
@@ -153,19 +155,17 @@ class ProxyService : Service() {
             process = null
             when {
                 userStopped -> {
-                    isRunning = false
+                    isRunning.value = false
                     stopSelf()
                 }
                 exitCode == 0 -> {
                     val uptime = System.currentTimeMillis() - startedAt
                     if (uptime < 5_000L) {
-                        // Мгновенный выход — скорее всего истекла ссылка или неверные аргументы
                         addLog("=== Быстрый выход (${uptime}мс) — проверьте VK-ссылку и настройки ===")
                     } else {
                         addLog("=== Сессия завершена нормально ===")
                     }
-                    isRunning = false
-                    onProxyFailed?.invoke()
+                    isRunning.value = false
                     stopSelf()
                 }
                 else -> scheduleWatchdogRestart()
@@ -179,8 +179,8 @@ class ProxyService : Service() {
         restartCount++
         if (restartCount > MAX_RESTARTS) {
             addLog("=== WATCHDOG: превышен лимит попыток ($MAX_RESTARTS), остановка ===")
-            isRunning = false
-            onProxyFailed?.invoke()
+            isRunning.value = false
+            proxyFailed.tryEmit(Unit)
             stopSelf()
             return
         }
@@ -236,7 +236,7 @@ class ProxyService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         userStopped = true
-        isRunning = false
+        isRunning.value = false
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
         addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")

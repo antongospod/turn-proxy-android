@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -520,11 +521,20 @@ private fun RepoLinkItem(
 
 @Composable
 private fun LogsPanel(logs: List<String>, modifier: Modifier = Modifier) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(logs.size) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .heightIn(max = 320.dp)
+                .verticalScroll(scrollState)
+                .padding(vertical = 8.dp)
+        ) {
             if (logs.isEmpty()) {
                 Text(
                     "Нет логов",
@@ -533,7 +543,7 @@ private fun LogsPanel(logs: List<String>, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
             } else {
-                logs.takeLast(50).forEachIndexed { index, line ->
+                logs.forEachIndexed { index, line ->
                     LogLine(line = line, isEven = index % 2 == 0)
                 }
             }
@@ -585,7 +595,7 @@ private fun LogLine(line: String, isEven: Boolean) {
             Spacer(Modifier.width(11.dp))
         }
         Text(
-            text = line.removePrefix("=== ").removeSuffix(" ==="),
+            text = line,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                 fontWeight = if (isHeader) androidx.compose.ui.text.font.FontWeight.SemiBold
