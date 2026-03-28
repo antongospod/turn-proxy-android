@@ -8,6 +8,7 @@ import com.jcraft.jsch.Session
 import com.jcraft.jsch.UserInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.thread
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.Properties
@@ -49,12 +50,18 @@ class SSHManager {
             val channel = tempSession.openChannel("exec") as ChannelExec
             channel.setCommand(command)
             channel.inputStream = null  // не подключать stdin
-            channel.setErrStream(null)
 
             val inStream = channel.inputStream
+            val errStream = channel.errStream
             channel.connect()
 
-            val output = inStream.bufferedReader().use { reader ->
+            // Читаем stderr в отдельном потоке чтобы не было дедлока
+            val errBuilder = StringBuilder()
+            val errThread = thread {
+                errStream.bufferedReader().forEachLine { errBuilder.appendLine(it) }
+            }
+
+            val stdout = inStream.bufferedReader().use { reader ->
                 buildString {
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
@@ -62,8 +69,17 @@ class SSHManager {
                     }
                 }
             }
+            errThread.join(3_000)
             channel.disconnect()
-            output.trim()
+
+            val stderr = errBuilder.toString().trim()
+            buildString {
+                append(stdout.trim())
+                if (stderr.isNotEmpty()) {
+                    if (stdout.isNotBlank()) append("\n")
+                    append(stderr)
+                }
+            }
         } catch (e: Exception) {
             // Если отпечаток изменился — конкретное сообщение об угрозе
             val isMitm = tofu.capturedFingerprint != null

@@ -213,15 +213,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pkill -9 -f "server-linux-" 2>/dev/null;
             ARCH=${'$'}(uname -m);
             if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
-            wget -qO ${'$'}BIN https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN &&
-            chmod +x ${'$'}BIN && echo "DONE"
+            URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN";
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsSL -o "${'$'}BIN" "${'$'}URL"
+            elif command -v wget >/dev/null 2>&1; then
+                wget -qO "${'$'}BIN" "${'$'}URL"
+            else
+                echo "ERROR: curl и wget не найдены на сервере"; exit 1
+            fi &&
+            chmod +x "${'$'}BIN" && echo "DONE"
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
                 knownFingerprint = cfg.fp)
-            delay(1000)
-            checkServerState(cfg)
+            if (!result.contains("DONE")) {
+                _serverState.value = ServerState.Error(
+                    result.lines().lastOrNull { it.isNotBlank() } ?: "Ошибка установки"
+                )
+            } else {
+                delay(500)
+                checkServerState(cfg)
+            }
         }
     }
 
