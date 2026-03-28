@@ -50,6 +50,9 @@ sealed class ProxyState {
     data class Error(val message: String) : ProxyState()
 }
 
+/** Возвращает сохранённый отпечаток хоста или null при первом подключении */
+private val SshConfig.fp get() = hostFingerprint.ifEmpty { null }
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = AppPreferences(application)
@@ -134,9 +137,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _sshState.value = SshConnectionState.Connecting("Проверка SSH...")
 
             val result = sshManager.executeSilentCommand(
-                config.ip, config.port, config.username, config.password, "echo OK"
+                config.ip, config.port, config.username, config.password, "echo OK",
+                knownFingerprint = config.fp
             )
             if (result.trim() == "OK") {
+                // При первом подключении сохраняем отпечаток хоста
+                if (config.hostFingerprint.isEmpty()) {
+                    sshManager.lastSeenFingerprint?.let { prefs.saveSshFingerprint(it) }
+                }
                 HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
                 _sshState.value = SshConnectionState.Connected(config.ip)
                 checkServerState(config)
@@ -165,7 +173,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, checkCmd)
+            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, checkCmd,
+                knownFingerprint = cfg.fp)
             _serverState.value = if (result.startsWith("ERROR")) {
                 ServerState.Error(result.removePrefix("ERROR: "))
             } else {
@@ -189,7 +198,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             timeout 2 ${'$'}BIN -version 2>&1 | head -1
         """.trimIndent()
         viewModelScope.launch {
-            val out = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, cmd)
+            val out = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, cmd,
+                knownFingerprint = cfg.fp)
             _serverVersion.value = out.trim().takeIf { it.isNotEmpty() && !it.startsWith("ERROR") }
         }
     }
@@ -209,7 +219,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script)
+            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+                knownFingerprint = cfg.fp)
             delay(1000)
             checkServerState(cfg)
         }
@@ -231,7 +242,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script)
+            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+                knownFingerprint = cfg.fp)
             delay(2000)
             checkServerState(cfg)
         }
@@ -250,7 +262,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script)
+            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+                knownFingerprint = cfg.fp)
             delay(2000)
             checkServerState(cfg)
         }

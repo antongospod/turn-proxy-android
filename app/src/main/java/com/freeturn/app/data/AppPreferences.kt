@@ -1,13 +1,19 @@
 package com.freeturn.app.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
+import androidx.core.content.edit
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_prefs")
 
@@ -17,7 +23,8 @@ data class SshConfig(
     val username: String = "root",
     val password: String = "",
     val authType: String = "PASSWORD",
-    val sshKey: String = ""
+    val sshKey: String = "",
+    val hostFingerprint: String = ""
 )
 
 data class ClientConfig(
@@ -37,9 +44,8 @@ class AppPreferences(private val context: Context) {
         val SSH_IP = stringPreferencesKey("ssh_ip")
         val SSH_PORT = intPreferencesKey("ssh_port")
         val SSH_USER = stringPreferencesKey("ssh_user")
-        val SSH_PASS = stringPreferencesKey("ssh_pass")
         val SSH_AUTH_TYPE = stringPreferencesKey("ssh_auth_type")
-        val SSH_KEY = stringPreferencesKey("ssh_key")
+        val SSH_HOST_FP = stringPreferencesKey("ssh_host_fp")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val CLIENT_SERVER_ADDR = stringPreferencesKey("client_server_addr")
         val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
@@ -51,6 +57,24 @@ class AppPreferences(private val context: Context) {
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
+
+        // Устаревшие ключи — используются только для миграции
+        private val SSH_PASS_LEGACY = stringPreferencesKey("ssh_pass")
+        private val SSH_KEY_LEGACY = stringPreferencesKey("ssh_key")
+    }
+
+    // Шифрованное хранилище для SSH-пароля и ключа (Android Keystore + AES-256)
+    private val encryptedPrefs: SharedPreferences by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "secure_ssh_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
     }
 
     val sshConfigFlow: Flow<SshConfig> = context.dataStore.data
@@ -60,9 +84,13 @@ class AppPreferences(private val context: Context) {
                 ip = prefs[SSH_IP] ?: "",
                 port = prefs[SSH_PORT] ?: 22,
                 username = prefs[SSH_USER] ?: "root",
-                password = prefs[SSH_PASS] ?: "",
+                // Читаем из зашифрованного хранилища; если пусто — берём из DataStore (миграция)
+                password = encryptedPrefs.getString("ssh_pass", null)
+                    ?: prefs[SSH_PASS_LEGACY] ?: "",
                 authType = prefs[SSH_AUTH_TYPE] ?: "PASSWORD",
-                sshKey = prefs[SSH_KEY] ?: ""
+                sshKey = encryptedPrefs.getString("ssh_key", null)
+                    ?: prefs[SSH_KEY_LEGACY] ?: "",
+                hostFingerprint = prefs[SSH_HOST_FP] ?: ""
             )
         }
 
@@ -94,14 +122,27 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
 
     suspend fun saveSshConfig(config: SshConfig) {
+        // Чувствительные данные — в зашифрованное хранилище
+        withContext(Dispatchers.IO) {
+            encryptedPrefs.edit {
+                putString("ssh_pass", config.password)
+                    .putString("ssh_key", config.sshKey)
+            }
+        }
+        // Остальное — в DataStore; удаляем устаревшие незашифрованные значения
         context.dataStore.edit { prefs ->
             prefs[SSH_IP] = config.ip
             prefs[SSH_PORT] = config.port
             prefs[SSH_USER] = config.username
-            prefs[SSH_PASS] = config.password
             prefs[SSH_AUTH_TYPE] = config.authType
-            prefs[SSH_KEY] = config.sshKey
+            prefs[SSH_HOST_FP] = config.hostFingerprint
+            prefs.remove(SSH_PASS_LEGACY)
+            prefs.remove(SSH_KEY_LEGACY)
         }
+    }
+
+    suspend fun saveSshFingerprint(fingerprint: String) {
+        context.dataStore.edit { prefs -> prefs[SSH_HOST_FP] = fingerprint }
     }
 
     suspend fun saveClientConfig(config: ClientConfig) {
