@@ -3,20 +3,27 @@ package com.freeturn.app.viewmodel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.ProxyService
 import com.freeturn.app.SSHManager
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.SshConfig
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.core.content.edit
+import java.io.File
 
 // ── SSH connection states ──────────────────────────────────────────────────
 sealed class SshConnectionState {
@@ -54,6 +61,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _serverState = MutableStateFlow<ServerState>(ServerState.Unknown)
     val serverState: StateFlow<ServerState> = _serverState.asStateFlow()
 
+    private val _serverVersion = MutableStateFlow<String?>(null)
+    val serverVersion: StateFlow<String?> = _serverVersion.asStateFlow()
+
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
 
@@ -62,6 +72,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+
+    private val _customKernelExists = MutableStateFlow(false)
+    val customKernelExists: StateFlow<Boolean> = _customKernelExists.asStateFlow()
 
     val sshConfig: StateFlow<SshConfig> = prefs.sshConfigFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SshConfig())
@@ -80,16 +93,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            // Wait for first real emit from DataStore before showing UI
-            onboardingDone.collect { _isInitialized.value = true }
+            // Wait for first real DataStore read before showing UI
+            prefs.onboardingDoneFlow.first()
+            _isInitialized.value = true
         }
 
         ProxyService.onLogReceived = { msg ->
             _logs.value = (_logs.value + msg).takeLast(200)
         }
+        ProxyService.onProxyFailed = {
+            setErrorWithAutoReset("Прокси упал ${ProxyService.MAX_RESTARTS} раз — проверьте настройки")
+        }
         _logs.value = ProxyService.logBuffer.toList()
 
         if (ProxyService.isRunning) _proxyState.value = ProxyState.Running
+
+        _customKernelExists.value =
+            File(getApplication<Application>().filesDir, "custom_vkturn").exists()
     }
 
     // ── SSH ────────────────────────────────────────────────────────────────
@@ -111,9 +131,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 config.ip, config.port, config.username, config.password, "echo OK"
             )
             if (result.trim() == "OK") {
+                HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
                 _sshState.value = SshConnectionState.Connected(config.ip)
                 checkServerState(config)
             } else {
+                HapticUtil.perform(getApplication(), HapticUtil.Pattern.ERROR)
                 _sshState.value = SshConnectionState.Error(result.removePrefix("ERROR: "))
             }
         }
@@ -141,11 +163,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _serverState.value = if (result.startsWith("ERROR")) {
                 ServerState.Error(result.removePrefix("ERROR: "))
             } else {
-                ServerState.Known(
+                val known = ServerState.Known(
                     installed = result.contains("INSTALLED:YES"),
                     running = result.contains("RUNNING:YES")
                 )
+                if (known.installed) fetchServerVersion(cfg)
+                known
             }
+        }
+    }
+
+    fun fetchServerVersion(config: SshConfig? = null) {
+        val cfg = config ?: sshConfig.value
+        if (cfg.ip.isEmpty()) return
+        val cmd = """
+            cd /opt/vk-turn 2>/dev/null &&
+            ARCH=${'$'}(uname -m);
+            if [ "${'$'}ARCH" = "x86_64" ]; then BIN="./server-linux-amd64"; else BIN="./server-linux-arm64"; fi;
+            timeout 2 ${'$'}BIN -version 2>&1 | head -1
+        """.trimIndent()
+        viewModelScope.launch {
+            val out = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, cmd)
+            _serverVersion.value = out.trim().takeIf { it.isNotEmpty() && !it.startsWith("ERROR") }
         }
     }
 
@@ -234,7 +273,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             // Write to legacy SharedPreferences so ProxyService can read them
-            context.getSharedPreferences("ProxyPrefs", Context.MODE_PRIVATE).edit().apply {
+            context.getSharedPreferences("ProxyPrefs", Context.MODE_PRIVATE).edit {
                 putString("peer", cfg.serverAddress)
                 putString("link", cfg.vkLink)
                 putString("n", cfg.threads.toString())
@@ -243,7 +282,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 putString("listen", cfg.localPort)
                 putBoolean("isRaw", cfg.isRawMode)
                 putString("rawCmd", cfg.rawCommand)
-            }.apply()
+            }
 
             ProxyService.logBuffer.clear()
             context.startForegroundService(Intent(context, ProxyService::class.java))
@@ -254,8 +293,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             when {
                 !ProxyService.isRunning ->
                     setErrorWithAutoReset("Прокси не запустился")
-                logText.contains("ошибка") || logText.contains("error") || logText.contains("fatal") ->
+                logText.contains("panic") || logText.contains("fatal") ||
+                logText.contains("rate limit") || logText.contains("критическая") -> {
+                    context.stopService(Intent(context, ProxyService::class.java))
                     setErrorWithAutoReset("Ошибка запуска — проверьте настройки")
+                }
                 else ->
                     _proxyState.value = ProxyState.Running
             }
@@ -263,6 +305,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun setErrorWithAutoReset(message: String) {
+        HapticUtil.perform(getApplication(), HapticUtil.Pattern.ERROR)
         _proxyState.value = ProxyState.Error(message)
         viewModelScope.launch {
             delay(3500)
@@ -294,9 +337,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _logs.value = emptyList()
     }
 
+    // ── Custom kernel ──────────────────────────────────────────────────────
+
+    fun setCustomKernel(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val app = getApplication<Application>()
+                val dest = File(app.filesDir, "custom_vkturn")
+                app.contentResolver.openInputStream(uri)?.use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                dest.setExecutable(true)
+                withContext(Dispatchers.Main) { _customKernelExists.value = true }
+                ProxyService.addLog("Кастомное ядро установлено: ${dest.length() / 1024} KB")
+            } catch (e: Exception) {
+                ProxyService.addLog("Ошибка установки ядра: ${e.message}")
+            }
+        }
+    }
+
+    fun clearCustomKernel() {
+        File(getApplication<Application>().filesDir, "custom_vkturn").delete()
+        _customKernelExists.value = false
+        ProxyService.addLog("Кастомное ядро удалено, используется встроенное")
+    }
+
     override fun onCleared() {
         super.onCleared()
         ProxyService.onLogReceived = null
+        ProxyService.onProxyFailed = null
         sshManager.disconnect()
     }
 }

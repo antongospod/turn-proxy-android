@@ -70,8 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    // Явно пиним M3 1.4.0-alpha10+ для WavyProgressIndicator и ExperimentalMaterial3ExpressiveApi
-    implementation("androidx.compose.material3:material3:1.4.0-alpha10")
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -2,14 +2,18 @@
 
 package com.freeturn.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -18,11 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -56,6 +63,13 @@ fun ClientSetupScreen(
     onFinish: (() -> Unit)? = null
 ) {
     val saved by viewModel.clientConfig.collectAsStateWithLifecycle()
+    val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
+    val proxyListen by viewModel.proxyListen.collectAsStateWithLifecycle()
+    val customKernelExists by viewModel.customKernelExists.collectAsStateWithLifecycle()
+
+    val kernelPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.setCustomKernel(it) } }
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
     var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
@@ -64,6 +78,14 @@ fun ClientSetupScreen(
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
+
+    // Автозаполнение адреса сервера из SSH-конфига если поле пустое
+    LaunchedEffect(sshConfig.ip, proxyListen) {
+        if (serverAddress.isBlank() && sshConfig.ip.isNotBlank()) {
+            val port = proxyListen.substringAfterLast(":", "56000")
+            serverAddress = "${sshConfig.ip}:$port"
+        }
+    }
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // Работает в обоих режимах — и при онбординге, и как вкладка.
@@ -84,12 +106,14 @@ fun ClientSetupScreen(
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Клиент") })
-        }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -120,7 +144,7 @@ fun ClientSetupScreen(
                 supportingText = { Text("VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)") }
             )
 
-            Divider()
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
             // ── Параметры ─────────────────────────────────────────────────
             Text("Параметры", style = MaterialTheme.typography.titleMedium)
@@ -162,7 +186,7 @@ fun ClientSetupScreen(
                 onCheckedChange = { noDtls = it }
             )
 
-            Divider()
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
             // ── Дополнительно (сворачиваемый) ─────────────────────────────
             Card(
@@ -200,6 +224,55 @@ fun ClientSetupScreen(
                         Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
                     }
                 )
+            }
+
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+
+            // ── Ядро ──────────────────────────────────────────────────────
+            Text("Ядро", style = MaterialTheme.typography.titleMedium)
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (customKernelExists)
+                        MaterialTheme.colorScheme.secondaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (customKernelExists) "Кастомное ядро" else "Встроенное ядро",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            if (customKernelExists) "Загружено из памяти устройства"
+                            else "Из APK (libvkturn.so)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (customKernelExists) {
+                            OutlinedButton(
+                                onClick = { viewModel.clearCustomKernel() },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) { Text("Сбросить") }
+                        }
+                        Button(onClick = { kernelPickerLauncher.launch(arrayOf("*/*")) }) {
+                            Text("Загрузить")
+                        }
+                    }
+                }
             }
 
             // Кнопка «Завершить» — только в онбординг-флоу
