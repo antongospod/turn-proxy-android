@@ -209,18 +209,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _serverState.value = ServerState.Working("Установка vk-turn-proxy...")
 
         val script = """
-            mkdir -p /opt/vk-turn && cd /opt/vk-turn &&
-            pkill -9 -f "server-linux-" 2>/dev/null;
-            ARCH=${'$'}(uname -m);
-            if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
-            URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN";
+            mkdir -p /opt/vk-turn && cd /opt/vk-turn
+            pkill -9 -f "server-linux-" 2>/dev/null; true
+            ARCH=${'$'}(uname -m)
+            if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi
+            URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN"
+            echo "Arch: ${'$'}ARCH | Binary: ${'$'}BIN"
             if command -v curl >/dev/null 2>&1; then
-                curl -fsSL -o "${'$'}BIN" "${'$'}URL"
+                curl -sSL -o "${'$'}BIN" "${'$'}URL" 2>&1 || { echo "curl failed: ${'$'}?"; exit 1; }
             elif command -v wget >/dev/null 2>&1; then
-                wget -qO "${'$'}BIN" "${'$'}URL"
+                wget -O "${'$'}BIN" "${'$'}URL" 2>&1 || { echo "wget failed: ${'$'}?"; exit 1; }
             else
-                echo "ERROR: curl и wget не найдены на сервере"; exit 1
-            fi &&
+                echo "ERROR: curl и wget не найдены"; exit 1
+            fi
+            SIZE=${'$'}(wc -c < "${'$'}BIN" 2>/dev/null || echo 0)
+            echo "Size: ${'$'}SIZE bytes"
+            if [ "${'$'}SIZE" -lt 100000 ]; then echo "ERROR: файл слишком мал (${'$'}SIZE байт)"; cat "${'$'}BIN" 2>/dev/null; exit 1; fi
             chmod +x "${'$'}BIN" && echo "DONE"
         """.trimIndent()
 
@@ -228,9 +232,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
                 knownFingerprint = cfg.fp)
             if (!result.contains("DONE")) {
-                _serverState.value = ServerState.Error(
-                    result.lines().lastOrNull { it.isNotBlank() } ?: "Ошибка установки"
-                )
+                val errorMsg = result.lines()
+                    .filter { it.isNotBlank() }
+                    .takeLast(4)
+                    .joinToString("\n")
+                    .ifBlank { "Нет вывода от команды" }
+                _serverState.value = ServerState.Error(errorMsg)
             } else {
                 delay(500)
                 checkServerState(cfg)
