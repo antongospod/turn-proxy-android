@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import com.freeturn.app.data.AppPreferences
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -20,7 +21,9 @@ import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.runBlocking
 
 class ProxyService : Service() {
 
@@ -80,8 +83,7 @@ class ProxyService : Service() {
     }
 
     private fun startBinaryProcess() {
-        val prefs = getSharedPreferences("ProxyPrefs", Context.MODE_PRIVATE)
-        val isRaw = prefs.getBoolean("isRaw", false)
+        val cfg = runBlocking { AppPreferences(this@ProxyService).clientConfigFlow.first() }
 
         val customBin = File(filesDir, "custom_vkturn")
         val executable = if (customBin.exists()) {
@@ -94,25 +96,19 @@ class ProxyService : Service() {
 
         val cmdArgs = mutableListOf<String>()
 
-        if (isRaw) {
-            val rawCmd = prefs.getString("rawCmd", "") ?: ""
-            val parts = rawCmd.trim().split("\\s+".toRegex())
+        if (cfg.isRawMode) {
+            val parts = cfg.rawCommand.trim().split("\\s+".toRegex())
             cmdArgs.add(executable)
             if (parts.size > 1) cmdArgs.addAll(parts.subList(1, parts.size))
         } else {
-            val peer = prefs.getString("peer", "") ?: ""
-            val link = prefs.getString("link", "") ?: ""
-            val n = prefs.getString("n", "") ?: ""
-            val listen = prefs.getString("listen", "127.0.0.1:9000") ?: ""
-
             cmdArgs.add(executable)
-            cmdArgs.add("-peer"); cmdArgs.add(peer)
-            cmdArgs.add(if (link.contains("yandex")) "-yandex-link" else "-vk-link")
-            cmdArgs.add(link)
-            cmdArgs.add("-listen"); cmdArgs.add(listen)
-            if (n.isNotEmpty()) { cmdArgs.add("-n"); cmdArgs.add(n) }
-            if (prefs.getBoolean("udp", false)) cmdArgs.add("-udp")
-            if (prefs.getBoolean("noDtls", false)) cmdArgs.add("-no-dtls")
+            cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
+            cmdArgs.add(if (cfg.vkLink.contains("yandex")) "-yandex-link" else "-vk-link")
+            cmdArgs.add(cfg.vkLink)
+            cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
+            if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
+            if (cfg.useUdp) cmdArgs.add("-udp")
+            if (cfg.noDtls) cmdArgs.add("-no-dtls")
         }
 
         var exitCode = -1

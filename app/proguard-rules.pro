@@ -1,21 +1,32 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ── Stacktraces ───────────────────────────────────────────────────────────────
+# Сохраняем имена файлов и номера строк для читаемых крэш-репортов
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ── JSch ──────────────────────────────────────────────────────────────────────
+# JSch загружает криптографические алгоритмы через reflection по имени класса.
+# Без этого правила R8 удалит/переименует нужные классы и SSH не будет работать.
+-keep class com.jcraft.jsch.** { *; }
+-dontwarn com.jcraft.jsch.**
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ── Kotlin Coroutines ─────────────────────────────────────────────────────────
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembernames class kotlinx.coroutines.** {
+    volatile <fields>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ── Android Security Crypto (EncryptedSharedPreferences) ──────────────────────
+-keep class androidx.security.crypto.** { *; }
+
+# ── DataStore ─────────────────────────────────────────────────────────────────
+-keep class androidx.datastore.** { *; }
+
+# ── Tink (транзитивная зависимость security-crypto) ───────────────────────────
+# Аннотационные библиотеки не включены в runtime, предупреждения безопасно подавить
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi
+-dontwarn javax.annotation.Nullable
+-dontwarn javax.annotation.concurrent.GuardedBy
