@@ -48,7 +48,9 @@ class SSHManager {
             lastSeenFingerprint = tofu.capturedFingerprint
 
             val channel = tempSession.openChannel("exec") as ChannelExec
-            channel.setCommand(command)
+            // Strip carriage returns: Kotlin string literals in CRLF source files
+            // contain \r which corrupts variable values on the remote Linux shell
+            channel.setCommand(command.replace("\r\n", "\n").replace("\r", "\n"))
             channel.inputStream = null  // не подключать stdin
 
             val inStream = channel.inputStream
