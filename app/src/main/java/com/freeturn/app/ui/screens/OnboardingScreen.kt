@@ -109,7 +109,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "Проксируйте WireGuard и Hysteria‑трафик\nчерез TURN‑серверы VK Calls и Yandex Telemost",
+                    text = "Проксируйте WireGuard и Hysteria‑трафик\nчерез TURN‑серверы VK Calls",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                     textAlign = TextAlign.Center
