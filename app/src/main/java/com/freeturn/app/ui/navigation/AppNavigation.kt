@@ -1,8 +1,13 @@
 package com.freeturn.app.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,46 +22,55 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.screens.ClientSetupScreen
 import com.freeturn.app.ui.screens.HomeScreen
 import com.freeturn.app.ui.screens.OnboardingScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 object Routes {
     const val ONBOARDING = "onboarding"
-    const val SSH_SETUP = "ssh_setup"
+    const val SSH_SETUP = "ssh_setup"              // из настроек/инфо-модалки
+    const val SSH_SETUP_OB = "ssh_setup_ob"        // только в мастере онбординга
     const val SERVER_MANAGEMENT = "server_management"
+    const val SERVER_MANAGEMENT_OB = "server_management_ob" // только в мастере онбординга
     const val CLIENT_SETUP = "client_setup"
     const val HOME = "home"
 }
 
+// Нижнее меню видно только в основном потоке, не во время онбординга
 private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.SERVER_MANAGEMENT, Routes.CLIENT_SETUP)
 
 @Composable
@@ -65,9 +79,7 @@ fun AppNavigation(viewModel: MainViewModel) {
     val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
 
     if (!isInitialized) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        SplashScreen()
         return
     }
 
@@ -115,18 +127,24 @@ fun AppNavigation(viewModel: MainViewModel) {
                 modifier = Modifier.statusBarsPadding() // Добавляем отступ для статус-бара сверху
             ) {
 
+                // ── Онбординг-мастер (без нижнего меню) ──────────────────────────
+
                 composable(Routes.ONBOARDING) {
                     OnboardingScreen(
-                        onSetupServer = { navController.navigate(Routes.SSH_SETUP) },
-                        onSkip = { navController.navigate(Routes.HOME) }
+                        onSetupServer = { navController.navigate(Routes.SSH_SETUP_OB) },
+                        onSkip = {
+                            viewModel.setOnboardingDone()
+                            navController.navigate(Routes.HOME)
+                        }
                     )
                 }
 
-                composable(Routes.SSH_SETUP) {
+                composable(Routes.SSH_SETUP_OB) {
                     SshSetupScreen(
                         viewModel = viewModel,
                         onConnected = {
-                            navController.navigate(Routes.SERVER_MANAGEMENT) {
+                            navController.navigate(Routes.SERVER_MANAGEMENT_OB) {
+                                popUpTo(Routes.SSH_SETUP_OB) { inclusive = true }
                                 launchSingleTop = true
                             }
                         },
@@ -134,11 +152,11 @@ fun AppNavigation(viewModel: MainViewModel) {
                     )
                 }
 
-                composable(Routes.SERVER_MANAGEMENT) {
+                composable(Routes.SERVER_MANAGEMENT_OB) {
                     ServerManagementScreen(
                         viewModel = viewModel,
                         onContinue = {
-                            navController.navigate(Routes.CLIENT_SETUP) {
+                            navController.navigate(Routes.CLIENT_SETUP + "_onboarding") {
                                 launchSingleTop = true
                             }
                         }
@@ -158,6 +176,35 @@ fun AppNavigation(viewModel: MainViewModel) {
                     )
                 }
 
+                // ── Основной поток (с нижним меню) ───────────────────────────────
+
+                composable(Routes.SSH_SETUP) {
+                    SshSetupScreen(
+                        viewModel = viewModel,
+                        onConnected = {
+                            navController.navigate(Routes.SERVER_MANAGEMENT) {
+                                popUpTo(Routes.SSH_SETUP) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Routes.SERVER_MANAGEMENT) {
+                    ServerManagementScreen(
+                        viewModel = viewModel,
+                        onContinue = {
+                            navController.navigate(Routes.CLIENT_SETUP) {
+                                // Убираем SERVER_MANAGEMENT из back stack,
+                                // иначе он остаётся под CLIENT_SETUP и bottom nav ломается
+                                popUpTo(Routes.HOME) { inclusive = false; saveState = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
+
                 composable(Routes.CLIENT_SETUP) {
                     ClientSetupScreen(
                         viewModel = viewModel,
@@ -168,10 +215,74 @@ fun AppNavigation(viewModel: MainViewModel) {
                 composable(Routes.HOME) {
                     HomeScreen(
                         viewModel = viewModel,
-                        onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) }
+                        onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) },
+                        onNavigateToClientSetup = { navController.navigate(Routes.CLIENT_SETUP) }
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SplashScreen() {
+    val context = LocalContext.current
+    val scale = remember { Animatable(0.72f) }
+    val alpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        HapticUtil.perform(context, HapticUtil.Pattern.LAUNCH)
+        launch {
+            scale.animateTo(
+                1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        }
+        alpha.animateTo(1f, animationSpec = tween(380))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF00416A)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.graphicsLayer {
+                this.alpha = alpha.value
+                scaleX = scale.value
+                scaleY = scale.value
+            }
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(112.dp)
+                    .background(Color.White.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(60.dp),
+                    tint = Color.White
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                "FreeTurn",
+                style = MaterialTheme.typography.displaySmall,
+                color = Color.White
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "VK TURN Proxy",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f)
+            )
         }
     }
 }
@@ -228,11 +339,15 @@ private fun FloatingNavItem(
     onNavigate: (String) -> Unit
 ) {
     val selected = currentRoute == route
+    val context = LocalContext.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .clickable { onNavigate(route) }
+            .clickable {
+                if (!selected) HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                onNavigate(route)
+            }
             .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Surface(

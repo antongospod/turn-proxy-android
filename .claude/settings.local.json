@@ -3,7 +3,13 @@
     "allow": [
       "Bash(./gradlew assembleDebug)",
       "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "WebFetch(domain:composables.com)",
+      "WebFetch(domain:cs.android.com)",
+      "WebSearch",
+      "WebFetch(domain:maven.google.com)",
+      "Bash(find /c/Users/hxmelander/.gradle/caches -name material3-android-1.4.0*)"
     ]
   }
 }
