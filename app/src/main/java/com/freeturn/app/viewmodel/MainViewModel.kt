@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
 import java.io.File
 
 // ── SSH connection states ──────────────────────────────────────────────────
@@ -291,17 +290,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _proxyState.value = ProxyState.Starting
 
         viewModelScope.launch {
-            // Write to legacy SharedPreferences so ProxyService can read them
-            context.getSharedPreferences("ProxyPrefs", Context.MODE_PRIVATE).edit {
-                putString("peer", cfg.serverAddress)
-                putString("link", cfg.vkLink)
-                putString("n", cfg.threads.toString())
-                putBoolean("udp", cfg.useUdp)
-                putBoolean("noDtls", cfg.noDtls)
-                putString("listen", cfg.localPort)
-                putBoolean("isRaw", cfg.isRawMode)
-                putString("rawCmd", cfg.rawCommand)
-            }
+            // Сохраняем актуальный конфиг в DataStore — ProxyService читает его напрямую
+            prefs.saveClientConfig(cfg)
 
             ProxyService.logs.value = emptyList()
             context.startForegroundService(Intent(context, ProxyService::class.java))
