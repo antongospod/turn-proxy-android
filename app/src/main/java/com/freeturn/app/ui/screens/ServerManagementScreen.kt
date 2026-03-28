@@ -45,8 +45,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.StatusGreen
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ServerState
@@ -67,6 +69,7 @@ fun ServerManagementScreen(
     var proxyListen by rememberSaveable(savedListen) { mutableStateOf(savedListen) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
 
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val isConnected = sshState is SshConnectionState.Connected
     val isWorking = serverState is ServerState.Working || serverState is ServerState.Checking
@@ -158,6 +161,7 @@ fun ServerManagementScreen(
             // Action buttons
             FilledTonalButton(
                 onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     viewModel.saveProxyServerConfig(proxyListen, proxyConnect)
                     viewModel.installServer()
                 },
@@ -174,6 +178,7 @@ fun ServerManagementScreen(
 
             Button(
                 onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     viewModel.saveProxyServerConfig(proxyListen, proxyConnect)
                     viewModel.startServer()
                 },
@@ -190,7 +195,10 @@ fun ServerManagementScreen(
             }
 
             OutlinedButton(
-                onClick = { viewModel.stopServer() },
+                onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.stopServer()
+                },
                 enabled = isConnected && !isWorking && serverKnown?.running == true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -208,7 +216,10 @@ fun ServerManagementScreen(
             if (serverKnown?.running == true) {
                 Spacer(Modifier.height(4.dp))
                 Button(
-                    onClick = onContinue,
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        onContinue()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

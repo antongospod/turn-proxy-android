@@ -40,14 +40,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 
@@ -67,6 +70,8 @@ fun ClientSetupScreen(
     val proxyListen by viewModel.proxyListen.collectAsStateWithLifecycle()
     val customKernelExists by viewModel.customKernelExists.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
+
     val kernelPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { viewModel.setCustomKernel(it) } }
@@ -78,6 +83,7 @@ fun ClientSetupScreen(
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    var lastSliderInt by remember { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {
@@ -165,7 +171,14 @@ fun ClientSetupScreen(
                 }
                 Slider(
                     value = threads,
-                    onValueChange = { threads = it },
+                    onValueChange = {
+                        val newInt = it.toInt()
+                        if (newInt != lastSliderInt) {
+                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                            lastSliderInt = newInt
+                        }
+                        threads = it
+                    },
                     valueRange = 1f..8f,
                     steps = 6,
                     modifier = Modifier.fillMaxWidth()
@@ -176,14 +189,20 @@ fun ClientSetupScreen(
                 label = "UDP-режим",
                 description = "Снижает задержки и повышает стабильность",
                 checked = useUdp,
-                onCheckedChange = { useUdp = it }
+                onCheckedChange = {
+                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                    useUdp = it
+                }
             )
 
             SwitchRow(
                 label = "Без DTLS-шифрования",
                 description = "Может ускорить соединение, повышает риск блокировки",
                 checked = noDtls,
-                onCheckedChange = { noDtls = it }
+                onCheckedChange = {
+                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                    noDtls = it
+                }
             )
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
@@ -194,7 +213,10 @@ fun ClientSetupScreen(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
-                onClick = { showAdvanced = !showAdvanced }
+                onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                    showAdvanced = !showAdvanced
+                }
             ) {
                 Row(
                     modifier = Modifier
@@ -262,13 +284,19 @@ fun ClientSetupScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (customKernelExists) {
                             OutlinedButton(
-                                onClick = { viewModel.clearCustomKernel() },
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    viewModel.clearCustomKernel()
+                                },
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.error
                                 )
                             ) { Text("Сбросить") }
                         }
-                        Button(onClick = { kernelPickerLauncher.launch(arrayOf("*/*")) }) {
+                        Button(onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            kernelPickerLauncher.launch(arrayOf("*/*"))
+                        }) {
                             Text("Загрузить")
                         }
                     }

@@ -48,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.SshConfig
+import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
 
@@ -82,13 +84,17 @@ fun SshSetupScreen(
     }
 
     val isConnecting = sshState is SshConnectionState.Connecting
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Подключение к серверу") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                        onBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
@@ -156,6 +162,7 @@ private fun FormSection(
     sshState: SshConnectionState,
     onConnect: () -> Unit
 ) {
+    val context = LocalContext.current
     Text("Данные сервера", style = MaterialTheme.typography.titleMedium)
 
     OutlinedTextField(
@@ -205,9 +212,17 @@ private fun FormSection(
             onDismissRequest = { onAuthDropdownChange(false) }
         ) {
             DropdownMenuItem(text = { Text("Пароль") },
-                onClick = { onAuthTypeChange("PASSWORD"); onAuthDropdownChange(false) })
+                onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                    onAuthTypeChange("PASSWORD")
+                    onAuthDropdownChange(false)
+                })
             DropdownMenuItem(text = { Text("Приватный ключ") },
-                onClick = { onAuthTypeChange("SSH_KEY"); onAuthDropdownChange(false) })
+                onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                    onAuthTypeChange("SSH_KEY")
+                    onAuthDropdownChange(false)
+                })
         }
     }
 
@@ -220,7 +235,10 @@ private fun FormSection(
             singleLine = true,
             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-                IconButton(onClick = onTogglePassword) {
+                IconButton(onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                    onTogglePassword()
+                }) {
                     Icon(
                         if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                         contentDescription = null
@@ -259,7 +277,10 @@ private fun FormSection(
     }
 
     Button(
-        onClick = onConnect,
+        onClick = {
+            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+            onConnect()
+        },
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),

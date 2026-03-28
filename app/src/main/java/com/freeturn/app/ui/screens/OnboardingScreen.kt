@@ -37,14 +37,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.freeturn.app.ui.HapticUtil
 
 @Composable
 fun OnboardingScreen(
     onSetupServer: () -> Unit,
     onSkip: () -> Unit
 ) {
+    val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "icon_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -147,7 +150,10 @@ fun OnboardingScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
-                    onClick = onSetupServer,
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        onSetupServer()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -161,7 +167,10 @@ fun OnboardingScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                TextButton(onClick = onSkip) {
+                TextButton(onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                    onSkip()
+                }) {
                     Text("Пропустить настройки")
                 }
 
