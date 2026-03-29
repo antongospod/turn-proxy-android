@@ -8,7 +8,6 @@ import com.jcraft.jsch.Session
 import com.jcraft.jsch.UserInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.concurrent.thread
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.Properties
@@ -48,22 +47,18 @@ class SSHManager {
             lastSeenFingerprint = tofu.capturedFingerprint
 
             val channel = tempSession.openChannel("exec") as ChannelExec
-            // Strip carriage returns: Kotlin string literals in CRLF source files
-            // contain \r which corrupts variable values on the remote Linux shell
-            channel.setCommand(command.replace("\r\n", "\n").replace("\r", "\n"))
-            channel.inputStream = null  // не подключать stdin
 
+            // "exec 2>&1" merges stderr into stdout at shell level — no separate thread needed.
+            // Also strip \r: Kotlin CRLF source files embed carriage returns into string literals
+            // which corrupts variable values on the remote Linux shell.
+            val sanitized = command.replace("\r\n", "\n").replace("\r", "\n")
+            channel.setCommand("exec 2>&1\n$sanitized")
+
+            // Получаем stdout-поток ДО connect() — после уже нельзя
             val inStream = channel.inputStream
-            val errStream = channel.errStream
             channel.connect()
 
-            // Читаем stderr в отдельном потоке чтобы не было дедлока
-            val errBuilder = StringBuilder()
-            val errThread = thread {
-                errStream.bufferedReader().forEachLine { errBuilder.appendLine(it) }
-            }
-
-            val stdout = inStream.bufferedReader().use { reader ->
+            val output = inStream.bufferedReader().use { reader ->
                 buildString {
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
@@ -71,17 +66,8 @@ class SSHManager {
                     }
                 }
             }
-            errThread.join(3_000)
             channel.disconnect()
-
-            val stderr = errBuilder.toString().trim()
-            buildString {
-                append(stdout.trim())
-                if (stderr.isNotEmpty()) {
-                    if (stdout.isNotBlank()) append("\n")
-                    append(stderr)
-                }
-            }
+            output.trim()
         } catch (e: Exception) {
             // Если отпечаток изменился — конкретное сообщение об угрозе
             val isMitm = tofu.capturedFingerprint != null

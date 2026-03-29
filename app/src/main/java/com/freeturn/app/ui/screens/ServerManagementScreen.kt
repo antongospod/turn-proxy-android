@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,13 +22,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -38,6 +42,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.ui.HapticUtil
@@ -65,6 +71,7 @@ fun ServerManagementScreen(
     val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
     val savedListen by viewModel.proxyListen.collectAsStateWithLifecycle()
     val savedConnect by viewModel.proxyConnect.collectAsStateWithLifecycle()
+    val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
 
     var proxyListen by rememberSaveable(savedListen) { mutableStateOf(savedListen) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
@@ -228,6 +235,74 @@ fun ServerManagementScreen(
                     Text("Продолжить настройку клиента")
                     Spacer(Modifier.width(8.dp))
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+                }
+            }
+
+            // ── SSH-лог (вывод всех команд) ────────────────────────────────
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("SSH-лог", style = MaterialTheme.typography.titleMedium)
+                        IconButton(
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                viewModel.fetchServerLogs()
+                            },
+                            enabled = isConnected
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Запросить server.log", modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    if (sshLog.isEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Вывод SSH-команд появится здесь",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    } else {
+                        Spacer(Modifier.height(12.dp))
+                        val scrollState = rememberScrollState()
+                        LaunchedEffect(sshLog.size) {
+                            scrollState.animateScrollTo(scrollState.maxValue)
+                        }
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 400.dp)
+                                    .verticalScroll(scrollState)
+                                    .padding(10.dp)
+                            ) {
+                                sshLog.forEach { line ->
+                                    val isHeader = line.startsWith("===")
+                                    val isError = line.contains("ERROR", ignoreCase = true) ||
+                                                  line.contains("error", ignoreCase = true) ||
+                                                  line.contains("failed", ignoreCase = true)
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = FontFamily.Monospace
+                                        ),
+                                        color = when {
+                                            isHeader -> MaterialTheme.colorScheme.primary
+                                            isError  -> MaterialTheme.colorScheme.error
+                                            else     -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

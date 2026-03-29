@@ -73,6 +73,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _serverVersion = MutableStateFlow<String?>(null)
     val serverVersion: StateFlow<String?> = _serverVersion.asStateFlow()
 
+    private val _serverLogs = MutableStateFlow<String?>(null)
+    val serverLogs: StateFlow<String?> = _serverLogs.asStateFlow()
+
+    // Накопительный лог всех SSH-операций (команда + вывод)
+    private val _sshLog = MutableStateFlow<List<String>>(emptyList())
+    val sshLog: StateFlow<List<String>> = _sshLog.asStateFlow()
+
+    private fun appendSshLog(vararg lines: String) {
+        _sshLog.value = (_sshLog.value + lines).takeLast(500)
+    }
+
+    private fun logCommand(target: String, cmd: String) {
+        appendSshLog("  ssh $target")
+        cmd.lines().filter { it.isNotBlank() }.forEach { appendSshLog("  \$ $it") }
+        appendSshLog("  ---")
+    }
+
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
 
@@ -142,10 +159,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(300)
             _sshState.value = SshConnectionState.Connecting("Проверка SSH...")
 
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== Подключение [$ts] ===")
+            logCommand("${config.username}@${config.ip}:${config.port}", "echo OK")
             val result = sshManager.executeSilentCommand(
                 config.ip, config.port, config.username, config.password, "echo OK",
                 knownFingerprint = config.fp
             )
+            appendSshLog(result.trim())
             if (result.trim() == "OK") {
                 // При первом подключении сохраняем отпечаток хоста
                 val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
@@ -166,8 +187,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reconnectSsh() {
-        val cfg = activeSshConfig ?: sshConfig.value
-        if (cfg.ip.isNotEmpty()) connectSsh(cfg)
+        // sshConfig.value может быть пустым если HomeScreen не подписывается на flow —
+        // в таком случае читаем конфиг напрямую из DataStore
+        viewModelScope.launch {
+            val cfg = activeSshConfig
+                ?: sshConfig.value.takeIf { it.ip.isNotEmpty() }
+                ?: prefs.sshConfigFlow.first()
+            if (cfg.ip.isNotEmpty()) connectSsh(cfg)
+        }
     }
 
     // ── Server management ──────────────────────────────────────────────────
@@ -183,8 +210,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== Проверка состояния [$ts] ===")
+            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", checkCmd)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, checkCmd,
                 knownFingerprint = cfg.fp)
+            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             _serverState.value = if (result.startsWith("ERROR")) {
                 ServerState.Error(result.removePrefix("ERROR: "))
             } else {
@@ -221,7 +252,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val script = """
             mkdir -p /opt/vk-turn && cd /opt/vk-turn
-            pkill -9 -f "server-linux-" 2>/dev/null; true
+            if [ -f /opt/vk-turn/proxy.pid ]; then kill -9 ${'$'}(cat /opt/vk-turn/proxy.pid) 2>/dev/null; rm -f /opt/vk-turn/proxy.pid; fi
             ARCH=${'$'}(uname -m)
             if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi
             URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN"
@@ -240,14 +271,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== Установка [$ts] ===")
+            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
                 knownFingerprint = cfg.fp)
+            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             if (!result.contains("DONE")) {
                 val errorMsg = result.lines()
                     .filter { it.isNotBlank() }
                     .takeLast(4)
                     .joinToString("\n")
-                    .ifBlank { "Нет вывода от команды" }
+                    .ifBlank { "Нет вывода от команды — см. SSH-лог" }
                 _serverState.value = ServerState.Error(errorMsg)
             } else {
                 delay(500)
@@ -272,8 +307,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== Запуск [$ts] ===")
+            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
+            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
                 knownFingerprint = cfg.fp)
+            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             delay(2000)
             checkServerState(cfg)
         }
@@ -287,17 +326,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val script = """
             cd /opt/vk-turn &&
             if [ -f proxy.pid ]; then kill -9 ${'$'}(cat proxy.pid) 2>/dev/null; rm -f proxy.pid; fi;
-            pkill -9 -f "server-linux-" 2>/dev/null;
+            pkill -9 -f "[s]erver-linux-" 2>/dev/null;
             echo "STOPPED"
         """.trimIndent()
 
         viewModelScope.launch {
-            sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== Остановка [$ts] ===")
+            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
+            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
                 knownFingerprint = cfg.fp)
+            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             delay(2000)
             checkServerState(cfg)
         }
     }
+
+    fun fetchServerLogs() {
+        val cfg = activeSshConfig ?: sshConfig.value
+        if (cfg.ip.isEmpty()) return
+        _serverLogs.value = "…"
+        val logCmd = "tail -n 80 /opt/vk-turn/server.log 2>/dev/null || echo '(лог пуст)'"
+        viewModelScope.launch {
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            appendSshLog("", "=== server.log [$ts] ===")
+            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", logCmd)
+            val out = sshManager.executeSilentCommand(
+                cfg.ip, cfg.port, cfg.username, cfg.password, logCmd,
+                knownFingerprint = cfg.fp
+            )
+            out.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            _serverLogs.value = out.trim().ifEmpty { "(лог пуст)" }
+        }
+    }
+
+    fun clearSshLog() { _sshLog.value = emptyList() }
 
     // ── Local proxy ────────────────────────────────────────────────────────
 
