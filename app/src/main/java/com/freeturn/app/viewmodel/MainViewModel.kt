@@ -86,8 +86,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _sshLog = MutableStateFlow<List<String>>(emptyList())
     val sshLog: StateFlow<List<String>> = _sshLog.asStateFlow()
 
+    // P3-10: ArrayDeque — O(1) вместо O(n) list concatenation
+    private val sshLogBuffer = ArrayDeque<String>(500)
     private fun appendSshLog(vararg lines: String) {
-        _sshLog.value = (_sshLog.value + lines).takeLast(500)
+        lines.forEach { sshLogBuffer.addLast(it) }
+        while (sshLogBuffer.size > 500) sshLogBuffer.removeFirst()
+        _sshLog.value = sshLogBuffer.toList()
     }
 
     private fun logCommand(target: String, cmd: String) {
@@ -173,8 +177,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             prefs.saveSshConfig(config)
         }
-        sshManager.disconnect()
-        // P2-6: сразу начинаем реальное подключение, без фейковых delay(400)/delay(300)
         _sshState.value = SshConnectionState.Connecting()
 
         viewModelScope.launch {
@@ -371,7 +373,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun clearSshLog() { _sshLog.value = emptyList() }
+    fun clearSshLog() {
+        sshLogBuffer.clear()
+        _sshLog.value = emptyList()
+    }
 
     // ── Local proxy ────────────────────────────────────────────────────────
 
@@ -395,7 +400,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             prefs.saveClientConfig(cfg)
 
-            ProxyService.logs.value = emptyList()
+            ProxyService.clearLogs()
             ProxyService.startupResult.value = null
             context.startForegroundService(Intent(context, ProxyService::class.java))
 
@@ -447,7 +452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearLogs() {
-        ProxyService.logs.value = emptyList()
+        ProxyService.clearLogs()
     }
 
     // ── Custom kernel ──────────────────────────────────────────────────────
@@ -475,8 +480,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ProxyService.addLog("Кастомное ядро удалено, используется встроенное")
     }
 
+    fun resetAllSettings(context: Context) {
+        viewModelScope.launch {
+            if (ProxyService.isRunning.value) {
+                context.stopService(Intent(context, ProxyService::class.java))
+            }
+            prefs.resetAll()
+            activeSshConfig = null
+            _sshState.value = SshConnectionState.Disconnected
+            _serverState.value = ServerState.Unknown
+            _serverVersion.value = null
+            _serverLogs.value = null
+            _sshLog.value = emptyList()
+            sshLogBuffer.clear()
+            _proxyState.value = ProxyState.Idle
+            _customKernelExists.value = false
+            ProxyService.clearLogs()
+
+            val intent = (context as? android.app.Activity)?.intent
+                ?: Intent(context, com.freeturn.app.MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            context.startActivity(intent)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        sshManager.disconnect()
     }
 }

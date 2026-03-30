@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +35,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -70,6 +76,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
@@ -277,12 +284,15 @@ fun HomeScreen(
     }
 
     if (showBottomSheet.value) {
+        val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet.value = false },
-            sheetState = bottomSheetState
+            sheetState = bottomSheetState,
+            containerColor = sheetColor
         ) {
             InfoBottomSheet(
                 viewModel = viewModel,
+                containerColor = sheetColor,
                 onNavigateToSshSetup = {
                     showBottomSheet.value = false
                     onNavigateToSshSetup()
@@ -357,6 +367,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 @Composable
 private fun InfoBottomSheet(
     viewModel: MainViewModel,
+    containerColor: Color,
     onNavigateToSshSetup: () -> Unit
 ) {
     val context = LocalContext.current
@@ -364,6 +375,7 @@ private fun InfoBottomSheet(
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
     val logs by viewModel.logs.collectAsStateWithLifecycle()
     var showLogs by rememberSaveable { mutableStateOf(false) }
+    var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     val appVersion = remember {
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—" }
@@ -378,8 +390,10 @@ private fun InfoBottomSheet(
     ) {
         // ── SSH ────────────────────────────────────────────────────────────
         val isConnected = sshState is SshConnectionState.Connected
+        val listColors = ListItemDefaults.colors(containerColor = containerColor)
         ListItem(
             headlineContent = { Text("Соединение", style = MaterialTheme.typography.titleSmall) },
+            colors = listColors,
             trailingContent = {
                 TextButton(onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -391,6 +405,7 @@ private fun InfoBottomSheet(
 
         ListItem(
             headlineContent = { Text("SSH-статус") },
+            colors = listColors,
             supportingContent = {
                 Text(
                     when (sshState) {
@@ -429,6 +444,7 @@ private fun InfoBottomSheet(
         // ── Логи ──────────────────────────────────────────────────────────
         ListItem(
             headlineContent = { Text("Логи", style = MaterialTheme.typography.titleSmall) },
+            colors = listColors,
             trailingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
@@ -468,11 +484,13 @@ private fun InfoBottomSheet(
 
         // ── О приложении ───────────────────────────────────────────────────
         ListItem(
-            headlineContent = { Text("О приложении", style = MaterialTheme.typography.titleSmall) }
+            headlineContent = { Text("О приложении", style = MaterialTheme.typography.titleSmall) },
+            colors = listColors
         )
 
         ListItem(
             headlineContent = { Text("FreeTurn") },
+            colors = listColors,
             supportingContent = { Text("Версия $appVersion") }
         )
 
@@ -480,6 +498,7 @@ private fun InfoBottomSheet(
             title = "Android-клиент",
             subtitle = "Fork MYSOREZ/vk-turn-proxy-android",
             url = "https://github.com/MYSOREZ/vk-turn-proxy-android",
+            containerColor = containerColor,
             onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
             onOpen = { uriHandler.openUri(it) }
         )
@@ -488,9 +507,52 @@ private fun InfoBottomSheet(
             title = "Прокси-ядро",
             subtitle = "cacggghp/vk-turn-proxy",
             url = "https://github.com/cacggghp/vk-turn-proxy",
+            containerColor = containerColor,
             onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
             onOpen = { uriHandler.openUri(it) }
         )
+
+        HorizontalDivider()
+
+        // ── Сброс ─────────────────────────────────────────────────────────
+        ListItem(
+            headlineContent = { Text("Сбросить настройки") },
+            colors = listColors,
+            supportingContent = { Text("SSH, клиент, прокси и кастомное ядро") },
+            trailingContent = {
+                TextButton(
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        showResetDialog = true
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Сбросить") }
+            }
+        )
+
+        if (showResetDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog = false },
+                title = { Text("Сбросить все настройки?") },
+                text = { Text("Все настройки будут удалены, прокси остановлен. Приложение перезапустится.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showResetDialog = false
+                            viewModel.resetAllSettings(context)
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Сбросить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
+                }
+            )
+        }
     }
 }
 
@@ -499,11 +561,13 @@ private fun RepoLinkItem(
     title: String,
     subtitle: String,
     url: String,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
     onHaptic: () -> Unit,
     onOpen: (String) -> Unit
 ) {
     ListItem(
         headlineContent = { Text(title) },
+        colors = ListItemDefaults.colors(containerColor = containerColor),
         supportingContent = {
             Text(
                 subtitle,
@@ -528,29 +592,29 @@ private fun RepoLinkItem(
 
 @Composable
 private fun LogsPanel(logs: List<String>, modifier: Modifier = Modifier) {
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
     LaunchedEffect(logs.size) {
-        scrollState.animateScrollTo(scrollState.maxValue)
+        if (logs.isNotEmpty()) listState.animateScrollToItem(logs.lastIndex)
     }
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(
-            modifier = Modifier
-                .heightIn(max = 320.dp)
-                .verticalScroll(scrollState)
-                .padding(vertical = 8.dp)
-        ) {
-            if (logs.isEmpty()) {
-                Text(
-                    "Нет логов",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-            } else {
-                logs.forEachIndexed { index, line ->
+        if (logs.isEmpty()) {
+            Text(
+                "Нет логов",
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .heightIn(max = 320.dp)
+                    .padding(vertical = 8.dp)
+            ) {
+                itemsIndexed(logs) { index, line ->
                     LogLine(line = line, isEven = index % 2 == 0)
                 }
             }

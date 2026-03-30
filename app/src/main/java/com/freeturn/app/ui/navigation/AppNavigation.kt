@@ -67,6 +67,7 @@ object Routes {
     const val SERVER_MANAGEMENT = "server_management"
     const val SERVER_MANAGEMENT_OB = "server_management_ob" // только в мастере онбординга
     const val CLIENT_SETUP = "client_setup"
+    const val CLIENT_SETUP_OB = "client_setup_onboarding"
     const val HOME = "home"
 }
 
@@ -156,14 +157,14 @@ fun AppNavigation(viewModel: MainViewModel) {
                     ServerManagementScreen(
                         viewModel = viewModel,
                         onContinue = {
-                            navController.navigate(Routes.CLIENT_SETUP + "_onboarding") {
+                            navController.navigate(Routes.CLIENT_SETUP_OB) {
                                 launchSingleTop = true
                             }
                         }
                     )
                 }
 
-                composable(Routes.CLIENT_SETUP + "_onboarding") {
+                composable(Routes.CLIENT_SETUP_OB) {
                     ClientSetupScreen(
                         viewModel = viewModel,
                         showFinishButton = true,

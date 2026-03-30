@@ -94,9 +94,6 @@ class SSHManager {
         }
     }
 
-    fun disconnect() {
-        // Все сессии в executeSilentCommand временные и закрываются в finally-блоке
-    }
 }
 
 /**

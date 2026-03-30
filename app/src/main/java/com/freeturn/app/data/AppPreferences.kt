@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import androidx.core.content.edit
 
@@ -169,6 +170,15 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs ->
             prefs[PROXY_LISTEN] = listen
             prefs[PROXY_CONNECT] = connect
+        }
+    }
+
+    /** Полный сброс: DataStore + EncryptedSharedPreferences + кастомный бинарник */
+    suspend fun resetAll() {
+        context.dataStore.edit { it.clear() }
+        withContext(Dispatchers.IO) {
+            encryptedPrefs.edit { clear() }
+            File(context.filesDir, "custom_vkturn").delete()
         }
     }
 }

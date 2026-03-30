@@ -27,7 +27,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed class StartupResult {
@@ -39,13 +38,28 @@ class ProxyService : Service() {
 
     companion object {
         const val MAX_RESTARTS = 8
+        private const val MAX_LOG_LINES = 200
         val isRunning = MutableStateFlow(false)
         val logs = MutableStateFlow<List<String>>(emptyList())
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val startupResult = MutableStateFlow<StartupResult?>(null)
 
+        // P3-3: ArrayDeque — O(1) addLast/removeFirst вместо O(n) list concatenation
+        private val logBuffer = ArrayDeque<String>(MAX_LOG_LINES)
+
         fun addLog(msg: String) {
-            logs.update { (it + msg).takeLast(200) }
+            synchronized(logBuffer) {
+                logBuffer.addLast(msg)
+                while (logBuffer.size > MAX_LOG_LINES) logBuffer.removeFirst()
+                logs.value = logBuffer.toList()
+            }
+        }
+
+        fun clearLogs() {
+            synchronized(logBuffer) {
+                logBuffer.clear()
+                logs.value = emptyList()
+            }
         }
     }
 
