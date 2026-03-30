@@ -371,13 +371,13 @@ if (showResetDialog) {
 
 | # | Файл | Проблема | Действие |
 |---|---|---|---|
-| P2-1 | `MainViewModel.kt:393` | `delay(2500)` + эвристика для определения старта | Добавить dedicated `StateFlow<StartupResult>` в `ProxyService` |
-| P2-2 | `MainViewModel.kt:162-335` | Дублирование `SimpleDateFormat` × 5, дублирование SSH-паттерна × 4 | Вынести в `timestamp()` и `runSshOperation()` |
+| ✅ P2-1 | `MainViewModel.kt:393` | `delay(2500)` + эвристика для определения старта | Добавить dedicated `StateFlow<StartupResult>` в `ProxyService` |
+| ✅ P2-2 | `MainViewModel.kt:162-335` | Дублирование `SimpleDateFormat` × 5, дублирование SSH-паттерна × 4 | Вынести в `timestamp()` и `runSshOperation()` |
 | ✅ P2-3 | `ProxyService.kt:86,41` | `AppPreferences(this@ProxyService)` без `applicationContext` | Заменить на `applicationContext` |
-| P2-4 | `MainViewModel.kt:203` | `_serverState` зависает в `Checking` при пустом IP | Добавить `_serverState.value = ServerState.Unknown` перед `return` |
+| ✅ P2-4 | `MainViewModel.kt:203` | `_serverState` зависает в `Checking` при пустом IP | Добавить `_serverState.value = ServerState.Unknown` перед `return` |
 | ✅ P2-5 | `ProxyService.kt:139,207,239` | `destroy()` → SIGTERM, нативный процесс может зависнуть | Заменить на `destroyForcibly()` |
-| P2-6 | `MainViewModel.kt:157` | Фейковый прогресс подключения | Убрать `delay(400)`/`delay(300)`, начинать SSH сразу |
-| P2-7 | `AppPreferences.kt` | DataStore не исключён из Android Backup | Добавить в `backup_rules.xml` и `data_extraction_rules.xml` |
+| ✅ P2-6 | `MainViewModel.kt:157` | Фейковый прогресс подключения | Убрать `delay(400)`/`delay(300)`, начинать SSH сразу |
+| ✅ P2-7 | `AppPreferences.kt` | DataStore не исключён из Android Backup | Добавить в `backup_rules.xml` и `data_extraction_rules.xml` |
 
 ### Приоритет 3 — Средние (производительность / качество)
 
@@ -421,12 +421,12 @@ if (showResetDialog) {
   ✅ P2-3  AppPreferences(applicationContext) в ProxyService и AppPreferences
   ✅ P2-5  destroyForcibly() везде
 
-Спринт 3 (архитектура и UX): ← СЛЕДУЮЩИЙ
-  P2-1  Явный сигнал запуска прокси
-  P2-2  Дедупликация кода (timestamp, runSshOperation)
-  P2-4  Фикс зависания serverState
-  P2-6  Убрать фейковый прогресс
-  P2-7  Backup exclusion для DataStore
+Спринт 3 (архитектура и UX): ✅ ГОТОВО
+  ✅ P2-1  StartupResult StateFlow + withTimeoutOrNull(5s) вместо delay(2500)
+  ✅ P2-2  timestamp() + runSshCommand() — убрано 5× SimpleDateFormat и 6× boilerplate
+  ✅ P2-4  serverState → Unknown при пустом IP
+  ✅ P2-6  Убраны delay(400)/delay(300) — SSH начинается сразу
+  ✅ P2-7  DataStore исключён из backup_rules.xml и data_extraction_rules.xml
 
 Спринт 3 (архитектура и UX):
   P2-1  Явный сигнал запуска прокси

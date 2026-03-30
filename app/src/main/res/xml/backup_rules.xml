@@ -3,4 +3,6 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="secure_ssh_prefs.xml"/>
     <exclude domain="sharedpref" path="ProxyPrefs.xml"/>
+    <!-- DataStore содержит SSH IP, порт, конфиг клиента — не бэкапим -->
+    <exclude domain="file" path="datastore/"/>
 </full-backup-content>

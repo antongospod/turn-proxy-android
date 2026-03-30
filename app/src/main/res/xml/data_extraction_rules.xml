@@ -5,9 +5,12 @@
         <exclude domain="sharedpref" path="secure_ssh_prefs.xml"/>
         <!-- Конфиг прокси содержит VK/Yandex ссылку — не бэкапим -->
         <exclude domain="sharedpref" path="ProxyPrefs.xml"/>
+        <!-- DataStore содержит SSH IP, порт, конфиг клиента -->
+        <exclude domain="file" path="datastore/"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="secure_ssh_prefs.xml"/>
         <exclude domain="sharedpref" path="ProxyPrefs.xml"/>
+        <exclude domain="file" path="datastore/"/>
     </device-transfer>
 </data-extraction-rules>

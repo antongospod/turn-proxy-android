@@ -30,6 +30,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+sealed class StartupResult {
+    data object Success : StartupResult()
+    data class Failed(val message: String) : StartupResult()
+}
+
 class ProxyService : Service() {
 
     companion object {
@@ -37,6 +42,7 @@ class ProxyService : Service() {
         val isRunning = MutableStateFlow(false)
         val logs = MutableStateFlow<List<String>>(emptyList())
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val startupResult = MutableStateFlow<StartupResult?>(null)
 
         fun addLog(msg: String) {
             logs.update { (it + msg).takeLast(200) }
@@ -134,6 +140,7 @@ class ProxyService : Service() {
 
         var exitCode = -1
         val startedAt = System.currentTimeMillis()
+        var startupEmitted = false
         try {
             addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -147,6 +154,18 @@ class ProxyService : Service() {
                 while (reader.readLine().also { line = it } != null) {
                     val l = line ?: continue
                     addLog(l)
+
+                    // P2-1: сигнализируем результат запуска по первой строке stdout
+                    if (!startupEmitted) {
+                        val lower = l.lowercase()
+                        if (lower.contains("panic") || lower.contains("fatal") ||
+                            lower.contains("rate limit")) {
+                            startupResult.value = StartupResult.Failed(l)
+                        } else {
+                            startupResult.value = StartupResult.Success
+                        }
+                        startupEmitted = true
+                    }
 
                     // Session Killer: compareAndSet гарантирует что postDelayed вызывается только раз
                     // даже если две quota-ошибки придут одновременно из одного потока чтения
@@ -166,6 +185,10 @@ class ProxyService : Service() {
 
             exitCode = if (proc.waitFor(5, TimeUnit.MINUTES)) proc.exitValue() else -1
             addLog("=== ПРОЦЕСС ОСТАНОВЛЕН (Код: $exitCode) ===")
+            if (!startupEmitted) {
+                startupResult.value = StartupResult.Failed(
+                    "Процесс завершился без вывода (код: $exitCode)")
+            }
 
         } catch (e: Exception) {
             addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
