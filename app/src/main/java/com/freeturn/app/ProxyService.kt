@@ -17,13 +17,18 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 class ProxyService : Service() {
 
@@ -39,18 +44,29 @@ class ProxyService : Service() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
-    @Volatile private var process: Process? = null
-    @Volatile private var userStopped = false
-    @Volatile private var sessionKillScheduled = false
+
+    // P1-1: AtomicReference вместо @Volatile — проверка null + вызов destroy() атомарны
+    private val process = AtomicReference<Process?>(null)
+
+    // P1-1: AtomicBoolean — флаг читается и пишется из разных потоков
+    private val userStopped = AtomicBoolean(false)
+
+    // P1-1: AtomicBoolean — compareAndSet предотвращает двойной postDelayed при параллельных quota-ошибках
+    private val sessionKillScheduled = AtomicBoolean(false)
+
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var networkInitialized = false
     private var restartCount = 0
 
+    // P1-2: CoroutineScope для запуска startBinaryProcess без runBlocking
+    private lateinit var serviceScope: CoroutineScope
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val channel = NotificationChannel("ProxyChannel", "Proxy", NotificationManager.IMPORTANCE_LOW)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
@@ -66,24 +82,29 @@ class ProxyService : Service() {
         startForeground(1, notification)
 
         isRunning.value = true
-        userStopped = false
+        userStopped.set(false)
         restartCount = 0
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
         @Suppress("WakelockTimeout")
-        wakeLock?.acquire() // foreground service сам управляет временем жизни; release() в onDestroy()
+        wakeLock?.acquire()
 
         registerNetworkCallback()
 
         addLog("=== ЗАПУСК ПРОКСИ ===")
-        thread { startBinaryProcess() }
+        // P1-2: запуск через корутину на Dispatchers.IO — никакого runBlocking
+        serviceScope.launch { startBinaryProcess() }
 
         return START_STICKY
     }
 
-    private fun startBinaryProcess() {
-        val cfg = runBlocking { AppPreferences(this@ProxyService).clientConfigFlow.first() }
+    // P1-2: suspend fun — читает DataStore напрямую без runBlocking
+    private suspend fun startBinaryProcess() {
+        if (userStopped.get()) return
+
+        // P2-3: applicationContext вместо this@ProxyService
+        val cfg = AppPreferences(applicationContext).clientConfigFlow.first()
 
         val customBin = File(filesDir, "custom_vkturn")
         val executable = if (customBin.exists()) {
@@ -119,7 +140,7 @@ class ProxyService : Service() {
             val proc = ProcessBuilder(cmdArgs)
                 .redirectErrorStream(true)
                 .start()
-            process = proc
+            process.set(proc)
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                 var line: String?
@@ -127,15 +148,16 @@ class ProxyService : Service() {
                     val l = line ?: continue
                     addLog(l)
 
-                    // Session Killer: обнаружение ошибки квоты → сброс сессии
-                    if (!sessionKillScheduled && isQuotaError(l)) {
-                        sessionKillScheduled = true
+                    // Session Killer: compareAndSet гарантирует что postDelayed вызывается только раз
+                    // даже если две quota-ошибки придут одновременно из одного потока чтения
+                    if (isQuotaError(l) && sessionKillScheduled.compareAndSet(false, true)) {
                         addLog(">>> QUOTA ERROR — сброс сессии через 2с")
                         handler.postDelayed({
-                            sessionKillScheduled = false
-                            if (!userStopped) {
-                                restartCount = 0  // сброс бэкоффа — квота не краш
-                                process?.destroy()
+                            sessionKillScheduled.set(false)
+                            if (!userStopped.get()) {
+                                restartCount = 0
+                                // P2-5: destroyForcibly() — SIGKILL, нативный процесс не игнорирует
+                                process.get()?.destroyForcibly()
                             }
                         }, 2_000)
                     }
@@ -148,9 +170,9 @@ class ProxyService : Service() {
         } catch (e: Exception) {
             addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
         } finally {
-            process = null
+            process.set(null)
             when {
-                userStopped -> {
+                userStopped.get() -> {
                     isRunning.value = false
                     stopSelf()
                 }
@@ -185,7 +207,8 @@ class ProxyService : Service() {
         val delay = baseDelay + jitter
         addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $restartCount/$MAX_RESTARTS) ===")
         handler.postDelayed({
-            if (!userStopped) thread { startBinaryProcess() }
+            // Проверка userStopped + запуск через serviceScope вместо thread {}
+            if (!userStopped.get()) serviceScope.launch { startBinaryProcess() }
         }, delay)
     }
 
@@ -197,14 +220,14 @@ class ProxyService : Service() {
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 if (!networkInitialized) {
-                    // Первый вызов — текущая сеть при регистрации, игнорируем
                     networkInitialized = true
                     return
                 }
-                if (!userStopped && process != null) {
+                if (!userStopped.get() && process.get() != null) {
                     addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
-                    restartCount = 0  // сброс бэкоффа — не краш
-                    process?.destroy()
+                    restartCount = 0
+                    // P2-5: destroyForcibly()
+                    process.get()?.destroyForcibly()
                 }
             }
         }
@@ -231,12 +254,14 @@ class ProxyService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        userStopped = true
+        userStopped.set(true)
         isRunning.value = false
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
         addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
-        process?.destroy()
+        // P2-5: destroyForcibly() вместо destroy()
+        process.get()?.destroyForcibly()
+        serviceScope.cancel()
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }
 }

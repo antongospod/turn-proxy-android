@@ -38,7 +38,10 @@ data class ClientConfig(
     val rawCommand: String = ""
 )
 
-class AppPreferences(private val context: Context) {
+// P2-3 / P3-6: всегда используем applicationContext, чтобы lazy-init encryptedPrefs
+// не мог сработать на уничтоженном контексте (например Service после onDestroy)
+class AppPreferences(context: Context) {
+    private val context = context.applicationContext
 
     companion object {
         val SSH_IP = stringPreferencesKey("ssh_ip")
