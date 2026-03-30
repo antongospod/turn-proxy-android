@@ -84,7 +84,7 @@ fun ClientSetupScreen(
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
-    var lastSliderInt by remember { mutableIntStateOf(saved.threads) }
+    var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {

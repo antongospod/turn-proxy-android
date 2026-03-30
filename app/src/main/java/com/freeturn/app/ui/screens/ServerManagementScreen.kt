@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -267,23 +270,23 @@ fun ServerManagementScreen(
                         )
                     } else {
                         Spacer(Modifier.height(12.dp))
-                        val scrollState = rememberScrollState()
+                        val listState = rememberLazyListState()
                         LaunchedEffect(sshLog.size) {
-                            scrollState.animateScrollTo(scrollState.maxValue)
+                            if (sshLog.isNotEmpty()) listState.animateScrollToItem(sshLog.lastIndex)
                         }
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Column(
+                            LazyColumn(
+                                state = listState,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(max = 400.dp)
-                                    .verticalScroll(scrollState)
                                     .padding(10.dp)
                             ) {
-                                sshLog.forEach { line ->
+                                items(sshLog) { line ->
                                     val isHeader = line.startsWith("===")
                                     val isError = line.contains("ERROR", ignoreCase = true) ||
                                                   line.contains("error", ignoreCase = true) ||
