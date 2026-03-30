@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.ProxyService
 import com.freeturn.app.SSHManager
+import com.freeturn.app.StartupResult
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.data.ClientConfig
@@ -18,10 +19,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 // ── SSH connection states ──────────────────────────────────────────────────
@@ -93,6 +96,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appendSshLog("  ---")
     }
 
+    // P2-2: единый форматтер времени вместо 5 копий SimpleDateFormat
+    private fun timestamp(): String =
+        java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+            .format(java.util.Date())
+
+    // P2-2: обобщённая SSH-операция — логирование + выполнение + вывод в SSH-лог
+    private suspend fun runSshCommand(cfg: SshConfig, label: String, cmd: String): String {
+        appendSshLog("", "=== $label [${timestamp()}] ===")
+        logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", cmd)
+        val result = sshManager.executeSilentCommand(
+            cfg.ip, cfg.port, cfg.username, cfg.password, cmd,
+            knownFingerprint = cfg.fp, sshKey = cfg.key
+        )
+        result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+        return result
+    }
+
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
 
@@ -154,30 +174,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             prefs.saveSshConfig(config)
         }
         sshManager.disconnect()
-        _sshState.value = SshConnectionState.Connecting("Подключение к серверу...")
+        // P2-6: сразу начинаем реальное подключение, без фейковых delay(400)/delay(300)
+        _sshState.value = SshConnectionState.Connecting()
 
         viewModelScope.launch {
-            delay(400)
-            _sshState.value = SshConnectionState.Connecting("Аутентификация...")
-            delay(300)
-            _sshState.value = SshConnectionState.Connecting("Проверка SSH...")
-
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== Подключение [$ts] ===")
-            logCommand("${config.username}@${config.ip}:${config.port}", "echo OK")
-            val result = sshManager.executeSilentCommand(
-                config.ip, config.port, config.username, config.password, "echo OK",
-                knownFingerprint = config.fp, sshKey = config.key
-            )
-            appendSshLog(result.trim())
+            val result = runSshCommand(config, "Подключение", "echo OK")
             if (result.trim() == "OK") {
-                // При первом подключении сохраняем отпечаток хоста
                 val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
                 if (config.hostFingerprint.isEmpty()) {
                     sshManager.lastSeenFingerprint?.let { prefs.saveSshFingerprint(it) }
                 }
-                // Кешируем полный конфиг (включая пароль) в памяти, чтобы
-                // installServer/startServer/stopServer не зависели от EncryptedSharedPreferences
                 activeSshConfig = config.copy(hostFingerprint = fp)
                 HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
                 _sshState.value = SshConnectionState.Connected(config.ip)
@@ -197,8 +203,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reconnectSsh() {
-        // sshConfig.value может быть пустым если HomeScreen не подписывается на flow —
-        // в таком случае читаем конфиг напрямую из DataStore
         viewModelScope.launch {
             val cfg = activeSshConfig
                 ?: sshConfig.value.takeIf { it.ip.isNotEmpty() }
@@ -211,7 +215,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkServerState(config: SshConfig? = null) {
         val cfg = config ?: activeSshConfig ?: sshConfig.value
-        if (cfg.ip.isEmpty()) return
+        // P2-4: сброс в Unknown вместо зависания в Checking при пустом IP
+        if (cfg.ip.isEmpty()) {
+            _serverState.value = ServerState.Unknown
+            return
+        }
         _serverState.value = ServerState.Checking
 
         val checkCmd = """
@@ -220,12 +228,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== Проверка состояния [$ts] ===")
-            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", checkCmd)
-            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, checkCmd,
-                knownFingerprint = cfg.fp, sshKey = cfg.key)
-            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            val result = runSshCommand(cfg, "Проверка состояния", checkCmd)
             _serverState.value = if (result.startsWith("ERROR")) {
                 ServerState.Error(result.removePrefix("ERROR: "))
             } else {
@@ -301,12 +304,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== Установка [$ts] ===")
-            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
-            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp, sshKey = cfg.key)
-            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            val result = runSshCommand(cfg, "Установка", script)
             if (!result.contains("DONE")) {
                 val errorMsg = result.lines()
                     .filter { it.isNotBlank() }
@@ -337,12 +335,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== Запуск [$ts] ===")
-            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
-            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp, sshKey = cfg.key)
-            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            runSshCommand(cfg, "Запуск", script)
             delay(2000)
             checkServerState(cfg)
         }
@@ -361,12 +354,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
 
         viewModelScope.launch {
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== Остановка [$ts] ===")
-            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
-            val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp, sshKey = cfg.key)
-            result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            runSshCommand(cfg, "Остановка", script)
             delay(2000)
             checkServerState(cfg)
         }
@@ -378,14 +366,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _serverLogs.value = "…"
         val logCmd = "tail -n 80 /opt/vk-turn/server.log 2>/dev/null || echo '(лог пуст)'"
         viewModelScope.launch {
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            appendSshLog("", "=== server.log [$ts] ===")
-            logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", logCmd)
-            val out = sshManager.executeSilentCommand(
-                cfg.ip, cfg.port, cfg.username, cfg.password, logCmd,
-                knownFingerprint = cfg.fp, sshKey = cfg.key
-            )
-            out.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+            val out = runSshCommand(cfg, "server.log", logCmd)
             _serverLogs.value = out.trim().ifEmpty { "(лог пуст)" }
         }
     }
@@ -397,10 +378,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startProxy(context: Context) {
         if (ProxyService.isRunning.value) return
 
-        // Сброс предыдущей ошибки перед повторной попыткой
         if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
 
-        // Валидация конфига до запуска
         val cfg = clientConfig.value
         if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
             setErrorWithAutoReset("Не заполнены настройки клиента")
@@ -414,34 +393,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _proxyState.value = ProxyState.Starting
 
         viewModelScope.launch {
-            // Сохраняем актуальный конфиг в DataStore — ProxyService читает его напрямую
             prefs.saveClientConfig(cfg)
 
             ProxyService.logs.value = emptyList()
+            ProxyService.startupResult.value = null
             context.startForegroundService(Intent(context, ProxyService::class.java))
 
-            // Ждём запуска: проверяем логи на ошибку или успех вместо простого isRunning
-            delay(2500)
+            // P2-1: ожидаем явного сигнала от ProxyService вместо delay(2500) + эвристики
+            val result = withTimeoutOrNull(5_000L) {
+                ProxyService.startupResult.filterNotNull().first()
+            }
+
             // Если proxyFailed уже обработал ошибку — не дублируем
             if (_proxyState.value is ProxyState.Error) return@launch
-            val logText = ProxyService.logs.value.joinToString("\n").lowercase()
-            when {
-                !ProxyService.isRunning.value ->
-                    setErrorWithAutoReset("Прокси не запустился")
-                logText.contains("panic") || logText.contains("fatal") ||
-                logText.contains("rate limit") || logText.contains("критическая") -> {
+
+            when (result) {
+                null -> setErrorWithAutoReset("Прокси не запустился")
+                is StartupResult.Failed -> {
                     context.stopService(Intent(context, ProxyService::class.java))
-                    val errorLine = ProxyService.logs.value
-                        .lastOrNull { line ->
-                            val l = line.lowercase()
-                            l.contains("error") || l.contains("ошибка") ||
-                            l.contains("panic") || l.contains("fatal") ||
-                            l.contains("критическая")
-                        }
-                    setErrorWithAutoReset(errorLine ?: "Ошибка запуска — проверьте настройки")
+                    setErrorWithAutoReset(result.message)
                 }
-                else ->
-                    _proxyState.value = ProxyState.Running
+                is StartupResult.Success -> _proxyState.value = ProxyState.Running
             }
         }
     }
