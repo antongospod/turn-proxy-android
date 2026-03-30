@@ -52,6 +52,9 @@ sealed class ProxyState {
 /** Возвращает сохранённый отпечаток хоста или null при первом подключении */
 private val SshConfig.fp get() = hostFingerprint.ifEmpty { null }
 
+/** Возвращает приватный ключ если выбран key-режим аутентификации, иначе пустую строку */
+private val SshConfig.key get() = if (authType == "SSH_KEY") sshKey else ""
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = AppPreferences(application)
@@ -164,7 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logCommand("${config.username}@${config.ip}:${config.port}", "echo OK")
             val result = sshManager.executeSilentCommand(
                 config.ip, config.port, config.username, config.password, "echo OK",
-                knownFingerprint = config.fp
+                knownFingerprint = config.fp, sshKey = config.key
             )
             appendSshLog(result.trim())
             if (result.trim() == "OK") {
@@ -184,6 +187,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _sshState.value = SshConnectionState.Error(result.removePrefix("ERROR: "))
             }
         }
+    }
+
+    fun disconnectSsh() {
+        activeSshConfig = null
+        _sshState.value = SshConnectionState.Disconnected
+        _serverState.value = ServerState.Unknown
+        _serverVersion.value = null
     }
 
     fun reconnectSsh() {
@@ -214,7 +224,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appendSshLog("", "=== Проверка состояния [$ts] ===")
             logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", checkCmd)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, checkCmd,
-                knownFingerprint = cfg.fp)
+                knownFingerprint = cfg.fp, sshKey = cfg.key)
             result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             _serverState.value = if (result.startsWith("ERROR")) {
                 ServerState.Error(result.removePrefix("ERROR: "))
@@ -240,7 +250,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         """.trimIndent()
         viewModelScope.launch {
             val out = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, cmd,
-                knownFingerprint = cfg.fp)
+                knownFingerprint = cfg.fp, sshKey = cfg.key)
             _serverVersion.value = out.trim().takeIf { it.isNotEmpty() && !it.startsWith("ERROR") }
         }
     }
@@ -255,18 +265,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if [ -f /opt/vk-turn/proxy.pid ]; then kill -9 ${'$'}(cat /opt/vk-turn/proxy.pid) 2>/dev/null; rm -f /opt/vk-turn/proxy.pid; fi
             ARCH=${'$'}(uname -m)
             if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi
-            URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download/${'$'}BIN"
+            BASE_URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download"
             echo "Arch: ${'$'}ARCH | Binary: ${'$'}BIN"
-            if command -v curl >/dev/null 2>&1; then
-                curl -sSL -o "${'$'}BIN" "${'$'}URL" 2>&1 || { echo "curl failed: ${'$'}?"; exit 1; }
-            elif command -v wget >/dev/null 2>&1; then
-                wget -O "${'$'}BIN" "${'$'}URL" 2>&1 || { echo "wget failed: ${'$'}?"; exit 1; }
-            else
-                echo "ERROR: curl и wget не найдены"; exit 1
-            fi
+            _dl() { URL=${'$'}1; OUT=${'$'}2
+                if command -v curl >/dev/null 2>&1; then
+                    curl -sSL -o "${'$'}OUT" "${'$'}URL" 2>&1
+                elif command -v wget >/dev/null 2>&1; then
+                    wget -q -O "${'$'}OUT" "${'$'}URL" 2>&1
+                else
+                    echo "ERROR: curl и wget не найдены"; return 1
+                fi
+            }
+            _dl "${'$'}BASE_URL/${'$'}BIN" "${'$'}BIN" || { echo "ERROR: скачивание бинарника не удалось"; exit 1; }
             SIZE=${'$'}(wc -c < "${'$'}BIN" 2>/dev/null || echo 0)
             echo "Size: ${'$'}SIZE bytes"
             if [ "${'$'}SIZE" -lt 100000 ]; then echo "ERROR: файл слишком мал (${'$'}SIZE байт)"; cat "${'$'}BIN" 2>/dev/null; exit 1; fi
+            if _dl "${'$'}BASE_URL/checksums.txt" checksums.txt && [ -s checksums.txt ]; then
+                EXPECTED=${'$'}(grep "${'$'}BIN" checksums.txt | awk '{print ${'$'}1}')
+                if [ -n "${'$'}EXPECTED" ]; then
+                    ACTUAL=${'$'}(sha256sum "${'$'}BIN" | awk '{print ${'$'}1}')
+                    if [ "${'$'}EXPECTED" = "${'$'}ACTUAL" ]; then
+                        echo "SHA256: OK"
+                    else
+                        echo "ERROR: SHA256 не совпадает — ожидался ${'$'}EXPECTED, получен ${'$'}ACTUAL"
+                        rm -f "${'$'}BIN" checksums.txt; exit 1
+                    fi
+                else
+                    echo "WARN: ${'$'}BIN не найден в checksums.txt, SHA256 пропущен"
+                fi
+                rm -f checksums.txt
+            else
+                echo "WARN: checksums.txt недоступен, SHA256 не проверен"
+            fi
             chmod +x "${'$'}BIN" && echo "DONE"
         """.trimIndent()
 
@@ -275,7 +305,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appendSshLog("", "=== Установка [$ts] ===")
             logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp)
+                knownFingerprint = cfg.fp, sshKey = cfg.key)
             result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             if (!result.contains("DONE")) {
                 val errorMsg = result.lines()
@@ -311,7 +341,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appendSshLog("", "=== Запуск [$ts] ===")
             logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp)
+                knownFingerprint = cfg.fp, sshKey = cfg.key)
             result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             delay(2000)
             checkServerState(cfg)
@@ -335,7 +365,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appendSshLog("", "=== Остановка [$ts] ===")
             logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", script)
             val result = sshManager.executeSilentCommand(cfg.ip, cfg.port, cfg.username, cfg.password, script,
-                knownFingerprint = cfg.fp)
+                knownFingerprint = cfg.fp, sshKey = cfg.key)
             result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             delay(2000)
             checkServerState(cfg)
@@ -353,7 +383,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", logCmd)
             val out = sshManager.executeSilentCommand(
                 cfg.ip, cfg.port, cfg.username, cfg.password, logCmd,
-                knownFingerprint = cfg.fp
+                knownFingerprint = cfg.fp, sshKey = cfg.key
             )
             out.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
             _serverLogs.value = out.trim().ifEmpty { "(лог пуст)" }

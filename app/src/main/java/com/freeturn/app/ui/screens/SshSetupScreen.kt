@@ -79,8 +79,13 @@ fun SshSetupScreen(
     var showPassword by remember { mutableStateOf(false) }
     var authDropdownExpanded by remember { mutableStateOf(false) }
 
+    // Переходим только если подключение было установлено ПОСЛЕ открытия экрана.
+    // Если sshState уже Connected при входе (пользователь хочет изменить настройки) —
+    // не перенаправляем автоматически, ждём явного нажатия «Подключиться».
+    var sawNonConnected by remember { mutableStateOf(sshState !is SshConnectionState.Connected) }
     LaunchedEffect(sshState) {
-        if (sshState is SshConnectionState.Connected) onConnected()
+        if (sshState !is SshConnectionState.Connected) sawNonConnected = true
+        if (sawNonConnected && sshState is SshConnectionState.Connected) onConnected()
     }
 
     val isConnecting = sshState is SshConnectionState.Connecting

@@ -38,8 +38,16 @@
         <service
             android:name=".ProxyService"
             android:exported="false"
-            android:foregroundServiceType="specialUse"
-        />
+            android:foregroundServiceType="specialUse">
+            <!--
+                Обязательное свойство для foregroundServiceType="specialUse".
+                Без него Google Play отклоняет приложение.
+                Описывает назначение: поддержание сетевого прокси-соединения.
+            -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Поддержание активного сетевого прокси-соединения через TURN-серверы для обхода ограничений сети." />
+        </service>
 
     </application>
 </manifest>

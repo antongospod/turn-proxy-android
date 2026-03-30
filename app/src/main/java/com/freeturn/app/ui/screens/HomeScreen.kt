@@ -377,13 +377,14 @@ private fun InfoBottomSheet(
             .verticalScroll(rememberScrollState())
     ) {
         // ── SSH ────────────────────────────────────────────────────────────
+        val isConnected = sshState is SshConnectionState.Connected
         ListItem(
             headlineContent = { Text("Соединение", style = MaterialTheme.typography.titleSmall) },
             trailingContent = {
                 TextButton(onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     onNavigateToSshSetup()
-                }) { Text("Настроить") }
+                }) { Text(if (isConnected) "Изменить" else "Настроить") }
             }
         )
         HorizontalDivider()
@@ -404,8 +405,14 @@ private fun InfoBottomSheet(
                 )
             },
             trailingContent = {
-                if (sshState is SshConnectionState.Connected) {
-                    Box(Modifier.size(10.dp).background(StatusGreen, CircleShape))
+                if (isConnected) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).background(StatusGreen, CircleShape))
+                        TextButton(onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            viewModel.disconnectSsh()
+                        }) { Text("Отключить") }
+                    }
                 } else {
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)

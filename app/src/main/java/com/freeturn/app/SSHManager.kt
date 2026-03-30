@@ -24,17 +24,26 @@ class SSHManager {
      * @param knownFingerprint SHA-256 отпечаток хоста из сохранённых настроек.
      *   - null  → первое подключение, принимаем любой ключ и сохраняем отпечаток
      *   - строка → проверяем совпадение; при расхождении возвращаем ошибку MITM
+     * @param sshKey PEM-строка приватного ключа. Если не пустая — используется key-аутентификация
+     *   вместо пароля. Поддерживаются RSA, EC, Ed25519 (JSch).
      */
     suspend fun executeSilentCommand(
         ip: String, port: Int, user: String, pass: String, command: String,
-        knownFingerprint: String? = null
+        knownFingerprint: String? = null,
+        sshKey: String = ""
     ): String = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
         var tempSession: Session? = null
         try {
             val jsch = JSch()
+            if (sshKey.isNotBlank()) {
+                // Аутентификация по приватному ключу (без парольной фразы)
+                jsch.addIdentity("identity", sshKey.toByteArray(Charsets.UTF_8), null, null)
+            }
             tempSession = jsch.getSession(user, ip, port)
-            tempSession.setPassword(pass)
+            if (sshKey.isBlank()) {
+                tempSession.setPassword(pass)
+            }
             tempSession.hostKeyRepository = tofu
 
             val config = Properties()
