@@ -19,10 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.ui.res.painterResource
+import com.freeturn.app.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -90,7 +88,7 @@ fun OnboardingScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Sensors,
+                        painter = painterResource(R.drawable.nearby_24px),
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -129,7 +127,7 @@ fun OnboardingScreen(
                         verticalAlignment = Alignment.Top
                     ) {
                         Icon(
-                            Icons.Filled.Security,
+                            painterResource(R.drawable.nearby_24px),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(18.dp)
@@ -160,7 +158,7 @@ fun OnboardingScreen(
                     shape = MaterialTheme.shapes.large,
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
-                    Icon(Icons.Filled.Wifi, contentDescription = null)
+                    Icon(painterResource(R.drawable.wifi_24px), contentDescription = null)
                     Spacer(Modifier.width(10.dp))
                     Text("Настроить сервер", style = MaterialTheme.typography.labelLarge)
                 }
