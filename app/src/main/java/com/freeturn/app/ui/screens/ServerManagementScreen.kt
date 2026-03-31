@@ -21,12 +21,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.ui.res.painterResource
+import com.freeturn.app.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -181,7 +177,7 @@ fun ServerManagementScreen(
                     .height(52.dp),
                 shape = MaterialTheme.shapes.large
             ) {
-                Icon(Icons.Filled.CloudDownload, null)
+                Icon(painterResource(R.drawable.cloud_download_24px), null)
                 Spacer(Modifier.width(8.dp))
                 Text(if (serverKnown?.installed == true) "Обновить" else "Установить")
             }
@@ -199,7 +195,7 @@ fun ServerManagementScreen(
                     .height(52.dp),
                 shape = MaterialTheme.shapes.large
             ) {
-                Icon(Icons.Filled.PlayArrow, null)
+                Icon(painterResource(R.drawable.play_arrow_24px), null)
                 Spacer(Modifier.width(8.dp))
                 Text("Запустить сервер")
             }
@@ -218,7 +214,7 @@ fun ServerManagementScreen(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Icon(Icons.Filled.Stop, null)
+                Icon(painterResource(R.drawable.stop_24px), null)
                 Spacer(Modifier.width(8.dp))
                 Text("Остановить сервер")
             }
@@ -237,7 +233,7 @@ fun ServerManagementScreen(
                 ) {
                     Text("Продолжить настройку клиента")
                     Spacer(Modifier.width(8.dp))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+                    Icon(painterResource(R.drawable.arrow_forward_24px), null)
                 }
             }
 
@@ -257,7 +253,7 @@ fun ServerManagementScreen(
                             },
                             enabled = isConnected
                         ) {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Запросить server.log", modifier = Modifier.size(18.dp))
+                            Icon(painterResource(R.drawable.refresh_24px), contentDescription = "Запросить server.log", modifier = Modifier.size(18.dp))
                         }
                     }
 

@@ -27,14 +27,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Launch
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.res.painterResource
+import com.freeturn.app.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -160,7 +154,7 @@ fun HomeScreen(
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         showBottomSheet.value = true
                     }) {
-                        Icon(Icons.Filled.Info, contentDescription = "Информация")
+                        Icon(painterResource(R.drawable.info_24px), contentDescription = "Информация")
                     }
                 }
             )
@@ -348,15 +342,15 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             when (state) {
                 is ProxyState.Starting -> CircularProgressIndicator(color = contentColor)
                 is ProxyState.Running -> Icon(
-                    Icons.Filled.CheckCircle, null,
+                    painterResource(R.drawable.check_circle_24px), null,
                     Modifier.size(52.dp), tint = contentColor
                 )
                 is ProxyState.Error -> Icon(
-                    Icons.Filled.Error, null,
+                    painterResource(R.drawable.error_24px), null,
                     Modifier.size(52.dp), tint = contentColor
                 )
                 else -> Icon(
-                    Icons.Filled.PlayArrow, null,
+                    painterResource(R.drawable.play_arrow_24px), null,
                     Modifier.size(52.dp), tint = contentColor
                 )
             }
@@ -433,7 +427,7 @@ private fun InfoBottomSheet(
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         viewModel.reconnectSsh()
                     }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Переподключить")
+                        Icon(painterResource(R.drawable.refresh_24px), contentDescription = "Переподключить")
                     }
                 }
             }
@@ -455,7 +449,7 @@ private fun InfoBottomSheet(
                         },
                         enabled = logs.isNotEmpty()
                     ) {
-                        Icon(Icons.Filled.ContentCopy, contentDescription = "Копировать логи", modifier = Modifier.size(18.dp))
+                        Icon(painterResource(R.drawable.content_copy_24px), contentDescription = "Копировать логи", modifier = Modifier.size(18.dp))
                     }
                     TextButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -577,7 +571,7 @@ private fun RepoLinkItem(
         },
         trailingContent = {
             Icon(
-                Icons.AutoMirrored.Filled.Launch,
+                painterResource(R.drawable.open_in_new_24px),
                 contentDescription = "Открыть",
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.primary
