@@ -15,14 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +31,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.painterResource
+import com.freeturn.app.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,7 +94,7 @@ fun SshSetupScreen(
                         HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                         onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(painterResource(R.drawable.arrow_back_24px), contentDescription = "Назад")
                     }
                 }
             )
@@ -245,7 +239,7 @@ private fun FormSection(
                     onTogglePassword()
                 }) {
                     Icon(
-                        if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        painterResource(if (showPassword) R.drawable.visibility_off_24px else R.drawable.visibility_24px),
                         contentDescription = null
                     )
                 }
@@ -270,7 +264,7 @@ private fun FormSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
         ) {
             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Error, null, tint = MaterialTheme.colorScheme.error)
+                Icon(painterResource(R.drawable.error_24px), null, tint = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.width(12.dp))
                 Text(
                     sshState.message,
@@ -331,11 +325,11 @@ private fun ConnectionProgressCard(step: String) {
                     val isActive = index == currentIndex
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = when {
-                                isDone -> Icons.Filled.CheckCircle
-                                isActive -> Icons.Filled.RadioButtonChecked
-                                else -> Icons.Filled.RadioButtonUnchecked
-                            },
+                            painter = painterResource(when {
+                                isDone -> R.drawable.check_circle_24px
+                                isActive -> R.drawable.radio_button_checked_24px
+                                else -> R.drawable.radio_button_unchecked_24px
+                            }),
                             contentDescription = null,
                             tint = when {
                                 isDone -> MaterialTheme.colorScheme.primary
