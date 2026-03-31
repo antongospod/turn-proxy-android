@@ -4,7 +4,6 @@ package com.freeturn.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,19 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -83,7 +77,6 @@ fun ClientSetupScreen(
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var showAdvanced by rememberSaveable { mutableStateOf(false) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
@@ -206,48 +199,17 @@ fun ClientSetupScreen(
                 }
             )
 
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-
-            // ── Дополнительно (сворачиваемый) ─────────────────────────────
-            Card(
+            OutlinedTextField(
+                value = localPort,
+                onValueChange = { localPort = it },
+                label = { Text("Локальный адрес прослушивания") },
+                placeholder = { Text("127.0.0.1:9000") },
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                onClick = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                    showAdvanced = !showAdvanced
+                singleLine = true,
+                supportingText = {
+                    Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
                 }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Дополнительно", style = MaterialTheme.typography.labelLarge)
-                    Icon(
-                        if (showAdvanced) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            AnimatedVisibility(visible = showAdvanced) {
-                OutlinedTextField(
-                    value = localPort,
-                    onValueChange = { localPort = it },
-                    label = { Text("Локальный адрес прослушивания") },
-                    placeholder = { Text("127.0.0.1:9000") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    supportingText = {
-                        Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
-                    }
-                )
-            }
+            )
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
