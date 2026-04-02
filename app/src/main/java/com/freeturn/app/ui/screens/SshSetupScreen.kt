@@ -34,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,13 +91,13 @@ fun SshSetupScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Подключение к серверу") },
+                title = { Text(stringResource(R.string.connect_to_server)) },
                 navigationIcon = {
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                         onBack()
                     }) {
-                        Icon(painterResource(R.drawable.arrow_back_24px), contentDescription = "Назад")
+                        Icon(painterResource(R.drawable.arrow_back_24px), contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -164,13 +165,13 @@ private fun FormSection(
     onConnect: () -> Unit
 ) {
     val context = LocalContext.current
-    Text("Данные сервера", style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.server_data), style = MaterialTheme.typography.titleMedium)
 
     OutlinedTextField(
         value = ip,
         onValueChange = onIpChange,
-        label = { Text("IP-адрес сервера") },
-        placeholder = { Text("1.2.3.4") },
+        label = { Text(stringResource(R.string.server_ip_label)) },
+        placeholder = { Text(stringResource(R.string.server_ip_placeholder)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
@@ -179,7 +180,7 @@ private fun FormSection(
     OutlinedTextField(
         value = port,
         onValueChange = onPortChange,
-        label = { Text("SSH порт") },
+        label = { Text(stringResource(R.string.ssh_port)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -188,7 +189,7 @@ private fun FormSection(
     OutlinedTextField(
         value = username,
         onValueChange = onUsernameChange,
-        label = { Text("Имя пользователя") },
+        label = { Text(stringResource(R.string.username)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )
@@ -199,10 +200,10 @@ private fun FormSection(
         modifier = Modifier.fillMaxWidth()
     ) {
         OutlinedTextField(
-            value = if (authType == "PASSWORD") "Пароль" else "Приватный ключ",
+            value = if (authType == "PASSWORD") stringResource(R.string.password) else stringResource(R.string.private_key),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Аутентификация") },
+            label = { Text(stringResource(R.string.authentication)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authDropdownExpanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -212,13 +213,13 @@ private fun FormSection(
             expanded = authDropdownExpanded,
             onDismissRequest = { onAuthDropdownChange(false) }
         ) {
-            DropdownMenuItem(text = { Text("Пароль") },
+            DropdownMenuItem(text = { Text(stringResource(R.string.password)) },
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     onAuthTypeChange("PASSWORD")
                     onAuthDropdownChange(false)
                 })
-            DropdownMenuItem(text = { Text("Приватный ключ") },
+            DropdownMenuItem(text = { Text(stringResource(R.string.private_key)) },
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     onAuthTypeChange("SSH_KEY")
@@ -231,7 +232,7 @@ private fun FormSection(
         OutlinedTextField(
             value = password,
             onValueChange = onPasswordChange,
-            label = { Text("Пароль") },
+            label = { Text(stringResource(R.string.password)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -252,8 +253,8 @@ private fun FormSection(
         OutlinedTextField(
             value = sshKey,
             onValueChange = onSshKeyChange,
-            label = { Text("Приватный ключ (PEM)") },
-            placeholder = { Text("-----BEGIN RSA PRIVATE KEY-----\n...") },
+            label = { Text(stringResource(R.string.private_key_pem)) },
+            placeholder = { Text(stringResource(R.string.private_key_placeholder)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp),
@@ -291,16 +292,16 @@ private fun FormSection(
         },
         shape = MaterialTheme.shapes.large
     ) {
-        Text("Подключиться", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.connect_btn), style = MaterialTheme.typography.labelLarge)
     }
 }
 
 @Composable
 private fun ConnectionProgressCard(step: String) {
     val steps = listOf(
-        "Подключение к серверу...",
-        "Аутентификация...",
-        "Проверка SSH..."
+        stringResource(R.string.step_connecting),
+        stringResource(R.string.step_auth),
+        stringResource(R.string.step_ssh_check)
     )
     val currentIndex = steps.indexOf(step).coerceAtLeast(0)
 

@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.ui.HapticUtil
@@ -98,7 +99,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(40.dp))
 
                 Text(
-                    text = "Turn Proxy",
+                    text = stringResource(R.string.onboarding_title),
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center
@@ -107,7 +108,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "Проксируйте WireGuard и Hysteria‑трафик\nчерез TURN‑серверы VK Calls",
+                    text = stringResource(R.string.onboarding_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                     textAlign = TextAlign.Center
@@ -134,7 +135,7 @@ fun OnboardingScreen(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "Мы не собираем никаких данных. Все настройки (SSH-доступ, параметры прокси) хранятся исключительно на вашем устройстве.",
+                            stringResource(R.string.privacy_notice),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -160,7 +161,7 @@ fun OnboardingScreen(
                 ) {
                     Icon(painterResource(R.drawable.wifi_24px), contentDescription = null)
                     Spacer(Modifier.width(10.dp))
-                    Text("Настроить сервер", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.setup_server), style = MaterialTheme.typography.labelLarge)
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -169,7 +170,7 @@ fun OnboardingScreen(
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     onSkip()
                 }) {
-                    Text("Пропустить настройки")
+                    Text(stringResource(R.string.skip_setup))
                 }
 
                 Spacer(Modifier.height(24.dp))

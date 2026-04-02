@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,7 +55,7 @@ fun LogsScreen(viewModel: MainViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Логи") },
+                title = { Text(stringResource(R.string.logs_title)) },
                 actions = {
                     IconButton(
                         onClick = {
@@ -66,7 +67,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                     ) {
                         Icon(
                             painterResource(R.drawable.content_copy_24px),
-                            contentDescription = "Копировать"
+                            contentDescription = stringResource(R.string.copy)
                         )
                     }
                     IconButton(
@@ -78,7 +79,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                     ) {
                         Icon(
                             painterResource(R.drawable.delete_24px),
-                            contentDescription = "Очистить"
+                            contentDescription = stringResource(R.string.clear)
                         )
                     }
                 }
@@ -93,7 +94,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Нет логов",
+                    stringResource(R.string.no_logs),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )

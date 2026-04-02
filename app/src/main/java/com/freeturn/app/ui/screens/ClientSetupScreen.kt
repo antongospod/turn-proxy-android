@@ -42,7 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.ui.HapticUtil
@@ -105,7 +107,7 @@ fun ClientSetupScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Клиент") })
+            TopAppBar(title = { Text(stringResource(R.string.client_title)) })
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
@@ -121,45 +123,45 @@ fun ClientSetupScreen(
             Spacer(Modifier.height(4.dp))
 
             // ── Подключение ───────────────────────────────────────────────
-            Text("Подключение", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
                 value = serverAddress,
                 onValueChange = { serverAddress = it },
-                label = { Text("Адрес vk-turn-proxy сервера") },
-                placeholder = { Text("1.2.3.4:56000") },
+                label = { Text(stringResource(R.string.server_address_label)) },
+                placeholder = { Text(stringResource(R.string.server_address_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                supportingText = { Text("IP и порт vk-turn-proxy на вашем VPS") }
+                supportingText = { Text(stringResource(R.string.server_address_support)) }
             )
 
             OutlinedTextField(
                 value = vkLink,
                 onValueChange = { vkLink = it },
-                label = { Text("Ссылка VK-звонок / Yandex Telemost") },
-                placeholder = { Text("https://vk.com/call/...") },
+                label = { Text(stringResource(R.string.vk_link_label)) },
+                placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 maxLines = 4,
-                supportingText = { Text("VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)") }
+                supportingText = { Text(stringResource(R.string.vk_link_support)) }
             )
 
             OutlinedTextField(
                 value = localPort,
                 onValueChange = { localPort = it },
-                label = { Text("Локальный адрес прослушивания") },
-                placeholder = { Text("127.0.0.1:9000") },
+                label = { Text(stringResource(R.string.local_listen_address)) },
+                placeholder = { Text(stringResource(R.string.local_listen_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 supportingText = {
-                    Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
+                    Text(stringResource(R.string.local_listen_support))
                 }
             )
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
             // ── Параметры ─────────────────────────────────────────────────
-            Text("Параметры", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.parameters_title), style = MaterialTheme.typography.titleMedium)
 
             Column {
                 Row(
@@ -167,9 +169,9 @@ fun ClientSetupScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Потоки: ${threads.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.threads_format, threads.toInt()), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "Рекомендуется 4–8",
+                            stringResource(R.string.threads_recommendation),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -192,8 +194,8 @@ fun ClientSetupScreen(
             }
 
             SwitchRow(
-                label = "UDP-режим",
-                description = "Снижает задержки и повышает стабильность",
+                label = stringResource(R.string.udp_mode),
+                description = stringResource(R.string.udp_mode_desc),
                 checked = useUdp,
                 onCheckedChange = {
                     HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
@@ -202,8 +204,8 @@ fun ClientSetupScreen(
             )
 
             SwitchRow(
-                label = "Без DTLS-шифрования",
-                description = "Может ускорить соединение, повышает риск блокировки",
+                label = stringResource(R.string.no_dtls),
+                description = stringResource(R.string.no_dtls_desc),
                 checked = noDtls,
                 onCheckedChange = {
                     HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
@@ -214,7 +216,7 @@ fun ClientSetupScreen(
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
             // ── Ядро ──────────────────────────────────────────────────────
-            Text("Ядро", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.core_title), style = MaterialTheme.typography.titleMedium)
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -234,12 +236,12 @@ fun ClientSetupScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (customKernelExists) "Кастомное ядро" else "Встроенное ядро",
+                            if (customKernelExists) stringResource(R.string.custom_core) else stringResource(R.string.builtin_core),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            if (customKernelExists) "Загружено из памяти устройства"
-                            else "Из APK (libvkturn.so)",
+                            if (customKernelExists) stringResource(R.string.loaded_from_memory)
+                            else stringResource(R.string.from_apk),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                         )
@@ -254,13 +256,13 @@ fun ClientSetupScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.error
                                 )
-                            ) { Text("Сбросить") }
+                            ) { Text(stringResource(R.string.reset)) }
                         }
                         Button(onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                             kernelPickerLauncher.launch(arrayOf("*/*"))
                         }) {
-                            Text("Загрузить")
+                            Text(stringResource(R.string.btn_load))
                         }
                     }
                 }
@@ -277,7 +279,7 @@ fun ClientSetupScreen(
                     enabled = serverAddress.isNotBlank() && vkLink.isNotBlank(),
                     shape = MaterialTheme.shapes.large
                 ) {
-                    Text("Завершить настройку", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.finish_setup), style = MaterialTheme.typography.labelLarge)
                 }
             }
 

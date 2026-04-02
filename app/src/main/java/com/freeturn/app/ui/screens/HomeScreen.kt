@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -148,13 +149,13 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Turn Proxy") },
+                title = { Text(stringResource(R.string.turn_proxy_title)) },
                 actions = {
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         showBottomSheet.value = true
                     }) {
-                        Icon(painterResource(R.drawable.info_24px), contentDescription = "Информация")
+                        Icon(painterResource(R.drawable.info_24px), contentDescription = stringResource(R.string.info_desc))
                     }
                 }
             )
@@ -191,10 +192,10 @@ fun HomeScreen(
 
             Text(
                 text = when (proxyState) {
-                    is ProxyState.Running -> "Прокси активен"
-                    is ProxyState.Starting -> "Подключение..."
+                    is ProxyState.Running -> stringResource(R.string.proxy_active)
+                    is ProxyState.Starting -> stringResource(R.string.proxy_connecting)
                     is ProxyState.Error -> (proxyState as ProxyState.Error).message
-                    else -> "Нажмите для запуска"
+                    else -> stringResource(R.string.proxy_press_to_start)
                 },
                 style = MaterialTheme.typography.titleMedium,
                 color = when (proxyState) {
@@ -215,12 +216,12 @@ fun HomeScreen(
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text("Текущие настройки", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.current_settings), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(12.dp))
-                        ConfigRow("Сервер", clientConfig.serverAddress)
-                        ConfigRow("Потоки", "${clientConfig.threads}")
-                        ConfigRow("UDP", if (clientConfig.useUdp) "Вкл" else "Выкл")
-                        ConfigRow("Локальный порт", clientConfig.localPort)
+                        ConfigRow(stringResource(R.string.server), clientConfig.serverAddress)
+                        ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
+                        ConfigRow(stringResource(R.string.udp), if (clientConfig.useUdp) stringResource(R.string.on) else stringResource(R.string.off))
+                        ConfigRow(stringResource(R.string.local_port), clientConfig.localPort)
                     }
                 }
 
@@ -245,9 +246,9 @@ fun HomeScreen(
                     Text(
                         when (sshState) {
                             is SshConnectionState.Connected -> "SSH: ${(sshState as SshConnectionState.Connected).ip}"
-                            is SshConnectionState.Connecting -> "SSH: подключение..."
-                            is SshConnectionState.Error -> "SSH: ошибка"
-                            else -> "SSH: не подключено"
+                            is SshConnectionState.Connecting -> stringResource(R.string.ssh_connecting)
+                            is SshConnectionState.Error -> stringResource(R.string.ssh_error)
+                            else -> stringResource(R.string.ssh_disconnected)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
@@ -261,7 +262,7 @@ fun HomeScreen(
                             },
                             modifier = Modifier.height(28.dp)
                         ) {
-                            Text("Переподключить", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.reconnect), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -336,15 +337,15 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             when (state) {
                 is ProxyState.Starting -> CircularWavyProgressIndicator(color = contentColor)
                 is ProxyState.Running -> Icon(
-                    painterResource(R.drawable.check_circle_24px), "Прокси активен — нажмите для остановки",
+                    painterResource(R.drawable.check_circle_24px), stringResource(R.string.proxy_active_stop),
                     Modifier.size(52.dp), tint = contentColor
                 )
                 is ProxyState.Error -> Icon(
-                    painterResource(R.drawable.error_24px), "Ошибка — нажмите для повторного запуска",
+                    painterResource(R.drawable.error_24px), stringResource(R.string.proxy_error_restart),
                     Modifier.size(52.dp), tint = contentColor
                 )
                 else -> Icon(
-                    painterResource(R.drawable.play_arrow_24px), "Запустить прокси",
+                    painterResource(R.drawable.play_arrow_24px), stringResource(R.string.start_proxy),
                     Modifier.size(52.dp), tint = contentColor
                 )
             }
@@ -379,7 +380,7 @@ private fun InfoBottomSheet(
         // ── Соединение ────────────────────────────────────────────────────
         item {
             ListItem(
-                headlineContent = { Text("Соединение", style = MaterialTheme.typography.titleSmall) },
+                headlineContent = { Text(stringResource(R.string.connection), style = MaterialTheme.typography.titleSmall) },
                 colors = listColors,
                 supportingContent = {
                     Text(
@@ -390,7 +391,7 @@ private fun InfoBottomSheet(
                                 (sshState as SshConnectionState.Connecting).step
                             is SshConnectionState.Error ->
                                 "Ошибка: ${(sshState as SshConnectionState.Error).message}"
-                            else -> "Не подключено"
+                            else -> stringResource(R.string.not_connected)
                         }
                     )
                 },
@@ -399,12 +400,12 @@ private fun InfoBottomSheet(
                         TextButton(onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                             onNavigateToSshSetup()
-                        }) { Text("Изменить") }
+                        }) { Text(stringResource(R.string.change)) }
                     } else {
                         TextButton(onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                             onNavigateToSshSetup()
-                        }) { Text("Настроить") }
+                        }) { Text(stringResource(R.string.configure)) }
                     }
                 }
             )
@@ -415,9 +416,9 @@ private fun InfoBottomSheet(
         // ── Ссылки ────────────────────────────────────────────────────────
         item {
             RepoLinkItem(
-                title = "Android-клиент",
-                subtitle = "antongospod/turn-proxy",
-                url = "https://github.com/antongospod/turn-proxy",
+                title = stringResource(R.string.android_client),
+                subtitle = "antongospod/turn-proxy-android",
+                url = "https://github.com/antongospod/turn-proxy-android",
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
                 onOpen = { uriHandler.openUri(it) }
@@ -426,7 +427,7 @@ private fun InfoBottomSheet(
 
         item {
             RepoLinkItem(
-                title = "Прокси-ядро",
+                title = stringResource(R.string.proxy_core),
                 subtitle = "cacggghp/vk-turn-proxy",
                 url = "https://github.com/cacggghp/vk-turn-proxy",
                 containerColor = containerColor,
@@ -442,7 +443,7 @@ private fun InfoBottomSheet(
             ListItem(
                 headlineContent = {
                     Text(
-                        "Сбросить настройки",
+                        stringResource(R.string.reset_settings),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -451,7 +452,7 @@ private fun InfoBottomSheet(
                 trailingContent = {
                     Icon(
                         painterResource(R.drawable.delete_24px),
-                        contentDescription = "Сбросить",
+                        contentDescription = stringResource(R.string.reset),
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
@@ -480,8 +481,8 @@ private fun InfoBottomSheet(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Сбросить все настройки?") },
-            text = { Text("Все настройки будут удалены, прокси остановлен. Приложение перезапустится.") },
+            title = { Text(stringResource(R.string.reset_all_settings_title)) },
+            text = { Text(stringResource(R.string.reset_all_settings_desc)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -491,10 +492,10 @@ private fun InfoBottomSheet(
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Сбросить") }
+                ) { Text(stringResource(R.string.reset)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
+                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -522,7 +523,7 @@ private fun RepoLinkItem(
         trailingContent = {
             Icon(
                 painterResource(R.drawable.open_in_new_24px),
-                contentDescription = "Открыть",
+                contentDescription = stringResource(R.string.btn_open),
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.primary
             )

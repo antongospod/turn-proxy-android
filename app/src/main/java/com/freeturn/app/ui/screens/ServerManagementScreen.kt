@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -86,7 +87,7 @@ fun ServerManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Сервер") },
+                title = { Text(stringResource(R.string.server)) },
                 actions = {
                     SshStatusBadge(sshState = sshState, ip = sshConfig.ip)
                 }
@@ -109,11 +110,11 @@ fun ServerManagementScreen(
             // Status card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Статус сервера", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.server_status), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
-                    StatusRow("SSH‑соединение", isConnected)
+                    StatusRow(stringResource(R.string.ssh_connection), isConnected)
                     Spacer(Modifier.height(10.dp))
-                    StatusRow("vk‑turn‑proxy", serverKnown?.running == true)
+                    StatusRow(stringResource(R.string.vk_turn_proxy), serverKnown?.running == true)
 
                     when (serverState) {
                         is ServerState.Checking -> {
@@ -133,7 +134,7 @@ fun ServerManagementScreen(
                         is ServerState.Error -> {
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "Ошибка: ${(serverState as ServerState.Error).message}",
+                                stringResource(R.string.error_format, (serverState as ServerState.Error).message),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -144,26 +145,26 @@ fun ServerManagementScreen(
             }
 
             // Server config
-            Text("Конфигурация сервера", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.server_config), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
                 value = proxyListen,
                 onValueChange = { proxyListen = it },
-                label = { Text("Порт прослушивания") },
-                placeholder = { Text("0.0.0.0:56000") },
+                label = { Text(stringResource(R.string.listen_port)) },
+                placeholder = { Text(stringResource(R.string.listen_port_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                supportingText = { Text("Порт, на котором сервер принимает подключения от клиентов") }
+                supportingText = { Text(stringResource(R.string.listen_port_desc)) }
             )
 
             OutlinedTextField(
                 value = proxyConnect,
                 onValueChange = { proxyConnect = it },
-                label = { Text("Адрес TURN‑клиента") },
-                placeholder = { Text("127.0.0.1:40537") },
+                label = { Text(stringResource(R.string.turn_client_address)) },
+                placeholder = { Text(stringResource(R.string.turn_client_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                supportingText = { Text("Локальный WireGuard/Hysteria-клиент на стороне сервера") }
+                supportingText = { Text(stringResource(R.string.turn_client_desc)) }
             )
 
             // Action buttons
@@ -181,7 +182,7 @@ fun ServerManagementScreen(
             ) {
                 Icon(painterResource(R.drawable.cloud_download_24px), null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (serverKnown?.installed == true) "Обновить" else "Установить")
+                Text(if (serverKnown?.installed == true) stringResource(R.string.update) else stringResource(R.string.install))
             }
 
             Button(
@@ -199,7 +200,7 @@ fun ServerManagementScreen(
             ) {
                 Icon(painterResource(R.drawable.play_arrow_24px), null)
                 Spacer(Modifier.width(8.dp))
-                Text("Запустить сервер")
+                Text(stringResource(R.string.start_server))
             }
 
             OutlinedButton(
@@ -218,7 +219,7 @@ fun ServerManagementScreen(
             ) {
                 Icon(painterResource(R.drawable.stop_24px), null)
                 Spacer(Modifier.width(8.dp))
-                Text("Остановить сервер")
+                Text(stringResource(R.string.stop_server))
             }
 
             if (serverKnown?.running == true) {
@@ -233,7 +234,7 @@ fun ServerManagementScreen(
                         .height(56.dp),
                     shape = MaterialTheme.shapes.large
                 ) {
-                    Text("Продолжить настройку клиента")
+                    Text(stringResource(R.string.continue_client_setup))
                     Spacer(Modifier.width(8.dp))
                     Icon(painterResource(R.drawable.arrow_forward_24px), null)
                 }
@@ -243,7 +244,7 @@ fun ServerManagementScreen(
             if (sshLog.isNotEmpty()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text("SSH-лог", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.ssh_log_title), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(12.dp))
                         val listState = rememberLazyListState()
                         LaunchedEffect(sshLog.size) {
@@ -303,7 +304,7 @@ private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            if (connected) ip else "Не подключено",
+            if (connected) ip else stringResource(R.string.not_connected),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
@@ -329,7 +330,7 @@ private fun StatusRow(label: String, isActive: Boolean) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                if (isActive) "Активно" else "Неактивно",
+                if (isActive) stringResource(R.string.active) else stringResource(R.string.inactive),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isActive) StatusGreen else MaterialTheme.colorScheme.outline
             )

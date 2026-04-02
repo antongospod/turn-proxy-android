@@ -1,3 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">FreeTurn</string>
+    <string name="app_name">Turn Proxy</string>
+
+    <!-- HomeScreen -->
+    <string name="turn_proxy_title">Turn Proxy</string>
+    <string name="info_desc">Информация</string>
+    <string name="proxy_active">Прокси активен</string>
+    <string name="proxy_connecting">Подключение…</string>
+    <string name="proxy_press_to_start">Нажмите для запуска</string>
+    <string name="current_settings">Текущие настройки</string>
+    <string name="server">Сервер</string>
+    <string name="threads">Потоки</string>
+    <string name="udp">UDP</string>
+    <string name="on">Вкл</string>
+    <string name="off">Выкл</string>
+    <string name="local_port">Локальный порт</string>
+    <string name="ssh_connecting">SSH: подключение…</string>
+    <string name="ssh_error">SSH: ошибка</string>
+    <string name="ssh_disconnected">SSH: не подключено</string>
+    <string name="reconnect">Переподключить</string>
+    <string name="proxy_active_stop">Прокси активен — нажмите для остановки</string>
+    <string name="proxy_error_restart">Ошибка — нажмите для повторного запуска</string>
+    <string name="start_proxy">Запустить прокси</string>
+    <string name="connection">Соединение</string>
+    <string name="not_connected">Не подключено</string>
+    <string name="change">Изменить</string>
+    <string name="configure">Настроить</string>
+    <string name="android_client">Android-клиент</string>
+    <string name="proxy_core">Прокси-ядро</string>
+    <string name="btn_open">Открыть</string>
+    <string name="reset_settings">Сбросить настройки</string>
+    <string name="reset">Сбросить</string>
+    <string name="reset_all_settings_title">Сбросить все настройки?</string>
+    <string name="reset_all_settings_desc">Все настройки будут удалены, прокси остановлен. Приложение перезапустится.</string>
+    <string name="cancel">Отмена</string>
+
+    <!-- ClientSetupScreen -->
+    <string name="client_title">Клиент</string>
+    <string name="connection_title">Подключение</string>
+    <string name="server_address_label">Адрес vk-turn-proxy сервера</string>
+    <string name="server_address_placeholder">1.2.3.4:56000</string>
+    <string name="server_address_support">IP и порт vk-turn-proxy на вашем VPS</string>
+    <string name="vk_link_label">Ссылка VK-звонок / Yandex Telemost</string>
+    <string name="vk_link_placeholder">https://vk.com/call/…</string>
+    <string name="vk_link_support">VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
+    <string name="local_listen_address">Локальный адрес прослушивания</string>
+    <string name="local_listen_placeholder">127.0.0.1:9000</string>
+    <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
+    <string name="parameters_title">Параметры</string>
+    <string name="threads_format">Потоки: %1$d</string>
+    <string name="threads_recommendation">Рекомендуется 4–8</string>
+    <string name="udp_mode">UDP-режим</string>
+    <string name="udp_mode_desc">Снижает задержки</string>
+    <string name="no_dtls">Без DTLS-шифрования</string>
+    <string name="no_dtls_desc">Может ускорить соединение, повышает риск блокировки</string>
+    <string name="core_title">Ядро</string>
+    <string name="custom_core">Кастомное ядро</string>
+    <string name="builtin_core">Встроенное ядро</string>
+    <string name="loaded_from_memory">Загружено из памяти устройства</string>
+    <string name="from_apk">Из APK (libvkturn.so)</string>
+    <string name="btn_load">Загрузить</string>
+    <string name="finish_setup">Завершить настройку</string>
+
+    <!-- LogsScreen -->
+    <string name="logs_title">Логи</string>
+    <string name="copy">Копировать</string>
+    <string name="clear">Очистить</string>
+    <string name="no_logs">Нет логов</string>
+
+    <!-- ServerManagementScreen -->
+    <string name="server_status">Статус сервера</string>
+    <string name="ssh_connection">SSH‑соединение</string>
+    <string name="vk_turn_proxy">vk‑turn‑proxy</string>
+    <string name="error_format">Ошибка: %1$s</string>
+    <string name="server_config">Конфигурация сервера</string>
+    <string name="listen_port">Порт прослушивания</string>
+    <string name="listen_port_placeholder">0.0.0.0:56000</string>
+    <string name="listen_port_desc">Порт, на котором сервер принимает подключения от клиентов</string>
+    <string name="turn_client_address">Адрес TURN‑клиента</string>
+    <string name="turn_client_placeholder">127.0.0.1:40537</string>
+    <string name="turn_client_desc">Локальный WireGuard/Hysteria-клиент на стороне сервера</string>
+    <string name="update">Обновить</string>
+    <string name="install">Установить</string>
+    <string name="start_server">Запустить сервер</string>
+    <string name="stop_server">Остановить сервер</string>
+    <string name="continue_client_setup">Продолжить настройку клиента</string>
+    <string name="ssh_log_title">SSH-лог</string>
+    <string name="active">Активно</string>
+    <string name="inactive">Неактивно</string>
+
+    <!-- SshSetupScreen -->
+    <string name="connect_to_server">Подключение к серверу</string>
+    <string name="back">Назад</string>
+    <string name="server_data">Данные сервера</string>
+    <string name="server_ip_label">IP-адрес сервера</string>
+    <string name="server_ip_placeholder">1.2.3.4</string>
+    <string name="ssh_port">SSH порт</string>
+    <string name="username">Имя пользователя</string>
+    <string name="password">Пароль</string>
+    <string name="private_key">Приватный ключ</string>
+    <string name="authentication">Аутентификация</string>
+    <string name="private_key_pem">Приватный ключ (PEM)</string>
+    <string name="private_key_placeholder">-----BEGIN RSA PRIVATE KEY-----\n…</string>
+    <string name="connect_btn">Подключиться</string>
+    <string name="step_connecting">Подключение к серверу…</string>
+    <string name="step_auth">Аутентификация…</string>
+    <string name="step_ssh_check">Проверка SSH…</string>
+
+    <!-- OnboardingScreen -->
+    <string name="onboarding_title">Turn Proxy</string>
+    <string name="onboarding_subtitle">Проксируйте WireGuard и Hysteria‑трафик\nчерез TURN‑серверы VK Calls</string>
+    <string name="privacy_notice">Мы не собираем никаких данных. Все настройки (SSH-доступ, параметры прокси) хранятся исключительно на вашем устройстве.</string>
+    <string name="setup_server">Настроить сервер</string>
+    <string name="skip_setup">Пропустить настройки</string>
 </resources>
