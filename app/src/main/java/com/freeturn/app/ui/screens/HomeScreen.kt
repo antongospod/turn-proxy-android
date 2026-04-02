@@ -336,15 +336,15 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             when (state) {
                 is ProxyState.Starting -> CircularWavyProgressIndicator(color = contentColor)
                 is ProxyState.Running -> Icon(
-                    painterResource(R.drawable.check_circle_24px), null,
+                    painterResource(R.drawable.check_circle_24px), "Прокси активен — нажмите для остановки",
                     Modifier.size(52.dp), tint = contentColor
                 )
                 is ProxyState.Error -> Icon(
-                    painterResource(R.drawable.error_24px), null,
+                    painterResource(R.drawable.error_24px), "Ошибка — нажмите для повторного запуска",
                     Modifier.size(52.dp), tint = contentColor
                 )
                 else -> Icon(
-                    painterResource(R.drawable.play_arrow_24px), null,
+                    painterResource(R.drawable.play_arrow_24px), "Запустить прокси",
                     Modifier.size(52.dp), tint = contentColor
                 )
             }

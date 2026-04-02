@@ -89,9 +89,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // P3-10: ArrayDeque — O(1) вместо O(n) list concatenation
     private val sshLogBuffer = ArrayDeque<String>(500)
     private fun appendSshLog(vararg lines: String) {
-        lines.forEach { sshLogBuffer.addLast(it) }
-        while (sshLogBuffer.size > 500) sshLogBuffer.removeFirst()
-        _sshLog.value = sshLogBuffer.toList()
+        synchronized(sshLogBuffer) {
+            lines.forEach { sshLogBuffer.addLast(it) }
+            while (sshLogBuffer.size > 500) sshLogBuffer.removeFirst()
+            _sshLog.value = sshLogBuffer.toList()
+        }
     }
 
     private fun logCommand(target: String, cmd: String) {
@@ -100,10 +102,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appendSshLog("  ---")
     }
 
-    // P2-2: единый форматтер времени вместо 5 копий SimpleDateFormat
-    private fun timestamp(): String =
-        java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-            .format(java.util.Date())
+    // P2-2: единый форматтер времени (DateTimeFormatter — thread-safe, не требует Locale)
+    private val timeFormatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+    private fun timestamp(): String = java.time.LocalTime.now().format(timeFormatter)
 
     // P2-2: обобщённая SSH-операция — логирование + выполнение + вывод в SSH-лог
     private suspend fun runSshCommand(cfg: SshConfig, label: String, cmd: String): String {
@@ -321,13 +322,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun isValidHostPort(s: String): Boolean =
+        s.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))
+
     fun startServer() {
         val cfg = activeSshConfig ?: sshConfig.value
         if (cfg.ip.isEmpty()) return
-        _serverState.value = ServerState.Working("Запуск сервера...")
 
         val l = proxyListen.value
         val c = proxyConnect.value
+        if (!isValidHostPort(l) || !isValidHostPort(c)) {
+            _serverState.value = ServerState.Error("Неверный формат адреса (ожидается host:port)")
+            return
+        }
+        _serverState.value = ServerState.Working("Запуск сервера...")
+
         val script = """
             cd /opt/vk-turn &&
             ARCH=${'$'}(uname -m);
@@ -374,8 +383,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearSshLog() {
-        sshLogBuffer.clear()
-        _sshLog.value = emptyList()
+        synchronized(sshLogBuffer) {
+            sshLogBuffer.clear()
+            _sshLog.value = emptyList()
+        }
     }
 
     // ── Local proxy ────────────────────────────────────────────────────────
@@ -491,8 +502,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _serverState.value = ServerState.Unknown
             _serverVersion.value = null
             _serverLogs.value = null
-            _sshLog.value = emptyList()
-            sshLogBuffer.clear()
+            synchronized(sshLogBuffer) {
+                sshLogBuffer.clear()
+                _sshLog.value = emptyList()
+            }
             _proxyState.value = ProxyState.Idle
             _customKernelExists.value = false
             ProxyService.clearLogs()
@@ -502,9 +515,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             context.startActivity(intent)
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
     }
 }

@@ -65,6 +65,7 @@ class ProxyService : Service() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var openAppIntent: PendingIntent? = null
 
     // P1-1: AtomicReference вместо @Volatile — проверка null + вызов destroy() атомарны
     private val process = AtomicReference<Process?>(null)
@@ -95,7 +96,7 @@ class ProxyService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (isRunning.value) return START_STICKY
 
-        val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+        openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
         }
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
@@ -103,7 +104,7 @@ class ProxyService : Service() {
             .setContentText("Подключение...")
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
-            .setContentIntent(openIntent)
+            .setContentIntent(openAppIntent)
             .build()
         startForeground(1, notification)
 
@@ -113,8 +114,7 @@ class ProxyService : Service() {
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
-        @Suppress("WakelockTimeout")
-        wakeLock?.acquire()
+        wakeLock?.acquire(TimeUnit.HOURS.toMillis(8))
 
         registerNetworkCallback()
 
@@ -295,15 +295,12 @@ class ProxyService : Service() {
     // ── Notification ─────────────────────────────────────────────────────────
 
     private fun updateNotification(title: String, text: String) {
-        val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
-            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
-        }
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
-            .setContentIntent(openIntent)
+            .setContentIntent(openAppIntent)
             .build()
         getSystemService(NotificationManager::class.java).notify(1, notification)
     }

@@ -31,37 +31,54 @@ object HapticUtil {
     fun perform(context: Context, pattern: Pattern) {
         val vibrator = context.getSystemService(Vibrator::class.java) ?: return
         val effect = when (pattern) {
-            Pattern.SELECTION -> VibrationEffect.createOneShot(11, 58)
+            Pattern.SELECTION -> VibrationEffect.createOneShot(20, 120)
 
-            Pattern.CLICK -> VibrationEffect.createOneShot(18, 100)
+            Pattern.CLICK -> VibrationEffect.createOneShot(25, 160)
 
             Pattern.TOGGLE_ON -> VibrationEffect.createWaveform(
-                longArrayOf(0L, 24L, 60L, 15L),
-                intArrayOf(0, 138, 0, 72),
+                longArrayOf(0L, 35L, 50L, 20L),
+                intArrayOf(0, 200, 0, 110),
                 -1
             )
 
             Pattern.TOGGLE_OFF -> VibrationEffect.createWaveform(
-                longArrayOf(0L, 19L, 55L, 11L),
-                intArrayOf(0, 88, 0, 44),
+                longArrayOf(0L, 28L, 45L, 16L),
+                intArrayOf(0, 140, 0, 70),
                 -1
             )
 
             Pattern.SUCCESS -> VibrationEffect.createWaveform(
-                longArrayOf(0L, 16L, 48L, 11L, 48L, 8L),
-                intArrayOf(0, 88, 0, 58, 0, 36),
+                longArrayOf(0L, 22L, 40L, 16L, 40L, 12L),
+                intArrayOf(0, 140, 0, 100, 0, 65),
                 -1
             )
 
             Pattern.ERROR -> VibrationEffect.createWaveform(
-                longArrayOf(0L, 32L, 22L, 32L, 22L, 20L),
-                intArrayOf(0, 155, 0, 120, 0, 85),
+                longArrayOf(0L, 45L, 25L, 45L, 25L, 30L),
+                intArrayOf(0, 210, 0, 175, 0, 130),
                 -1
             )
 
+            // Музыкальная вибрация
             Pattern.LAUNCH -> VibrationEffect.createWaveform(
-                longArrayOf(0L, 36L, 88L, 22L),
-                intArrayOf(0, 112, 0, 58),
+                longArrayOf(
+                    0L,
+                    18L, 55L,
+                    18L, 45L,
+                    22L, 35L,
+                    30L, 80L,
+                    15L, 40L,
+                    10L
+                ),
+                intArrayOf(
+                    0,
+                    80, 0,
+                    110, 0,
+                    150, 0,
+                    210, 0,
+                    60, 0,
+                    30
+                ),
                 -1
             )
         }

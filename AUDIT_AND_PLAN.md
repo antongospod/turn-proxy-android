@@ -1,451 +1,367 @@
-# Аудит кода и план исправлений — FreeTurn (vk-turn-proxy-android)
+# Комплексный аудит FreeTurn v2.0.0
 
-**Дата:** 2026-03-30
-**Модель:** claude-sonnet-4-6
-**Охват:** все `.kt`-файлы в `app/src/main/java/`
-
----
-
-## Часть 1 — Аудит качества кода (детальный)
-
-### 1.1 Гонки и многопоточность
-
-#### [КРИТИЧНО] `ProxyService`: гонка между `userStopped` и `process`
-**Файл:** `ProxyService.kt:43,188`
-
-```kotlin
-// Фоновый поток
-if (!userStopped) thread { startBinaryProcess() }   // <-- читаем flag
-
-// Главный поток (onDestroy) — может исполниться МЕЖДУ строками выше
-userStopped = true
-process?.destroy()
-// Новый поток уже создан, процесс запустится после destroy()
-```
-
-`@Volatile` гарантирует видимость значения, но не атомарность операции «проверить + запустить поток». Нужен `AtomicBoolean` + синхронизированный блок.
-
-#### [КРИТИЧНО] `sessionKillScheduled`: несинхронизированный доступ из двух потоков
-**Файл:** `ProxyService.kt:131-140`
-
-Флаг читается в фоновом потоке (`BufferedReader.readLine` loop), а сбрасывается в `handler.postDelayed` — на main looper. Не `@Volatile`, не `AtomicBoolean`. При двух параллельных quota-ошибках флаг может не защитить от двойного `postDelayed`.
-
-#### [КРИТИЧНО] `runBlocking` в фоновом потоке при чтении DataStore
-**Файл:** `ProxyService.kt:86`
-
-```kotlin
-val cfg = runBlocking { AppPreferences(this@ProxyService).clientConfigFlow.first() }
-```
-
-DataStore использует `Dispatchers.IO`. `runBlocking` на фоновом thread занимает один поток пула. При насыщении `Dispatchers.IO` — дедлок. Нужен `CoroutineScope(Dispatchers.IO).launch { ... }` внутри `onStartCommand`.
+**Дата:** 2026-04-03
+**Модель:** claude-opus-4-6
+**Охват:** все `.kt`-файлы, ресурсы, конфигурация сборки
+**Последний коммит:** `b5d4f93` feat: logs screen, bottom sheet cleanup, wavy indicators, dynamic notification
 
 ---
 
-### 1.2 Утечки и lifecycle
+## 1. Сборка и зависимости
 
-#### [ВЫСОКОЕ] `AppPreferences` создаётся с `Service` context вместо `applicationContext`
-**Файл:** `ProxyService.kt:86`, `AppPreferences.kt:41`
+### Версии инструментов
 
-`EncryptedSharedPreferences` инициализируется lazy — может произойти уже после `onDestroy()`. Правильно: `AppPreferences(this@ProxyService.applicationContext)`.
+| Компонент | Версия | Статус |
+|---|---|---|
+| Gradle | 9.3.1 | Актуальная |
+| AGP | 9.1.0 | Актуальная |
+| Kotlin | 2.3.20 | Актуальная |
+| Compose BOM | 2026.03.01 | Актуальная |
+| compileSdk / targetSdk | 36 | Актуальная |
+| minSdk | 26 | OK (Android 8.0) |
 
-#### [ВЫСОКОЕ] `companion object MutableStateFlow` — глобальные синглтоны, не привязанные к lifecycle
-**Файл:** `ProxyService.kt:32-34`, `MainViewModel.kt:96,390`
+Инструменты сборки и AndroidX-зависимости свежие, обновлены до последних стабильных версий.
 
-`ProxyService.logs`, `isRunning`, `proxyFailed` — глобальные изменяемые состояния. ViewModel напрямую экспортирует и мутирует их:
+### Проблемы зависимостей
 
-```kotlin
-val logs: StateFlow<List<String>> = ProxyService.logs   // прямая ссылка
-ProxyService.logs.value = emptyList()                   // прямая мутация из ViewModel
-```
+| Зависимость | Версия | Проблема | Severity |
+|---|---|---|---|
+| `security-crypto` | **1.1.0-alpha06** | Alpha в продакшне. Единственная стабильная — 1.0.0, но у неё другой API | СРЕДНЕЕ |
+| `jsch` (mwiede fork) | 2.27.9 | OK, но не мейнстрим; следить за обновлениями | НИЗКОЕ |
 
-Это делает Unit-тестирование невозможным и нарушает инкапсуляцию сервиса.
+### Конфигурация сборки
+
+- **ProGuard/R8:** правила корректные — JSch, Tink, DataStore защищены от обфускации. Stacktrace-атрибуты сохранены.
+- **Lint:** `checkReleaseBuilds = false`, `ExpiredTargetSdkVersion` отключен — осознанно.
+- **Manifest:** все разрешения обоснованы; `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` на месте.
+- **Packaging:** `jniLibs.useLegacyPackaging = true` — необходимо для нативного бинарника.
 
 ---
 
-### 1.3 Логика и корректность
+## 2. Архитектура
 
-#### [ВЫСОКОЕ] Бесконечный цикл автосохранения в `ClientSetupScreen`
-**Файл:** `ClientSetupScreen.kt:80-111`
+### Общая структура
+
+```
+MainActivity (Compose Activity)
+  └── MainViewModel (AndroidViewModel)
+        ├── AppPreferences (DataStore + EncryptedSharedPreferences)
+        ├── SSHManager (JSch wrapper)
+        └── ProxyService (Foreground Service + нативный процесс)
+```
+
+### Сильные стороны
+
+- Чистое разделение: UI (Compose screens) → ViewModel → Data/Service
+- Reactive state: `StateFlow` + `collectAsStateWithLifecycle()` повсюду
+- TOFU SSH: собственный `HostKeyRepository` с MITM-детекцией
+- Миграция секретов: пароль/ключ мигрируются из DataStore в EncryptedSharedPreferences
+- Watchdog: экспоненциальный backoff + jitter для перезапуска нативного процесса
+- Startup signal: `StartupResult` StateFlow вместо `delay(2500)`
+- Динамические уведомления: текст нотификации обновляется при смене состояния (подключение, активен, ошибка, переподключение, смена сети)
+- Логи вынесены в отдельный экран `LogsScreen` с отдельной вкладкой навигации
+
+### Проблемы
+
+#### [СРЕДНЕЕ] Глобальное состояние в `ProxyService.companion`
+**Файл:** `ProxyService.kt:42-45`
 
 ```kotlin
-var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
-
-LaunchedEffect(serverAddress, ...) {
-    delay(600)
-    viewModel.saveClientConfig(ClientConfig(serverAddress = serverAddress.trim(), ...))
+companion object {
+    val isRunning = MutableStateFlow(false)
+    val logs = MutableStateFlow<List<String>>(emptyList())
+    val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val startupResult = MutableStateFlow<StartupResult?>(null)
 }
 ```
 
-При сохранении `saved` обновляется → если `saved.serverAddress != serverAddress` (например, из-за `.trim()`), `rememberSaveable` сбрасывает локальное состояние → триггерит `LaunchedEffect` снова. На практике стабилизируется, но логика хрупкая.
+ViewModel напрямую читает и мутирует эти поля. Unit-тестирование ViewModel без реального `ProxyService` невозможно. Решение — DI (Hilt/Koin) + репозиторий-посредник.
 
-#### [ВЫСОКОЕ] `delay(2500)` + парсинг строк лога вместо явного сигнала запуска
-**Файл:** `MainViewModel.kt:393-415`
+#### [СРЕДНЕЕ] `AppPreferences` создаётся как `new` при каждом обращении
+**Файлы:** `MainViewModel.kt:63`, `ProxyService.kt:127`
 
-Определение успешного старта прокси — эвристика:
-```kotlin
-delay(2500)
-val logText = ProxyService.logs.value.joinToString("\n").lowercase()
-when {
-    !ProxyService.isRunning.value -> setErrorWithAutoReset("Прокси не запустился")
-    logText.contains("panic") || logText.contains("fatal") -> ...
-    else -> _proxyState.value = ProxyState.Running
-}
-```
+Два экземпляра `AppPreferences` → два разных `encryptedPrefs` lazy-инициализации. Работает корректно (оба идут к одному файлу через `applicationContext`), но расточительно. Должен быть синглтон.
 
-На медленных устройствах 2500 мс может не хватить. На быстрых — лишняя задержка. Нужен отдельный `StateFlow` «бинарник готов» или парсинг первой non-error строки.
+#### [НИЗКОЕ] `MainViewModel` — god object (510 строк)
 
-#### [СРЕДНЕЕ] `checkServerState`: не сбрасывает `_serverState` при пустом IP
-**Файл:** `MainViewModel.kt:202-204`
-
-```kotlin
-val cfg = config ?: activeSshConfig ?: sshConfig.value
-if (cfg.ip.isEmpty()) return   // silently returns, _serverState остаётся Checking
-```
-
-Если `checkServerState()` вызвана с пустым конфигом после `_serverState.value = ServerState.Checking`, состояние зависнет в `Checking` навсегда.
-
-#### [СРЕДНЕЕ] Фейковый прогресс SSH-подключения
-**Файл:** `MainViewModel.kt:157-160`
-
-```kotlin
-delay(400)
-_sshState.value = SshConnectionState.Connecting("Аутентификация...")
-delay(300)
-_sshState.value = SshConnectionState.Connecting("Проверка SSH...")
-// только ЗДЕСЬ начинается реальное подключение
-```
-
-UI показывает "Аутентификация..." за 300 мс до того как JSch вообще открыл сокет. Вводит пользователя в заблуждение.
-
-#### [СРЕДНЕЕ] `SSHManager.disconnect()` — публичный no-op
-**Файл:** `SSHManager.kt:88-90`
-
-```kotlin
-fun disconnect() {
-    // Все сессии в executeSilentCommand временные и закрываются в finally-блоке
-}
-```
-
-Вызывается из `connectSsh()` и `onCleared()` с ожиданием что-то сделает. При добавлении persistent-сессии в будущем — молчаливый баг.
-
-#### [СРЕДНЕЕ] `proc.waitFor(5, TimeUnit.MINUTES)` — блокировка фонового потока
-**Файл:** `ProxyService.kt:145`
-
-Если нативный процесс закрыл stdout, но завис — фоновый поток заблокирован на 5 минут. `isRunning.value` остаётся `true`, UI не реагирует.
+SSH-подключение, управление сервером, локальный прокси, настройки, кастомное ядро, сброс — всё в одном ViewModel. При росте функциональности станет проблемой.
 
 ---
 
-### 1.4 Дублирование кода
+## 3. Многопоточность и concurrency
 
-#### [СРЕДНЕЕ] `SimpleDateFormat` создаётся 5 раз идентично
-**Файл:** `MainViewModel.kt:162,213,274,310,335,352`
+### Корректно реализовано
+
+- `AtomicBoolean` для `userStopped`, `sessionKillScheduled`
+- `AtomicReference<Process>` для `process`
+- `synchronized(logBuffer)` для логов ProxyService
+- `serviceScope` с `SupervisorJob` вместо `runBlocking`
+- `destroyForcibly()` вместо `destroy()`
+
+### Проблемы
+
+#### [СРЕДНЕЕ] WakeLock без timeout
+**Файл:** `ProxyService.kt:110-111`
 
 ```kotlin
-// Эта строка повторяется дословно 5 раз:
-val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+@Suppress("WakelockTimeout")
+wakeLock?.acquire()
 ```
 
-Нужна `private fun timestamp(): String`.
+Бессрочный wake lock. Если `onDestroy()` не вызовется (OOM kill), устройство не заснёт. Рекомендация: `acquire(TimeUnit.HOURS.toMillis(8))` с периодическим продлением.
 
-#### [СРЕДНЕЕ] SSH-операции дублируют паттерн: `ts → appendSshLog → logCommand → executeSilentCommand → forEach → checkServerState`
-**Файл:** `MainViewModel.kt:248-342`
+#### [СРЕДНЕЕ] `@Volatile var networkInitialized` — стилистическая непоследовательность
+**Файл:** `ProxyService.kt:79`
 
-`installServer()`, `startServer()`, `stopServer()`, `fetchServerLogs()` — практически идентичная структура. Подходит для обобщения в `private suspend fun runSshOperation(label: String, script: String, cfg: SshConfig): String`.
+Рядом — `AtomicBoolean` для всех остальных флагов. `@Volatile` достаточно (single-writer, multi-reader), но смешение стилей затрудняет ревью.
 
----
-
-### 1.5 Compose-специфика
-
-#### [СРЕДНЕЕ] `ServerManagementScreen`: SSH-лог рендерится через `Column + forEach` (не lazy)
-**Файл:** `ServerManagementScreen.kt:286-302`
+#### [НИЗКОЕ] `sshLogBuffer` не синхронизирован
+**Файл:** `MainViewModel.kt:91-94`
 
 ```kotlin
-Column(modifier = Modifier.heightIn(max = 400.dp).verticalScroll(...)) {
-    sshLog.forEach { line -> Text(line, ...) }  // все 500 строк композируются одновременно
+private fun appendSshLog(vararg lines: String) {
+    lines.forEach { sshLogBuffer.addLast(it) }
+    while (sshLogBuffer.size > 500) sshLogBuffer.removeFirst()
+    _sshLog.value = sshLogBuffer.toList()
 }
 ```
 
-Нужен `LazyColumn` с `items(sshLog)`.
+`ArrayDeque` не thread-safe. Вызывается из `viewModelScope.launch` — потенциально из нескольких корутин одновременно.
 
-#### [СРЕДНЕЕ] `LogsPanel` в `HomeScreen` — аналогичная проблема
-**Файл:** `HomeScreen.kt:546-551`
+---
+
+## 4. Безопасность
+
+### Сильные стороны
+
+- SSH-пароль и ключ в `EncryptedSharedPreferences` (AES-256-GCM + Android Keystore)
+- TOFU-модель для SSH host keys с MITM-детекцией
+- SHA-256 верификация скачанного бинарника через `checksums.txt`
+- Кастомный бинарник в приватной директории (`filesDir`)
+- `ProxyService` не экспортируется (`exported="false"`)
+
+### Проблемы
+
+#### [ВЫСОКОЕ] Shell injection в SSH-командах
+**Файл:** `MainViewModel.kt:335`
 
 ```kotlin
-logs.forEachIndexed { index, line -> LogLine(line, index % 2 == 0) }
+nohup ./${'$'}BIN -listen $l -connect $c > server.log 2>&1 &
 ```
 
-При 200 строках — 200 Text composable одновременно.
+`l` и `c` берутся из пользовательского ввода (`proxyListen.value`, `proxyConnect.value`). Нужна валидация формата `host:port` перед подстановкой. Пользователь вводит данные на своём сервере, но это всё равно плохая практика.
 
-#### [НИЗКОЕ] `lastSliderInt` в `ClientSetupScreen` — `remember`, не `rememberSaveable`
-**Файл:** `ClientSetupScreen.kt:87`
+#### [СРЕДНЕЕ] TOFU: первое подключение принимает любой ключ
+**Файл:** `SSHManager.kt:117`
 
-После ротации экрана `lastSliderInt` сбрасывается в `saved.threads`, haptic сработает при первом же движении слайдера.
+Стандартный TOFU — допустимо, но пользователь не предупреждается.
 
-#### [НИЗКОЕ] `startDestination` запоминается один раз через `remember`
+#### [СРЕДНЕЕ] Логи копируются в clipboard без предупреждения
+**Файл:** `LogsScreen.kt:60-62`
+
+Логи могут содержать IP-адреса серверов, VK-ссылки, команды. На Android < 13 clipboard доступен всем приложениям.
+
+#### [НИЗКОЕ] Кастомный бинарник не верифицируется
+**Файл:** `MainViewModel.kt:465-468`
+
+Любой файл, выбранный пользователем, становится executable. By design (power user feature), но стоит показывать предупреждение.
+
+---
+
+## 5. UI / Compose
+
+### Сильные стороны
+
+- **Material Design 3:** `lightColorScheme`/`darkColorScheme`, dynamic color (Android 12+), M3-компоненты
+- **M3 Expressive:** `CircularWavyProgressIndicator` для состояния загрузки (Experimental M3 Expressive API)
+- **Тёмная тема:** полноценная поддержка, status bar адаптируется
+- **Типография:** правильная M3-шкала (36sp → 11sp) с корректными line heights
+- **Анимации:** `spring()`, `tween()`, `Crossfade`, `animateColorAsState`
+- **Window insets:** `navigationBarsPadding()`, `imePadding()`
+- **Haptic feedback:** продуманные Apple-like паттерны
+- **LazyColumn** для логов (отдельный экран `LogsScreen`)
+- **`rememberSaveable`** для сохранения состояния при ротации
+- **Lifecycle-aware collection:** `collectAsStateWithLifecycle()` повсюду
+- **Bottom sheet:** упрощён — логи вынесены в отдельную вкладку, sheet теперь только для настроек и ссылок
+- **Условный показ:** карточка настроек и SSH-статус скрыты, если SSH не настроен (`isConfigured`)
+- **Навигация:** popUpTo с `inclusive = true` + `launchSingleTop` при завершении онбординга — предотвращает дублирование в back stack
+
+### Проблемы
+
+#### [ВЫСОКОЕ] Все строки захардкожены — нет `strings.xml`
+
+`strings.xml` содержит только `<string name="app_name">FreeTurn</string>`.
+
+Все UI-тексты (~100+ строк) захардкожены в Kotlin. Нарушает:
+- Android guidelines: строки должны быть в ресурсах
+- Локализацию: невозможно перевести без переписывания кода
+- Accessibility: TalkBack может некорректно работать с некоторыми элементами
+
+#### [СРЕДНЕЕ] `contentDescription = null` на иконках ProxyToggleButton
+**Файл:** `HomeScreen.kt:347-356`
+
+Главная кнопка приложения (148dp) недоступна для TalkBack. Нужно описание состояния.
+
+#### [СРЕДНЕЕ] Дублирование `LogLine` composable
+**Файлы:** `LogsScreen.kt:116-161`, ранее была в `HomeScreen.kt`
+
+`LogLine` composable дублируется — если она используется только в `LogsScreen`, нужно убедиться, что в `HomeScreen` старая копия удалена. Если нужна в обоих местах — вынести в общий файл.
+
+#### [НИЗКОЕ] `LazyColumn` без `key` в LogsScreen
+**Файл:** `LogsScreen.kt:107`
+
+```kotlin
+itemsIndexed(logs) { _, line -> LogLine(line = line) }
+```
+
+Без `key` Compose не может корректно анимировать изменения списка.
+
+#### [НИЗКОЕ] `Color(0xFFE67E22)` — magic color в LogLine
+**Файл:** `LogsScreen.kt:131`
+
+Единственный цвет вне `Color.kt`. Стоит вынести в `StatusOrange`.
+
+#### [НИЗКОЕ] Вкладка «Логи» — одинаковые filled/outlined иконки
+**Файл:** `AppNavigation.kt:297`
+
+```kotlin
+NavItem(Routes.LOGS, "Логи", R.drawable.terminal_24px, R.drawable.terminal_24px)
+```
+
+Для остальных вкладок есть отдельные filled и outlined варианты иконок. Для логов используется одна и та же иконка — нет визуальной разницы между активным и неактивным состоянием.
+
+---
+
+## 6. Навигация
+
+### Сильные стороны
+
+- `Routes` — константы вместо строковых литералов
+- `saveState` / `restoreState` для сохранения стека
+- `CLIENT_SETUP_OB` — константа для онбординг-маршрута
+- Slide-анимации для переходов
+- 4 вкладки: Главная, Сервер, Клиент, Логи
+- `popUpTo(startDestinationId) { inclusive = true }` при завершении онбординга — корректная очистка стека
+
+### Проблемы
+
+#### [НИЗКОЕ] `startDestination` через `remember`
 **Файл:** `AppNavigation.kt:86`
 
-```kotlin
-val startDestination = remember { if (onboardingDone) Routes.HOME else Routes.ONBOARDING }
-```
-
-После сброса настроек (`onboardingDone = false`) NavHost не пересоздастся — пользователь не попадёт на онбординг без перезапуска Activity.
+Не реагирует на сброс настроек. Компенсируется перезапуском Activity в `resetAllSettings()`, но хрупко.
 
 ---
 
-### 1.6 Навигация
+## 7. Качество кода
 
-#### [СРЕДНЕЕ] Строковая конкатенация вместо константы
-**Файл:** `AppNavigation.kt:159,166`
+### Сильные стороны
 
+- `timestamp()` — единый форматтер
+- `runSshCommand()` — обобщённая SSH-операция
+- `ArrayDeque` для логов (O(1) вместо O(n))
+- Data classes с defaults (`SshConfig`, `ClientConfig`)
+- `sealed class` для состояний
+- Корректный `finally`-блок в `startBinaryProcess()`
+- `updateNotification()` — вынесено в отдельный метод, не дублируется
+
+### Проблемы
+
+#### [СРЕДНЕЕ] `SimpleDateFormat` создаётся при каждом вызове `timestamp()`
+**Файл:** `MainViewModel.kt:104-106`
+
+`SimpleDateFormat` не thread-safe, поэтому не стоит хранить в companion. Но можно использовать `DateTimeFormatter` (thread-safe):
 ```kotlin
-navController.navigate(Routes.CLIENT_SETUP + "_onboarding")  // не константа
-composable(Routes.CLIENT_SETUP + "_onboarding") { ... }
+private val timeFormatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+private fun timestamp(): String = java.time.LocalTime.now().format(timeFormatter)
 ```
 
-Если `Routes.CLIENT_SETUP` переименовать — этот маршрут сломается без ошибки компилятора.
+#### [СРЕДНЕЕ] Пустой `onCleared()`
+**Файл:** `MainViewModel.kt:507-509`
 
-#### [НИЗКОЕ] `saveState = true` в Bottom Nav может восстанавливать устаревший Compose-стейт
-**Файл:** `AppNavigation.kt:104`
+Не несёт функции. Удалить.
 
-При переключении вкладок `rememberSaveable`-состояние (включая VK-ссылку) восстанавливается из Bundle. После долгого отсутствия на вкладке это может быть неожиданным поведением.
-
----
-
-### 1.7 Прочее
-
-#### [СРЕДНЕЕ] O(n) аллокации на каждую строку лога (2 места)
-**Файл:** `ProxyService.kt:37`, `MainViewModel.kt:84`
+#### [НИЗКОЕ] Дублирование `PendingIntent` в `ProxyService`
+**Файл:** `ProxyService.kt:97-99, 288-290`
 
 ```kotlin
-logs.update { (it + msg).takeLast(200) }          // 2 new List на каждую строку
-_sshLog.value = (_sshLog.value + lines).takeLast(500)  // аналогично
-```
-
-`ArrayDeque<String>` с максимальным размером — O(1) добавление и удаление.
-
-#### [НИЗКОЕ] `process.destroy()` → SIGTERM вместо `destroyForcibly()` → SIGKILL
-**Файл:** `ProxyService.kt:139,207,239`
-
-`minSdk = 26`, `destroyForcibly()` доступен. Нативный бинарник может не обрабатывать SIGTERM.
-
-#### [НИЗКОЕ] SSH-лог доступен через clipboard всем приложениям
-**Файл:** `HomeScreen.kt:429-431`
-
-SSH-лог содержит IP-сервера, пути, команды. Копируется в системный clipboard без предупреждения.
-
----
-
-## Часть 2 — Функция «Сбросить все настройки»
-
-### Описание
-
-Полный сброс всех данных приложения к заводским настройкам:
-- Очистка DataStore (`app_prefs`)
-- Очистка EncryptedSharedPreferences (`secure_ssh_prefs`) — пароль и SSH-ключ
-- Удаление кастомного бинарника (`filesDir/custom_vkturn`)
-- Сброс флага онбординга → показ онбординга при следующем запуске
-- Остановка прокси-сервиса если запущен
-- Сброс всех in-memory состояний в ViewModel
-- Перезапуск Activity для корректного сброса NavHost
-
-### Затрагиваемые файлы
-
-| Файл | Изменение |
-|---|---|
-| `AppPreferences.kt` | `suspend fun resetAll()` — очищает DataStore + EncryptedSharedPreferences |
-| `MainViewModel.kt` | `fun resetAllSettings(context: Context)` — оркестрирует сброс, перезапускает Activity |
-| `HomeScreen.kt` (InfoBottomSheet) | Кнопка «Сбросить настройки» с диалогом подтверждения |
-
-### Реализация — `AppPreferences.resetAll()`
-
-```kotlin
-suspend fun resetAll() {
-    // 1. DataStore
-    context.dataStore.edit { it.clear() }
-
-    // 2. EncryptedSharedPreferences
-    withContext(Dispatchers.IO) {
-        encryptedPrefs.edit { clear() }
-    }
-
-    // 3. Кастомный бинарник
-    withContext(Dispatchers.IO) {
-        File(context.filesDir, "custom_vkturn").delete()
-    }
+val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+    PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
 }
 ```
 
-### Реализация — `MainViewModel.resetAllSettings()`
+Создаётся в `onStartCommand()` и повторно в `updateNotification()`. Можно сохранить как поле класса.
+
+#### [НИЗКОЕ] `Regex` компилируется при каждом вызове
+**Файл:** `ProxyService.kt:141`
 
 ```kotlin
-fun resetAllSettings(context: Context) {
-    viewModelScope.launch {
-        // Стоп прокси
-        if (ProxyService.isRunning.value) {
-            context.stopService(Intent(context, ProxyService::class.java))
-        }
-
-        // Сброс данных
-        prefs.resetAll()
-
-        // Сброс in-memory состояния
-        activeSshConfig = null
-        _sshState.value = SshConnectionState.Disconnected
-        _serverState.value = ServerState.Unknown
-        _serverVersion.value = null
-        _serverLogs.value = null
-        _sshLog.value = emptyList()
-        _proxyState.value = ProxyState.Idle
-        _customKernelExists.value = false
-        ProxyService.logs.value = emptyList()
-
-        // Перезапуск Activity — единственный надёжный способ сбросить NavHost
-        val intent = (context as? android.app.Activity)?.intent
-            ?: Intent(context, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        context.startActivity(intent)
-    }
-}
+val parts = cfg.rawCommand.trim().split("\\s+".toRegex())
 ```
 
-### Реализация — UI (InfoBottomSheet в `HomeScreen.kt`)
-
-Добавить в `InfoBottomSheet` после секции «Логи»:
-
-```kotlin
-// ── Сброс настроек ─────────────────────────────────────────────────────
-HorizontalDivider()
-
-var showResetDialog by remember { mutableStateOf(false) }
-
-ListItem(
-    headlineContent = {
-        Text("Сбросить все настройки", color = MaterialTheme.colorScheme.error)
-    },
-    supportingContent = { Text("Удалит SSH-данные, конфигурацию клиента и кастомное ядро") },
-    trailingContent = {
-        IconButton(onClick = { showResetDialog = true }) {
-            Icon(Icons.Filled.DeleteForever, null, tint = MaterialTheme.colorScheme.error)
-        }
-    },
-    modifier = Modifier.clickable { showResetDialog = true }
-)
-
-if (showResetDialog) {
-    AlertDialog(
-        onDismissRequest = { showResetDialog = false },
-        title = { Text("Сбросить настройки?") },
-        text = { Text("Все SSH-данные, настройки клиента и кастомный бинарник будут удалены. Приложение перезапустится.") },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    showResetDialog = false
-                    HapticUtil.perform(context, HapticUtil.Pattern.ERROR)
-                    viewModel.resetAllSettings(context)
-                },
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) { Text("Сбросить") }
-        },
-        dismissButton = {
-            TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
-        }
-    )
-}
-```
+`"\\s+".toRegex()` компилирует паттерн каждый раз. Вынести в `companion object`.
 
 ---
 
-## Часть 3 — Сводная таблица всех задач
+## 8. Тесты
 
-### Приоритет 1 — Критичные (блокируют корректность / безопасность)
+Тесты полностью отсутствуют. В зависимостях есть JUnit 4, AndroidX Test, Espresso — но не используются.
 
-| # | Файл | Проблема | Действие |
-|---|---|---|---|
-| ✅ P1-1 | `ProxyService.kt:43,131,188` | Гонка `userStopped`/`process`/`sessionKillScheduled` | `AtomicBoolean` + `AtomicReference<Process>` + synchronized блок |
-| ✅ P1-2 | `ProxyService.kt:86` | `runBlocking` в фоновом потоке при чтении DataStore | Переписать `startBinaryProcess()` как suspend-функцию внутри `CoroutineScope(Dispatchers.IO)` |
-| ✅ P1-3 | `SSHManager.kt` | SSH key auth в UI нефункциональна (ключ игнорируется) | Реализовать `jsch.addIdentity(...)` или убрать UI-опцию |
-| ✅ P1-4 | `MainViewModel.kt:253-271` | Нет верификации SHA-256 скачанного бинарника | Добавить проверку контрольной суммы перед `chmod +x` |
-| ✅ P1-5 | `AndroidManifest.xml` | Отсутствует `<property>` для `specialUse` FGS — отклонение Play | Добавить `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` |
+Приоритетные кандидаты:
+1. `AppPreferences` — сохранение/чтение/миграция/сброс
+2. `TofuHostKeyRepository` — TOFU-логика, MITM-детекция
+3. `isQuotaError()` — парсинг ошибок
+4. `MainViewModel` — состояния и переходы (потребует мокирования `ProxyService`)
 
-### Приоритет 2 — Высокие (баги UX / архитектурные долги)
+---
 
-| # | Файл | Проблема | Действие |
-|---|---|---|---|
-| ✅ P2-1 | `MainViewModel.kt:393` | `delay(2500)` + эвристика для определения старта | Добавить dedicated `StateFlow<StartupResult>` в `ProxyService` |
-| ✅ P2-2 | `MainViewModel.kt:162-335` | Дублирование `SimpleDateFormat` × 5, дублирование SSH-паттерна × 4 | Вынести в `timestamp()` и `runSshOperation()` |
-| ✅ P2-3 | `ProxyService.kt:86,41` | `AppPreferences(this@ProxyService)` без `applicationContext` | Заменить на `applicationContext` |
-| ✅ P2-4 | `MainViewModel.kt:203` | `_serverState` зависает в `Checking` при пустом IP | Добавить `_serverState.value = ServerState.Unknown` перед `return` |
-| ✅ P2-5 | `ProxyService.kt:139,207,239` | `destroy()` → SIGTERM, нативный процесс может зависнуть | Заменить на `destroyForcibly()` |
-| ✅ P2-6 | `MainViewModel.kt:157` | Фейковый прогресс подключения | Убрать `delay(400)`/`delay(300)`, начинать SSH сразу |
-| ✅ P2-7 | `AppPreferences.kt` | DataStore не исключён из Android Backup | Добавить в `backup_rules.xml` и `data_extraction_rules.xml` |
+## 9. Сводная оценка
 
-### Приоритет 3 — Средние (производительность / качество)
-
-| # | Файл | Проблема | Действие |
-|---|---|---|---|
-| P3-1 | `ServerManagementScreen.kt:286` | `Column + forEach` для 500 строк SSH-лога | Заменить на `LazyColumn` |
-| P3-2 | `HomeScreen.kt:546` | `Column + forEachIndexed` для 200 строк прокси-лога | Заменить на `LazyColumn` |
-| P3-3 | `ProxyService.kt:37`, `MainViewModel.kt:84` | O(n) аллокации на каждую строку лога | Использовать `ArrayDeque` с maxSize |
-| P3-4 | `AppNavigation.kt:159` | `Routes.CLIENT_SETUP + "_onboarding"` — строковая конкатенация | Вынести в `Routes.CLIENT_SETUP_OB` константу |
-| P3-5 | `SSHManager.kt:88` | `disconnect()` — no-op с вводящим в заблуждение API | Удалить метод или добавить `@Deprecated` + документацию |
-| P3-6 | `AppPreferences.kt:41` | `encryptedPrefs` lazy init может произойти на уничтоженном context | Использовать `applicationContext` |
-| P3-7 | `app/build.gradle.kts` | `security-crypto:1.1.0-alpha06` — alpha в продакшне | Понизить до стабильной `1.0.0` |
-| P3-8 | `ProxyService.kt:64` | Системный drawable в нотификации | Использовать собственную иконку из `res/drawable` |
-| P3-9 | `ClientSetupScreen.kt:87` | `lastSliderInt` через `remember` сбрасывается при ротации | Заменить на `rememberSaveable` |
-| P3-10 | `MainViewModel.kt:84` | `appendSshLog` — O(n) на каждые несколько строк | Использовать `ArrayDeque` + `toList()` только при публикации |
-
-### Новая функция — Сброс настроек
-
-| # | Файл | Задача |
+| Категория | Оценка | Комментарий |
 |---|---|---|
-| F1 | `AppPreferences.kt` | Реализовать `suspend fun resetAll()` — DataStore + EncryptedSharedPreferences + custom binary |
-| F2 | `MainViewModel.kt` | Реализовать `fun resetAllSettings(context: Context)` — стоп сервиса + resetAll() + сброс состояния + restart Activity |
-| F3 | `HomeScreen.kt` | Добавить пункт «Сбросить настройки» в `InfoBottomSheet` с `AlertDialog` подтверждения |
-| F4 | `AppPreferences.kt` | Добавить `Icons.Filled.DeleteForever` в импорты (из `material-icons-extended`) |
+| Зависимости | 9/10 | Все свежие; `security-crypto` alpha |
+| Архитектура | 7/10 | Чёткое разделение; global state, god ViewModel |
+| Concurrency | 8/10 | Atomics, synchronized, coroutines; WakeLock timeout |
+| Безопасность | 7/10 | EncryptedPrefs, TOFU, SHA-256; shell injection |
+| UI/Compose | 8/10 | M3 + Expressive, dark theme, animations, отдельный LogsScreen; строки захардкожены |
+| Качество кода | 8/10 | Sealed classes, no duplication; мелкие проблемы |
+| Тесты | 1/10 | Полностью отсутствуют |
+| **Общее** | **7/10** | Хорошая база с активным улучшением |
 
 ---
 
-## Часть 4 — Порядок реализации (рекомендуемый)
+## 10. Приоритетный план действий
 
-```
-Спринт 1 (критичная безопасность и корректность): ✅ ГОТОВО
-  ✅ P1-3  SSH key auth через jsch.addIdentity()
-  ✅ P1-4  SHA-256 верификация бинарника через checksums.txt
-  ✅ P1-5  <property> для specialUse FGS
-  ✅ (доп.) disconnectSsh() + кнопка «Отключить» в InfoBottomSheet
-  ✅ (доп.) SshSetupScreen: нет авто-перехода при уже активном подключении
+### P1 — Критичные
 
-Спринт 2 (конкурентность и стабильность): ✅ ГОТОВО
-  ✅ P1-1  AtomicBoolean/AtomicReference вместо @Volatile
-  ✅ P1-2  startBinaryProcess → suspend fun в serviceScope
-  ✅ P2-3  AppPreferences(applicationContext) в ProxyService и AppPreferences
-  ✅ P2-5  destroyForcibly() везде
+| # | Проблема | Файл | Статус |
+|---|---|---|---|
+| 1 | Валидация `host:port` перед подстановкой в shell-скрипты | `MainViewModel.kt:335` | |
+| 2 | `contentDescription` для ProxyToggleButton | `HomeScreen.kt:347-356` | |
 
-Спринт 3 (архитектура и UX): ✅ ГОТОВО
-  ✅ P2-1  StartupResult StateFlow + withTimeoutOrNull(5s) вместо delay(2500)
-  ✅ P2-2  timestamp() + runSshCommand() — убрано 5× SimpleDateFormat и 6× boilerplate
-  ✅ P2-4  serverState → Unknown при пустом IP
-  ✅ P2-6  Убраны delay(400)/delay(300) — SSH начинается сразу
-  ✅ P2-7  DataStore исключён из backup_rules.xml и data_extraction_rules.xml
+### P2 — Высокие
 
-Спринт 3 (архитектура и UX):
-  P2-1  Явный сигнал запуска прокси
-  P2-2  Дедупликация кода (timestamp, runSshOperation)
-  P2-4  Фикс зависания serverState
-  P2-6  Убрать фейковый прогресс
-  P2-7  Backup exclusion для DataStore
+| # | Проблема | Файл | Статус |
+|---|---|---|---|
+| 3 | Вынести строки в `strings.xml` (~100+ строк) | Все UI-файлы | |
+| 4 | WakeLock с timeout | `ProxyService.kt:110-111` | |
+| 5 | Синхронизация `sshLogBuffer` | `MainViewModel.kt:91-94` | |
 
-Спринт 4 (новая функция):
-  F1    AppPreferences.resetAll()
-  F2    MainViewModel.resetAllSettings()
-  F3    UI — кнопка сброса + AlertDialog
+### P3 — Средние
 
-Спринт 5 (производительность и полировка):
-  P3-1  LazyColumn для SSH-лога
-  P3-2  LazyColumn для прокси-лога
-  P3-3  ArrayDeque для логов
-  P3-4  Константа CLIENT_SETUP_OB
-  P3-7  security-crypto стабильная версия
-  P3-8  Собственная иконка нотификации
-  Остальные P3-*
-```
+| # | Проблема | Файл | Статус |
+|---|---|---|---|
+| 6 | `AppPreferences` → синглтон | `AppPreferences.kt`, `ProxyService.kt:127` | |
+| 7 | `DateTimeFormatter` вместо `SimpleDateFormat` | `MainViewModel.kt:104-106` | |
+| 8 | Удалить пустой `onCleared()` | `MainViewModel.kt:507-509` | |
+| 9 | Вынести `StatusOrange` в `Color.kt` | `LogsScreen.kt:131` | |
+| 10 | `key` в `LazyColumn` для логов | `LogsScreen.kt:107` | |
+| 11 | Outlined-вариант иконки для вкладки «Логи» | `AppNavigation.kt:297` | |
+| 12 | Дедупликация `PendingIntent` в ProxyService | `ProxyService.kt:97,288` | |
+| 13 | Написать базовые unit-тесты | Новые файлы | |
+
+---
+
+## Changelog
+
+- **2026-04-03:** Актуализировано после `b5d4f93`. Добавлены: LogsScreen как отдельная вкладка, динамические уведомления в ProxyService, CircularWavyProgressIndicator (M3 Expressive), упрощение InfoBottomSheet (логи вынесены), условный показ карточки настроек, popUpTo fix в навигации. Обновлены номера строк. Новые проблемы: дублирование PendingIntent, одинаковые иконки вкладки «Логи». UI оценка повышена 7→8.
+- **2026-04-02:** Первичный аудит (claude-opus-4-6).

@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.StatusGreen
+import com.freeturn.app.ui.theme.StatusOrange
 import com.freeturn.app.viewmodel.MainViewModel
 
 @Composable
@@ -104,7 +105,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                itemsIndexed(logs) { _, line ->
+                itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
                     LogLine(line = line)
                 }
             }
@@ -128,7 +129,7 @@ private fun LogLine(line: String) {
 
     val textColor = when {
         isError   -> MaterialTheme.colorScheme.error
-        isWarning -> androidx.compose.ui.graphics.Color(0xFFE67E22)
+        isWarning -> StatusOrange
         isSuccess -> StatusGreen
         isHeader  -> MaterialTheme.colorScheme.primary
         else      -> MaterialTheme.colorScheme.onSurfaceVariant
