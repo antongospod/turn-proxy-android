@@ -61,6 +61,7 @@ class AppPreferences(context: Context) {
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
+        val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
 
         // Устаревшие ключи — используются только для миграции
         private val SSH_PASS_LEGACY = stringPreferencesKey("ssh_pass")
@@ -125,6 +126,10 @@ class AppPreferences(context: Context) {
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
 
+    val dynamicThemeFlow: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[DYNAMIC_THEME] ?: true }
+
     suspend fun saveSshConfig(config: SshConfig) {
         // Чувствительные данные — в зашифрованное хранилище
         withContext(Dispatchers.IO) {
@@ -164,6 +169,10 @@ class AppPreferences(context: Context) {
 
     suspend fun setOnboardingDone(done: Boolean) {
         context.dataStore.edit { prefs -> prefs[ONBOARDING_DONE] = done }
+    }
+
+    suspend fun setDynamicTheme(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[DYNAMIC_THEME] = enabled }
     }
 
     suspend fun saveProxyConfig(listen: String, connect: String) {

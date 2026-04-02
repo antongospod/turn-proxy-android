@@ -113,4 +113,7 @@
     <string name="privacy_notice">Мы не собираем никаких данных. Все настройки (SSH-доступ, параметры прокси) хранятся исключительно на вашем устройстве.</string>
     <string name="setup_server">Настроить сервер</string>
     <string name="skip_setup">Пропустить настройки</string>
+
+    <string name="dynamic_theme_title">Динамическая тема</string>
+    <string name="dynamic_theme_desc">Использовать системные цвета (Material You)</string>
 </resources>

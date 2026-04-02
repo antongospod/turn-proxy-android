@@ -13,6 +13,9 @@ import com.freeturn.app.ui.navigation.AppNavigation
 import com.freeturn.app.ui.theme.FreeTurnTheme
 import com.freeturn.app.viewmodel.MainViewModel
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
@@ -21,7 +24,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FreeTurnTheme {
+            val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
+            FreeTurnTheme(dynamicColor = dynamicTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
