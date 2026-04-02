@@ -69,6 +69,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val proxyConnect: StateFlow<String> = prefs.proxyConnectFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "127.0.0.1:40537")
 
+    val dynamicTheme: StateFlow<Boolean> = prefs.dynamicThemeFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setDynamicTheme(enabled: Boolean) {
+        viewModelScope.launch { prefs.setDynamicTheme(enabled) }
+    }
+
     // ── SSH ────────────────────────────────────────────────────────────────
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {

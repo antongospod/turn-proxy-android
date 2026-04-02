@@ -306,9 +306,9 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
     val contentColor by animateColorAsState(
         targetValue = when (state) {
             is ProxyState.Running -> StatusGreen
-            is ProxyState.Error -> MaterialTheme.colorScheme.error
-            is ProxyState.Starting -> MaterialTheme.colorScheme.secondary
-            else -> MaterialTheme.colorScheme.primary
+            is ProxyState.Error -> MaterialTheme.colorScheme.onErrorContainer
+            is ProxyState.Starting -> MaterialTheme.colorScheme.onSecondaryContainer
+            else -> MaterialTheme.colorScheme.onPrimaryContainer
         },
         animationSpec = tween(600),
         label = "btn_fg"
@@ -362,6 +362,7 @@ private fun InfoBottomSheet(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
+    val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     val appVersion = remember {
@@ -433,6 +434,23 @@ private fun InfoBottomSheet(
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
                 onOpen = { uriHandler.openUri(it) }
+            )
+        }
+
+        item { HorizontalDivider() }
+
+        // ── Настройки интерфейса ──────────────────────────────────────────
+        item {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.dynamic_theme_title)) },
+                supportingContent = { Text(stringResource(R.string.dynamic_theme_desc)) },
+                colors = listColors,
+                trailingContent = {
+                    androidx.compose.material3.Switch(
+                        checked = dynamicTheme,
+                        onCheckedChange = { viewModel.setDynamicTheme(it) }
+                    )
+                }
             )
         }
 
