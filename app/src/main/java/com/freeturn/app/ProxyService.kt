@@ -28,7 +28,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class StartupResult {
     data object Success : StartupResult()
@@ -45,22 +47,15 @@ class ProxyService : Service() {
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val startupResult = MutableStateFlow<StartupResult?>(null)
 
-        // P3-3: ArrayDeque — O(1) addLast/removeFirst вместо O(n) list concatenation
-        private val logBuffer = ArrayDeque<String>(MAX_LOG_LINES)
-
         fun addLog(msg: String) {
-            synchronized(logBuffer) {
-                logBuffer.addLast(msg)
-                while (logBuffer.size > MAX_LOG_LINES) logBuffer.removeFirst()
-                logs.value = logBuffer.toList()
+            logs.update { current ->
+                val next = current + msg
+                if (next.size > MAX_LOG_LINES) next.drop(next.size - MAX_LOG_LINES) else next
             }
         }
 
         fun clearLogs() {
-            synchronized(logBuffer) {
-                logBuffer.clear()
-                logs.value = emptyList()
-            }
+            logs.value = emptyList()
         }
     }
 
@@ -164,9 +159,11 @@ class ProxyService : Service() {
         try {
             addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
-            val proc = ProcessBuilder(cmdArgs)
-                .redirectErrorStream(true)
-                .start()
+            val proc = withContext(Dispatchers.IO) {
+                ProcessBuilder(cmdArgs)
+                    .redirectErrorStream(true)
+                    .start()
+            }
             process.set(proc)
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
@@ -205,7 +202,9 @@ class ProxyService : Service() {
                 }
             }
 
-            exitCode = if (proc.waitFor(5, TimeUnit.MINUTES)) proc.exitValue() else -1
+            exitCode = if (withContext(Dispatchers.IO) {
+                    proc.waitFor(5, TimeUnit.MINUTES)
+                }) proc.exitValue() else -1
             addLog("=== ПРОЦЕСС ОСТАНОВЛЕН (Код: $exitCode) ===")
             if (!startupEmitted) {
                 startupResult.value = StartupResult.Failed(

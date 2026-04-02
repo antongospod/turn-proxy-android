@@ -3,6 +3,10 @@ package com.freeturn.app.ui
 import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Apple-like haptic patterns for a tactile, musical feel.
@@ -28,6 +32,7 @@ object HapticUtil {
         LAUNCH,
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     fun perform(context: Context, pattern: Pattern) {
         val vibrator = context.getSystemService(Vibrator::class.java) ?: return
         val effect = when (pattern) {
@@ -82,6 +87,8 @@ object HapticUtil {
                 -1
             )
         }
-        vibrator.vibrate(effect)
+        GlobalScope.launch(Dispatchers.Default) {
+            try { vibrator.vibrate(effect) } catch(_: Exception) {}
+        }
     }
 }

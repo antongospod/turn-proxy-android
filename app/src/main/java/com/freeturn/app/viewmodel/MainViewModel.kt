@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -86,13 +87,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _sshLog = MutableStateFlow<List<String>>(emptyList())
     val sshLog: StateFlow<List<String>> = _sshLog.asStateFlow()
 
-    // P3-10: ArrayDeque — O(1) вместо O(n) list concatenation
-    private val sshLogBuffer = ArrayDeque<String>(500)
     private fun appendSshLog(vararg lines: String) {
-        synchronized(sshLogBuffer) {
-            lines.forEach { sshLogBuffer.addLast(it) }
-            while (sshLogBuffer.size > 500) sshLogBuffer.removeFirst()
-            _sshLog.value = sshLogBuffer.toList()
+        _sshLog.update { current ->
+            var next = current + lines
+            if (next.size > 500) next = next.drop(next.size - 500)
+            next
         }
     }
 
@@ -383,10 +382,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearSshLog() {
-        synchronized(sshLogBuffer) {
-            sshLogBuffer.clear()
-            _sshLog.value = emptyList()
-        }
+        _sshLog.value = emptyList()
     }
 
     // ── Local proxy ────────────────────────────────────────────────────────
@@ -502,10 +498,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _serverState.value = ServerState.Unknown
             _serverVersion.value = null
             _serverLogs.value = null
-            synchronized(sshLogBuffer) {
-                sshLogBuffer.clear()
-                _sshLog.value = emptyList()
-            }
+            _sshLog.value = emptyList()
             _proxyState.value = ProxyState.Idle
             _customKernelExists.value = false
             ProxyService.clearLogs()
