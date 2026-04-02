@@ -259,6 +259,8 @@ class ProxyService : Service() {
 
     // ── Network Handover ──────────────────────────────────────────────────────
 
+    private var networkDebounceJob: kotlinx.coroutines.Job? = null
+
     private fun registerNetworkCallback() {
         networkInitialized = false
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -268,12 +270,17 @@ class ProxyService : Service() {
                     networkInitialized = true
                     return
                 }
-                if (!userStopped.get() && process.get() != null) {
-                    addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
-                    updateNotification("VK TURN Proxy", "Смена сети, переподключение...")
-                    restartCount = 0
-                    // P2-5: destroyForcibly()
-                    process.get()?.destroyForcibly()
+                
+                // Дебаунс: отменяем предыдущий ждущий перезапуск, если он был
+                networkDebounceJob?.cancel()
+                networkDebounceJob = serviceScope.launch {
+                    kotlinx.coroutines.delay(2000)
+                    if (!userStopped.get() && process.get() != null) {
+                        addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
+                        updateNotification("VK TURN Proxy", "Смена сети, переподключение...")
+                        restartCount = 0
+                        process.get()?.destroyForcibly()
+                    }
                 }
             }
         }
