@@ -2,6 +2,7 @@ package com.freeturn.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -94,10 +95,15 @@ class ProxyService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (isRunning.value) return START_STICKY
 
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
+        }
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
             .setContentTitle("VK TURN Proxy")
-            .setContentText("Работает в фоне")
+            .setContentText("Подключение...")
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
+            .setOngoing(true)
+            .setContentIntent(openIntent)
             .build()
         startForeground(1, notification)
 
@@ -175,8 +181,10 @@ class ProxyService : Service() {
                         if (lower.contains("panic") || lower.contains("fatal") ||
                             lower.contains("rate limit")) {
                             startupResult.value = StartupResult.Failed(l)
+                            updateNotification("VK TURN Proxy", "Ошибка подключения")
                         } else {
                             startupResult.value = StartupResult.Success
+                            updateNotification("VK TURN Proxy", "Прокси активен")
                         }
                         startupEmitted = true
                     }
@@ -243,6 +251,7 @@ class ProxyService : Service() {
         val jitter = Random.nextLong(0, 500)
         val delay = baseDelay + jitter
         addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $restartCount/$MAX_RESTARTS) ===")
+        updateNotification("VK TURN Proxy", "Переподключение ($restartCount/$MAX_RESTARTS)...")
         handler.postDelayed({
             // Проверка userStopped + запуск через serviceScope вместо thread {}
             if (!userStopped.get()) serviceScope.launch { startBinaryProcess() }
@@ -262,6 +271,7 @@ class ProxyService : Service() {
                 }
                 if (!userStopped.get() && process.get() != null) {
                     addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
+                    updateNotification("VK TURN Proxy", "Смена сети, переподключение...")
                     restartCount = 0
                     // P2-5: destroyForcibly()
                     process.get()?.destroyForcibly()
@@ -280,6 +290,22 @@ class ProxyService : Service() {
             } catch (_: Exception) {}
         }
         networkCallback = null
+    }
+
+    // ── Notification ─────────────────────────────────────────────────────────
+
+    private fun updateNotification(title: String, text: String) {
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
+        }
+        val notification = NotificationCompat.Builder(this, "ProxyChannel")
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_menu_preferences)
+            .setOngoing(true)
+            .setContentIntent(openIntent)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(1, notification)
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

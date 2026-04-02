@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.freeturn.app.ui.screens
 
 import androidx.compose.foundation.background
@@ -31,7 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -116,7 +118,7 @@ fun ServerManagementScreen(
                     when (serverState) {
                         is ServerState.Checking -> {
                             Spacer(Modifier.height(12.dp))
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
                         is ServerState.Working -> {
                             Spacer(Modifier.height(12.dp))
@@ -126,7 +128,7 @@ fun ServerManagementScreen(
                                 color = MaterialTheme.colorScheme.secondary
                             )
                             Spacer(Modifier.height(6.dp))
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
                         is ServerState.Error -> {
                             Spacer(Modifier.height(12.dp))
@@ -238,33 +240,10 @@ fun ServerManagementScreen(
             }
 
             // ── SSH-лог (вывод всех команд) ────────────────────────────────
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+            if (sshLog.isNotEmpty()) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                         Text("SSH-лог", style = MaterialTheme.typography.titleMedium)
-                        IconButton(
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                viewModel.fetchServerLogs()
-                            },
-                            enabled = isConnected
-                        ) {
-                            Icon(painterResource(R.drawable.refresh_24px), contentDescription = "Запросить server.log", modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    if (sshLog.isEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Вывод SSH-команд появится здесь",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    } else {
                         Spacer(Modifier.height(12.dp))
                         val listState = rememberLazyListState()
                         LaunchedEffect(sshLog.size) {

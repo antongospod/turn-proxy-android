@@ -45,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.screens.ClientSetupScreen
 import com.freeturn.app.ui.screens.HomeScreen
+import com.freeturn.app.ui.screens.LogsScreen
 import com.freeturn.app.ui.screens.OnboardingScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
@@ -60,10 +61,11 @@ object Routes {
     const val CLIENT_SETUP = "client_setup"
     const val CLIENT_SETUP_OB = "client_setup_onboarding"
     const val HOME = "home"
+    const val LOGS = "logs"
 }
 
 // Нижнее меню видно только в основном потоке, не во время онбординга
-private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.SERVER_MANAGEMENT, Routes.CLIENT_SETUP)
+private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.LOGS, Routes.SERVER_MANAGEMENT, Routes.CLIENT_SETUP)
 
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
@@ -121,7 +123,10 @@ fun AppNavigation(viewModel: MainViewModel) {
                         onSetupServer = { navController.navigate(Routes.SSH_SETUP_OB) },
                         onSkip = {
                             viewModel.setOnboardingDone()
-                            navController.navigate(Routes.HOME)
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
@@ -157,7 +162,8 @@ fun AppNavigation(viewModel: MainViewModel) {
                         onFinish = {
                             viewModel.setOnboardingDone()
                             navController.navigate(Routes.HOME) {
-                                popUpTo(Routes.ONBOARDING) { inclusive = true }
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                launchSingleTop = true
                             }
                         }
                     )
@@ -205,6 +211,10 @@ fun AppNavigation(viewModel: MainViewModel) {
                         onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) },
                         onNavigateToClientSetup = { navController.navigate(Routes.CLIENT_SETUP) }
                     )
+                }
+
+                composable(Routes.LOGS) {
+                    LogsScreen(viewModel = viewModel)
                 }
             }
         }
@@ -284,7 +294,8 @@ private data class NavItem(
 private val navItems = listOf(
     NavItem(Routes.HOME, "Главная", R.drawable.home_24px, R.drawable.home_outlined_24px),
     NavItem(Routes.SERVER_MANAGEMENT, "Сервер", R.drawable.database_24px, R.drawable.database_outlined_24px),
-    NavItem(Routes.CLIENT_SETUP, "Клиент", R.drawable.mobile_24px, R.drawable.mobile_outlined_24px)
+    NavItem(Routes.CLIENT_SETUP, "Клиент", R.drawable.mobile_24px, R.drawable.mobile_outlined_24px),
+    NavItem(Routes.LOGS, "Логи", R.drawable.terminal_24px, R.drawable.terminal_24px)
 )
 
 @Composable

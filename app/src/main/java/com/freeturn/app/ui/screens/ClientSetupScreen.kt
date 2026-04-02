@@ -144,6 +144,18 @@ fun ClientSetupScreen(
                 supportingText = { Text("VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)") }
             )
 
+            OutlinedTextField(
+                value = localPort,
+                onValueChange = { localPort = it },
+                label = { Text("Локальный адрес прослушивания") },
+                placeholder = { Text("127.0.0.1:9000") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
+                }
+            )
+
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
             // ── Параметры ─────────────────────────────────────────────────
@@ -196,18 +208,6 @@ fun ClientSetupScreen(
                 onCheckedChange = {
                     HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                     noDtls = it
-                }
-            )
-
-            OutlinedTextField(
-                value = localPort,
-                onValueChange = { localPort = it },
-                label = { Text("Локальный адрес прослушивания") },
-                placeholder = { Text("127.0.0.1:9000") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                supportingText = {
-                    Text("Адрес, на котором клиент принимает трафик от WireGuard/Hysteria")
                 }
             )
 

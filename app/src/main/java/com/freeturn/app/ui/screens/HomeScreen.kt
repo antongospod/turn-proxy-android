@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
+)
 
 package com.freeturn.app.ui.screens
 
@@ -17,13 +20,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -33,7 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,11 +52,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -98,7 +96,9 @@ fun HomeScreen(
     val context = LocalContext.current
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
+    val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
     val clientConfig by viewModel.clientConfig.collectAsStateWithLifecycle()
+    val isConfigured = sshConfig.ip.isNotBlank()
 
     // ── Запрос разрешений при первом открытии главного экрана ─────────────
     val batteryOptLauncher = rememberLauncherForActivityResult(
@@ -205,70 +205,64 @@ fun HomeScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(40.dp))
+            if (isConfigured) {
+                Spacer(Modifier.height(40.dp))
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                elevation = CardDefaults.cardElevation(2.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Текущие настройки", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(12.dp))
-                    if (clientConfig.serverAddress.isNotBlank()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Текущие настройки", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(12.dp))
                         ConfigRow("Сервер", clientConfig.serverAddress)
                         ConfigRow("Потоки", "${clientConfig.threads}")
                         ConfigRow("UDP", if (clientConfig.useUdp) "Вкл" else "Выкл")
                         ConfigRow("Локальный порт", clientConfig.localPort)
-                    } else {
-                        Text(
-                            "Не настроено. Перейдите в раздел «Клиент».",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
                     }
                 }
-            }
 
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(8.dp)
-                        .background(
-                            if (sshState is SshConnectionState.Connected) StatusGreen
-                            else MaterialTheme.colorScheme.outline,
-                            CircleShape
-                        )
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    when (sshState) {
-                        is SshConnectionState.Connected -> "SSH: ${(sshState as SshConnectionState.Connected).ip}"
-                        is SshConnectionState.Connecting -> "SSH: подключение..."
-                        is SshConnectionState.Error -> "SSH: ошибка"
-                        else -> "SSH: не подключено"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
-                if (sshState !is SshConnectionState.Connected) {
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                if (sshState is SshConnectionState.Connected) StatusGreen
+                                else MaterialTheme.colorScheme.outline,
+                                CircleShape
+                            )
+                    )
                     Spacer(Modifier.width(8.dp))
-                    TextButton(
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            viewModel.reconnectSsh()
+                    Text(
+                        when (sshState) {
+                            is SshConnectionState.Connected -> "SSH: ${(sshState as SshConnectionState.Connected).ip}"
+                            is SshConnectionState.Connecting -> "SSH: подключение..."
+                            is SshConnectionState.Error -> "SSH: ошибка"
+                            else -> "SSH: не подключено"
                         },
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Text("Переподключить", style = MaterialTheme.typography.labelSmall)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
+                    if (sshState !is SshConnectionState.Connected) {
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                viewModel.reconnectSsh()
+                            },
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Переподключить", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -340,7 +334,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             when (state) {
-                is ProxyState.Starting -> CircularProgressIndicator(color = contentColor)
+                is ProxyState.Starting -> CircularWavyProgressIndicator(color = contentColor)
                 is ProxyState.Running -> Icon(
                     painterResource(R.drawable.check_circle_24px), null,
                     Modifier.size(52.dp), tint = contentColor
@@ -367,8 +361,6 @@ private fun InfoBottomSheet(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
-    val logs by viewModel.logs.collectAsStateWithLifecycle()
-    var showLogs by rememberSaveable { mutableStateOf(false) }
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     val appVersion = remember {
@@ -376,177 +368,135 @@ private fun InfoBottomSheet(
         catch (_: Exception) { "—" }
     }
 
-    Column(
+    val isConnected = sshState is SshConnectionState.Connected
+    val listColors = ListItemDefaults.colors(containerColor = containerColor)
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 16.dp)
-            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
     ) {
-        // ── SSH ────────────────────────────────────────────────────────────
-        val isConnected = sshState is SshConnectionState.Connected
-        val listColors = ListItemDefaults.colors(containerColor = containerColor)
-        ListItem(
-            headlineContent = { Text("Соединение", style = MaterialTheme.typography.titleSmall) },
-            colors = listColors,
-            trailingContent = {
-                TextButton(onClick = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    onNavigateToSshSetup()
-                }) { Text(if (isConnected) "Изменить" else "Настроить") }
-            }
-        )
-        HorizontalDivider()
-
-        ListItem(
-            headlineContent = { Text("SSH-статус") },
-            colors = listColors,
-            supportingContent = {
-                Text(
-                    when (sshState) {
-                        is SshConnectionState.Connected ->
-                            "Подключено: ${(sshState as SshConnectionState.Connected).ip}"
-                        is SshConnectionState.Connecting ->
-                            (sshState as SshConnectionState.Connecting).step
-                        is SshConnectionState.Error ->
-                            "Ошибка: ${(sshState as SshConnectionState.Error).message}"
-                        else -> "Не подключено"
-                    }
-                )
-            },
-            trailingContent = {
-                if (isConnected) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).background(StatusGreen, CircleShape))
+        // ── Соединение ────────────────────────────────────────────────────
+        item {
+            ListItem(
+                headlineContent = { Text("Соединение", style = MaterialTheme.typography.titleSmall) },
+                colors = listColors,
+                supportingContent = {
+                    Text(
+                        when (sshState) {
+                            is SshConnectionState.Connected ->
+                                "Подключено: ${(sshState as SshConnectionState.Connected).ip}"
+                            is SshConnectionState.Connecting ->
+                                (sshState as SshConnectionState.Connecting).step
+                            is SshConnectionState.Error ->
+                                "Ошибка: ${(sshState as SshConnectionState.Error).message}"
+                            else -> "Не подключено"
+                        }
+                    )
+                },
+                trailingContent = {
+                    if (isConnected) {
                         TextButton(onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            viewModel.disconnectSsh()
-                        }) { Text("Отключить") }
-                    }
-                } else {
-                    IconButton(onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.reconnectSsh()
-                    }) {
-                        Icon(painterResource(R.drawable.refresh_24px), contentDescription = "Переподключить")
+                            onNavigateToSshSetup()
+                        }) { Text("Изменить") }
+                    } else {
+                        TextButton(onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            onNavigateToSshSetup()
+                        }) { Text("Настроить") }
                     }
                 }
-            }
-        )
-
-        HorizontalDivider()
-
-        // ── Логи ──────────────────────────────────────────────────────────
-        ListItem(
-            headlineContent = { Text("Логи", style = MaterialTheme.typography.titleSmall) },
-            colors = listColors,
-            trailingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = {
-                            val cm = context.getSystemService(ClipboardManager::class.java)
-                            cm.setPrimaryClip(ClipData.newPlainText("proxy_logs", logs.joinToString("\n")))
-                            HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
-                        },
-                        enabled = logs.isNotEmpty()
-                    ) {
-                        Icon(painterResource(R.drawable.content_copy_24px), contentDescription = "Копировать логи", modifier = Modifier.size(18.dp))
-                    }
-                    TextButton(onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.clearLogs()
-                    }) { Text("Очистить") }
-                    TextButton(onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                        showLogs = !showLogs
-                    }) {
-                        Text(if (showLogs) "Скрыть" else "Показать")
-                    }
-                }
-            }
-        )
-
-        if (showLogs) {
-            LogsPanel(
-                logs = logs,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
 
-        HorizontalDivider()
+        item { HorizontalDivider() }
 
-        // ── О приложении ───────────────────────────────────────────────────
-        ListItem(
-            headlineContent = { Text("О приложении", style = MaterialTheme.typography.titleSmall) },
-            colors = listColors
-        )
+        // ── Ссылки ────────────────────────────────────────────────────────
+        item {
+            RepoLinkItem(
+                title = "Android-клиент",
+                subtitle = "antongospod/turn-proxy",
+                url = "https://github.com/antongospod/turn-proxy",
+                containerColor = containerColor,
+                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
+                onOpen = { uriHandler.openUri(it) }
+            )
+        }
 
-        ListItem(
-            headlineContent = { Text("FreeTurn") },
-            colors = listColors,
-            supportingContent = { Text("Версия $appVersion") }
-        )
+        item {
+            RepoLinkItem(
+                title = "Прокси-ядро",
+                subtitle = "cacggghp/vk-turn-proxy",
+                url = "https://github.com/cacggghp/vk-turn-proxy",
+                containerColor = containerColor,
+                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
+                onOpen = { uriHandler.openUri(it) }
+            )
+        }
 
-        RepoLinkItem(
-            title = "Android-клиент",
-            subtitle = "Fork MYSOREZ/vk-turn-proxy-android",
-            url = "https://github.com/MYSOREZ/vk-turn-proxy-android",
-            containerColor = containerColor,
-            onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
-            onOpen = { uriHandler.openUri(it) }
-        )
-
-        RepoLinkItem(
-            title = "Прокси-ядро",
-            subtitle = "cacggghp/vk-turn-proxy",
-            url = "https://github.com/cacggghp/vk-turn-proxy",
-            containerColor = containerColor,
-            onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
-            onOpen = { uriHandler.openUri(it) }
-        )
-
-        HorizontalDivider()
+        item { HorizontalDivider() }
 
         // ── Сброс ─────────────────────────────────────────────────────────
-        ListItem(
-            headlineContent = { Text("Сбросить настройки") },
-            colors = listColors,
-            supportingContent = { Text("SSH, клиент, прокси и кастомное ядро") },
-            trailingContent = {
+        item {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        "Сбросить настройки",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                colors = listColors,
+                trailingContent = {
+                    Icon(
+                        painterResource(R.drawable.delete_24px),
+                        contentDescription = "Сбросить",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                modifier = Modifier.clickable {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    showResetDialog = true
+                }
+            )
+        }
+
+        // ── Версия ────────────────────────────────────────────────────────
+        item {
+            Text(
+                text = "v$appVersion",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Сбросить все настройки?") },
+            text = { Text("Все настройки будут удалены, прокси остановлен. Приложение перезапустится.") },
+            confirmButton = {
                 TextButton(
                     onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        showResetDialog = true
+                        showResetDialog = false
+                        viewModel.resetAllSettings(context)
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
                 ) { Text("Сбросить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
             }
         )
-
-        if (showResetDialog) {
-            AlertDialog(
-                onDismissRequest = { showResetDialog = false },
-                title = { Text("Сбросить все настройки?") },
-                text = { Text("Все настройки будут удалены, прокси остановлен. Приложение перезапустится.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showResetDialog = false
-                            viewModel.resetAllSettings(context)
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) { Text("Сбросить") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showResetDialog = false }) { Text("Отмена") }
-                }
-            )
-        }
     }
 }
 
@@ -584,92 +534,6 @@ private fun RepoLinkItem(
     )
 }
 
-@Composable
-private fun LogsPanel(logs: List<String>, modifier: Modifier = Modifier) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) listState.animateScrollToItem(logs.lastIndex)
-    }
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        if (logs.isEmpty()) {
-            Text(
-                "Нет логов",
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .heightIn(max = 320.dp)
-                    .padding(vertical = 8.dp)
-            ) {
-                itemsIndexed(logs) { index, line ->
-                    LogLine(line = line, isEven = index % 2 == 0)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LogLine(line: String, isEven: Boolean) {
-    val lower = line.lowercase()
-    val isHeader = line.startsWith("===")
-    val isError = lower.contains("ошибка") || lower.contains("error") ||
-                  lower.contains("критическая") || lower.contains("failed") ||
-                  lower.contains("fatal") || lower.contains("panic")
-    val isWarning = lower.contains("watchdog") || lower.contains("перезапуск") ||
-                    lower.contains("quota") || lower.contains("warn") ||
-                    lower.contains(">>>")
-    val isSuccess = lower.contains("запущен") || lower.contains("подключен") ||
-                    lower.contains("success") || lower.contains("started") ||
-                    lower.contains("ok")
-
-    val textColor = when {
-        isError   -> MaterialTheme.colorScheme.error
-        isWarning -> androidx.compose.ui.graphics.Color(0xFFE67E22)
-        isSuccess -> StatusGreen
-        isHeader  -> MaterialTheme.colorScheme.primary
-        else      -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val bgColor = if (isEven)
-        MaterialTheme.colorScheme.surfaceVariant
-    else
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(bgColor)
-            .padding(horizontal = 12.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        if (isHeader || isError || isWarning || isSuccess) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 5.dp, end = 6.dp)
-                    .size(5.dp)
-                    .background(textColor, CircleShape)
-            )
-        } else {
-            Spacer(Modifier.width(11.dp))
-        }
-        Text(
-            text = line,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontWeight = if (isHeader) androidx.compose.ui.text.font.FontWeight.SemiBold
-                             else androidx.compose.ui.text.font.FontWeight.Normal
-            ),
-            color = textColor
-        )
-    }
-}
 
 @Composable
 private fun ConfigRow(label: String, value: String) {
