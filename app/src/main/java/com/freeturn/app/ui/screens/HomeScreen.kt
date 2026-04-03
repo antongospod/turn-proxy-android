@@ -177,11 +177,11 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            viewModel.startProxy(context)
+                            viewModel.startProxy()
                         }
                         is ProxyState.Running -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
-                            viewModel.stopProxy(context)
+                            viewModel.stopProxy()
                         }
                         else -> {}
                     }

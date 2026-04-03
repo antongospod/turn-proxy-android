@@ -44,7 +44,10 @@ class LocalProxyManager(private val context: Context) {
 
     suspend fun observeProxyServiceStatus() {
         ProxyService.isRunning.collect { running ->
-            if (!running && _proxyState.value == ProxyState.Running) {
+            if (running && _proxyState.value !is ProxyState.Running && _proxyState.value !is ProxyState.Starting) {
+                // Сервис запущен внешним источником (например, ProxyReceiver)
+                _proxyState.value = ProxyState.Running
+            } else if (!running && _proxyState.value is ProxyState.Running) {
                 _proxyState.value = ProxyState.Idle
             }
         }
