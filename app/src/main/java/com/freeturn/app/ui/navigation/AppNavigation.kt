@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -244,7 +245,7 @@ private fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF00416A)),
+            .background(MaterialTheme.colorScheme.primary),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -258,27 +259,27 @@ private fun SplashScreen() {
             Box(
                 modifier = Modifier
                     .size(112.dp)
-                    .background(Color.White.copy(alpha = 0.15f), CircleShape),
+                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(R.drawable.nearby_24px),
                     contentDescription = null,
                     modifier = Modifier.size(60.dp),
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                "FreeTurn",
+                stringResource(R.string.splash_title),
                 style = MaterialTheme.typography.displaySmall,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onPrimary
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "VK TURN Proxy",
+                stringResource(R.string.splash_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
             )
         }
     }
@@ -286,16 +287,16 @@ private fun SplashScreen() {
 
 private data class NavItem(
     val route: String,
-    val label: String,
+    val labelResId: Int,
     val selectedIconRes: Int,
     val unselectedIconRes: Int
 )
 
 private val navItems = listOf(
-    NavItem(Routes.HOME, "Главная", R.drawable.home_24px, R.drawable.home_outlined_24px),
-    NavItem(Routes.SERVER_MANAGEMENT, "Сервер", R.drawable.database_24px, R.drawable.database_outlined_24px),
-    NavItem(Routes.CLIENT_SETUP, "Клиент", R.drawable.mobile_24px, R.drawable.mobile_outlined_24px),
-    NavItem(Routes.LOGS, "Логи", R.drawable.terminal_24px, R.drawable.terminal_24px)
+    NavItem(Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
+    NavItem(Routes.SERVER_MANAGEMENT, R.string.server, R.drawable.database_24px, R.drawable.database_outlined_24px),
+    NavItem(Routes.CLIENT_SETUP, R.string.client_title, R.drawable.mobile_24px, R.drawable.mobile_outlined_24px),
+    NavItem(Routes.LOGS, R.string.logs_title, R.drawable.terminal_24px, R.drawable.terminal_24px)
 )
 
 @Composable
@@ -319,11 +320,11 @@ private fun AppNavigationBar(
                             painter = painterResource(
                                 if (isSelected) item.selectedIconRes else item.unselectedIconRes
                             ),
-                            contentDescription = item.label
+                            contentDescription = stringResource(item.labelResId)
                         )
                     }
                 },
-                label = { Text(item.label) }
+                label = { Text(stringResource(item.labelResId)) }
             )
         }
     }

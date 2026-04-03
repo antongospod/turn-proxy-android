@@ -42,6 +42,14 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
+    suspend fun observeCaptchaEvents() {
+        ProxyService.captchaUrl.collect { url ->
+            if (url != null) {
+                _proxyState.value = ProxyState.CaptchaRequired(url)
+            }
+        }
+    }
+
     suspend fun observeProxyServiceStatus() {
         ProxyService.isRunning.collect { running ->
             if (!running && _proxyState.value == ProxyState.Running) {
@@ -85,6 +93,10 @@ class LocalProxyManager(private val context: Context) {
                 stopProxy()
                 setErrorWithAutoReset(result.message)
             }
+            is StartupResult.Captcha -> {
+                stopProxy()
+                _proxyState.value = ProxyState.CaptchaRequired(result.url)
+            }
             is StartupResult.Success -> _proxyState.value = ProxyState.Running
         }
     }
@@ -101,6 +113,14 @@ class LocalProxyManager(private val context: Context) {
             delay(3500)
             if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
         }
+    }
+
+    suspend fun onCaptchaSolved(cfg: ClientConfig) {
+        ProxyService.clearCaptcha()
+        _proxyState.value = ProxyState.Idle
+        // Даём VK немного времени обработать прохождение капчи
+        delay(1500)
+        startProxy(cfg)
     }
 
     suspend fun setCustomKernel(uri: Uri) = withContext(Dispatchers.IO) {

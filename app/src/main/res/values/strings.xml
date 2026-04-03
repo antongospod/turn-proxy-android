@@ -3,6 +3,9 @@
     <string name="app_name">Turn Proxy</string>
 
     <!-- HomeScreen -->
+    <string name="nav_home">Главная</string>
+    <string name="splash_title">FreeTurn</string>
+    <string name="splash_subtitle">VK TURN Proxy</string>
     <string name="turn_proxy_title">Turn Proxy</string>
     <string name="info_desc">Информация</string>
     <string name="proxy_active">Прокси активен</string>
