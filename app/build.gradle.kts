@@ -52,10 +52,10 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.webkit:webkit:1.14.0")
-    implementation("com.github.mwiede:jsch:2.27.9")
+    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("com.github.mwiede:jsch:2.28.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

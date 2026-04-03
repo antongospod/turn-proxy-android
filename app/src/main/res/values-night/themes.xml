@@ -4,4 +4,11 @@
         <!-- Customize your dark theme here. -->
         <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
     </style>
+
+    <!-- Splash screen theme (Core Splash Screen API) — dark variant -->
+    <style name="Theme.FreeTurn.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FF111318</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.FreeTurn</item>
+    </style>
 </resources>

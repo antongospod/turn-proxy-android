@@ -260,6 +260,7 @@ fun HomeScreen(
                                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                                 viewModel.reconnectSsh()
                             },
+                            enabled = sshState !is SshConnectionState.Connecting,
                             modifier = Modifier.height(28.dp)
                         ) {
                             Text(stringResource(R.string.reconnect), style = MaterialTheme.typography.labelSmall)

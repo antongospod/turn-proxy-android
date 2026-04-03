@@ -101,7 +101,7 @@ class LocalProxyManager(private val context: Context) {
         resetJob?.cancel()
         _proxyState.value = ProxyState.Error(message)
         resetJob = scope.launch {
-            delay(3500)
+            delay(4_000)
             if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
         }
     }
