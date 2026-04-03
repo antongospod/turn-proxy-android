@@ -156,6 +156,12 @@ nohup ./server-linux-amd64 -listen 0.0.0.0:56000 -connect 127.0.0.1:<порт_wg
 
 APK: `app/build/outputs/apk/release/app-release.apk`
 
+## Благодарности
+
+- [alexmac6574/vk-turn-proxy](https://github.com/alexmac6574/vk-turn-proxy) — [@alexmac6574](https://github.com/alexmac6574), оригинальное ядро vk-turn-proxy
+- [cacggghp/vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy) — [@cacggghp](https://github.com/cacggghp), форк vk-turn-proxy
+- [MYSOREZ/vk-turn-proxy-android](https://github.com/MYSOREZ/vk-turn-proxy-android) — [@MYSOREZ](https://github.com/MYSOREZ), оригинальный Android-клиент
+
 ## Лицензия
 
 [GPL-3.0](LICENSE)
