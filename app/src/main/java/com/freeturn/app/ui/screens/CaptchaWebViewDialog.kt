@@ -6,11 +6,12 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.view.ViewGroup
 import android.webkit.CookieManager
-import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -40,11 +41,10 @@ import androidx.compose.ui.window.DialogProperties
 @Composable
 fun CaptchaWebViewDialog(
     captchaUrl: String,
-    onCaptchaSolved: () -> Unit,
+    onCaptchaSolved: (successToken: String?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var isLoading by remember { mutableStateOf(true) }
-    var currentUrl by remember { mutableStateOf(captchaUrl) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -74,7 +74,7 @@ fun CaptchaWebViewDialog(
                         TextButton(onClick = onDismiss) {
                             Text("Отмена", color = MaterialTheme.colorScheme.error)
                         }
-                        TextButton(onClick = onCaptchaSolved) {
+                        TextButton(onClick = { onCaptchaSolved(null) }) {
                             Text("Готово")
                         }
                     }
@@ -108,34 +108,111 @@ fun CaptchaWebViewDialog(
                             }
 
                             // Включаем cookies — VK использует их для трекинга прохождения капчи
+                            val webViewRef = this
                             CookieManager.getInstance().apply {
                                 setAcceptCookie(true)
-                                setAcceptThirdPartyCookies(this@apply as? WebView ?: return@apply, true)
+                                setAcceptThirdPartyCookies(webViewRef, true)
                             }
-
-                            webChromeClient = object : WebChromeClient() {
-                                override fun onCloseWindow(window: WebView?) {
-                                    super.onCloseWindow(window)
-                                    onCaptchaSolved()
+                            
+                            addJavascriptInterface(object {
+                                @android.webkit.JavascriptInterface
+                                fun onToken(token: String) {
+                                    android.util.Log.d("CaptchaWV", "onToken: $token")
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        onCaptchaSolved(if (token == "closed" || token == "null") null else token)
+                                    }
                                 }
+                                @android.webkit.JavascriptInterface
+                                fun onDebug(msg: String) {
+                                    android.util.Log.d("CaptchaWV", "JS: $msg")
+                                }
+                            }, "AndroidCaptcha")
+
+                            // Перехват XHR и fetch — ловим success_token из ответов VK API
+                            val openerScript = """
+                                (function() {
+                                    function tryExtract(text) {
+                                        try {
+                                            var d = typeof text === 'string' ? JSON.parse(text) : text;
+                                            var token = d.success_token
+                                                || (d.data && d.data.success_token)
+                                                || (d.payload && d.payload.success_token)
+                                                || (d.response && d.response.success_token)
+                                                || null;
+                                            if (token) {
+                                                AndroidCaptcha.onDebug('token found: ' + token.substring(0, 20));
+                                                AndroidCaptcha.onToken(token);
+                                            }
+                                        } catch(e) {}
+                                    }
+
+                                    // Перехват XHR
+                                    var _open = XMLHttpRequest.prototype.open;
+                                    var _send = XMLHttpRequest.prototype.send;
+                                    XMLHttpRequest.prototype.open = function(m, url) {
+                                        this._xUrl = url;
+                                        return _open.apply(this, arguments);
+                                    };
+                                    XMLHttpRequest.prototype.send = function() {
+                                        this.addEventListener('load', function() {
+                                            AndroidCaptcha.onDebug('XHR ' + this._xUrl + ' => ' + (this.responseText||'').substring(0, 120));
+                                            tryExtract(this.responseText);
+                                        });
+                                        return _send.apply(this, arguments);
+                                    };
+
+                                    // Перехват fetch
+                                    var _fetch = window.fetch;
+                                    window.fetch = function(input, init) {
+                                        return _fetch.apply(this, arguments).then(function(resp) {
+                                            var clone = resp.clone();
+                                            clone.text().then(function(t) {
+                                                AndroidCaptcha.onDebug('fetch ' + input + ' => ' + t.substring(0, 120));
+                                                tryExtract(t);
+                                            }).catch(function(){});
+                                            return resp;
+                                        });
+                                    };
+
+                                    // window.opener как запасной вариант
+                                    window.opener = {
+                                        postMessage: function(data, origin) {
+                                            try {
+                                                var d = typeof data === 'string' ? JSON.parse(data) : data;
+                                                AndroidCaptcha.onDebug('opener.pm: ' + JSON.stringify(d).substring(0, 120));
+                                                tryExtract(d);
+                                            } catch(e) {}
+                                        }
+                                    };
+                                    window.close = function() {
+                                        AndroidCaptcha.onDebug('window.close');
+                                        AndroidCaptcha.onToken('closed');
+                                    };
+                                    window.addEventListener('message', function(e) {
+                                        AndroidCaptcha.onDebug('msg ' + e.origin + ': ' + JSON.stringify(e.data).substring(0,120));
+                                        tryExtract(e.data);
+                                    });
+                                })();
+                            """.trimIndent()
+
+                            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                                WebViewCompat.addDocumentStartJavaScript(this, openerScript, setOf("*"))
                             }
 
                             webViewClient = object : WebViewClient() {
                                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                     super.onPageStarted(view, url, favicon)
                                     isLoading = true
-                                    url?.let { currentUrl = it }
+                                    android.util.Log.d("CaptchaWV", "start: $url")
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     super.onPageFinished(view, url)
                                     isLoading = false
-                                    url?.let { currentUrl = it }
-
-                                    // Определяем что капча пройдена:
-                                    // После "Я не робот" VK перенаправляет в лобби звонка
-                                    if (url != null && isCaptchaSolved(url)) {
-                                        onCaptchaSolved()
+                                    android.util.Log.d("CaptchaWV", "finish: $url")
+                                    // Фолбэк если DOCUMENT_START_SCRIPT не поддерживается
+                                    if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                                        view?.evaluateJavascript(openerScript, null)
                                     }
                                 }
 
@@ -143,10 +220,14 @@ fun CaptchaWebViewDialog(
                                     view: WebView?,
                                     request: WebResourceRequest?
                                 ): Boolean {
-                                    val url = request?.url?.toString() ?: return false
-                                    // Если VK перенаправляет на страницу звонка — капча пройдена
-                                    if (isCaptchaSolved(url)) {
-                                        onCaptchaSolved()
+                                    val url = request?.url ?: return false
+                                    android.util.Log.d("CaptchaWV", "nav: $url")
+                                    val token = url.getQueryParameter("success_token")
+                                    if (token != null) {
+                                        android.util.Log.d("CaptchaWV", "token in url: $token")
+                                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                            onCaptchaSolved(token)
+                                        }
                                         return true
                                     }
                                     return false
@@ -167,16 +248,4 @@ fun CaptchaWebViewDialog(
             }
         }
     }
-}
-
-/**
- * Определяет, что капча была пройдена по URL перенаправления.
- * VK после прохождения "Я не робот" перенаправляет на:
- * - Страницу звонка (vk.com/call/)
- * - Или просто закрывает страницу
- */
-private fun isCaptchaSolved(url: String): Boolean {
-    val lower = url.lowercase()
-    return (lower.contains("vk.com/call/") || lower.contains("vk.ru/call/")) &&
-           !lower.contains("captcha") && !lower.contains("not_robot")
 }

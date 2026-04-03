@@ -94,7 +94,7 @@ class LocalProxyManager(private val context: Context) {
                 setErrorWithAutoReset(result.message)
             }
             is StartupResult.Captcha -> {
-                stopProxy()
+                // НЕ останавливаем — процесс ждёт токен из stdin
                 _proxyState.value = ProxyState.CaptchaRequired(result.url)
             }
             is StartupResult.Success -> _proxyState.value = ProxyState.Running
@@ -115,12 +115,30 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    suspend fun onCaptchaSolved(cfg: ClientConfig) {
+    suspend fun onCaptchaSolved(cfg: ClientConfig, successToken: String?) {
         ProxyService.clearCaptcha()
-        _proxyState.value = ProxyState.Idle
-        // Даём VK немного времени обработать прохождение капчи
-        delay(1500)
-        startProxy(cfg)
+
+        if (successToken != null && ProxyService.isRunning.value) {
+            // Процесс жив — шлём токен через stdin, он сам продолжит
+            _proxyState.value = ProxyState.Starting
+            ProxyService.startupResult.value = null
+            ProxyService.sendSuccessToken(successToken)
+
+            val result = withTimeoutOrNull(15_000L) {
+                ProxyService.startupResult.filterNotNull().first()
+            }
+            when (result) {
+                null -> { stopProxy(); setErrorWithAutoReset("Нет ответа после капчи") }
+                is StartupResult.Failed -> { stopProxy(); setErrorWithAutoReset(result.message) }
+                is StartupResult.Captcha -> _proxyState.value = ProxyState.CaptchaRequired(result.url)
+                is StartupResult.Success -> _proxyState.value = ProxyState.Running
+            }
+        } else {
+            // Процесс уже упал — перезапускаем
+            _proxyState.value = ProxyState.Idle
+            delay(1500)
+            startProxy(cfg)
+        }
     }
 
     suspend fun setCustomKernel(uri: Uri) = withContext(Dispatchers.IO) {

@@ -296,7 +296,7 @@ fun HomeScreen(
     if (proxyState is ProxyState.CaptchaRequired) {
         CaptchaWebViewDialog(
             captchaUrl = (proxyState as ProxyState.CaptchaRequired).url,
-            onCaptchaSolved = { viewModel.onCaptchaSolved() },
+            onCaptchaSolved = { token -> viewModel.onCaptchaSolved(token) },
             onDismiss = { viewModel.dismissCaptcha() }
         )
     }
