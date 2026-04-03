@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 
 class LocalProxyManager(private val context: Context) {
@@ -25,6 +28,9 @@ class LocalProxyManager(private val context: Context) {
 
     private val _customKernelExists = MutableStateFlow(false)
     val customKernelExists: StateFlow<Boolean> = _customKernelExists.asStateFlow()
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var resetJob: kotlinx.coroutines.Job? = null
 
     init {
         _customKernelExists.value = File(context.filesDir, "custom_vkturn").exists()
@@ -88,10 +94,13 @@ class LocalProxyManager(private val context: Context) {
         _proxyState.value = ProxyState.Idle
     }
 
-    suspend fun setErrorWithAutoReset(message: String) {
+    fun setErrorWithAutoReset(message: String) {
+        resetJob?.cancel()
         _proxyState.value = ProxyState.Error(message)
-        delay(3500)
-        if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
+        resetJob = scope.launch {
+            delay(3500)
+            if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
+        }
     }
 
     suspend fun setCustomKernel(uri: Uri) = withContext(Dispatchers.IO) {

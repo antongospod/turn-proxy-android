@@ -58,7 +58,7 @@ object ServerScripts {
         cd /opt/vk-turn &&
         ARCH=${'$'}(uname -m);
         if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
-        nohup ./${'$'}BIN -listen $listen -connect $connect > server.log 2>&1 &
+        nohup ./${'$'}BIN -listen '${listen}' -connect '${connect}' > server.log 2>&1 &
         echo ${'$'}! > proxy.pid && echo "STARTED"
     """.trimIndent()
 
