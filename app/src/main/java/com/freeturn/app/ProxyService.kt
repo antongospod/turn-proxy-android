@@ -109,7 +109,7 @@ class ProxyService : Service() {
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
-        wakeLock?.acquire(TimeUnit.HOURS.toMillis(8))
+        wakeLock?.acquire(TimeUnit.HOURS.toMillis(24))
 
         registerNetworkCallback()
 
@@ -195,7 +195,8 @@ class ProxyService : Service() {
                             if (!userStopped.get()) {
                                 restartCount = 0
                                 // P2-5: destroyForcibly() — SIGKILL, нативный процесс не игнорирует
-                                process.get()?.destroyForcibly()
+                                val p = process.get()
+                                p?.destroyForcibly()
                             }
                         }, 2_000)
                     }
@@ -279,7 +280,8 @@ class ProxyService : Service() {
                         addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
                         updateNotification("VK TURN Proxy", "Смена сети, переподключение...")
                         restartCount = 0
-                        process.get()?.destroyForcibly()
+                        val p = process.get()
+                        p?.destroyForcibly()
                     }
                 }
             }

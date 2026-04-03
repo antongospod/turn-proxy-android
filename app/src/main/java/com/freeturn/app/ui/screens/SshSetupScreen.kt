@@ -70,7 +70,7 @@ fun SshSetupScreen(
     var ip by rememberSaveable(savedConfig.ip) { mutableStateOf(savedConfig.ip) }
     var port by rememberSaveable(savedConfig.port) { mutableStateOf(savedConfig.port.toString()) }
     var username by rememberSaveable(savedConfig.username) { mutableStateOf(savedConfig.username) }
-    var password by rememberSaveable { mutableStateOf(savedConfig.password) }
+    var password by remember { mutableStateOf(savedConfig.password) }
     var authType by rememberSaveable(savedConfig.authType) { mutableStateOf(savedConfig.authType) }
     var sshKey by rememberSaveable(savedConfig.sshKey) { mutableStateOf(savedConfig.sshKey) }
     var showPassword by remember { mutableStateOf(false) }

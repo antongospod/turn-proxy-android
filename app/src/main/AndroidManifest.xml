@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <permission android:name="com.freeturn.app.permission.CONTROL_PROXY" android:protectionLevel="signature" />
+    <uses-permission android:name="com.freeturn.app.permission.CONTROL_PROXY" />
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy"
@@ -51,7 +53,8 @@
 
         <receiver
             android:name=".ProxyReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.freeturn.app.permission.CONTROL_PROXY">
             <intent-filter>
                 <action android:name="com.freeturn.app.START_PROXY" />
                 <action android:name="com.freeturn.app.STOP_PROXY" />
