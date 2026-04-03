@@ -141,13 +141,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ── Local proxy ────────────────────────────────────────────────────────
-    fun startProxy(context: Context) {
+    fun startProxy() {
         viewModelScope.launch {
             proxyManager.startProxy(clientConfig.value)
         }
     }
 
-    fun stopProxy(context: Context) {
+    fun stopProxy() {
         proxyManager.stopProxy()
     }
 

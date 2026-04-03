@@ -64,13 +64,8 @@ class ProxyService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var openAppIntent: PendingIntent? = null
 
-    // P1-1: AtomicReference вместо @Volatile — проверка null + вызов destroy() атомарны
     private val process = AtomicReference<Process?>(null)
-
-    // P1-1: AtomicBoolean — флаг читается и пишется из разных потоков
     private val userStopped = AtomicBoolean(false)
-
-    // P1-1: AtomicBoolean — compareAndSet предотвращает двойной postDelayed при параллельных quota-ошибках
     private val sessionKillScheduled = AtomicBoolean(false)
 
     private val handler = Handler(Looper.getMainLooper())
@@ -78,7 +73,6 @@ class ProxyService : Service() {
     @Volatile private var networkInitialized = false
     private var restartCount = 0
 
-    // P1-2: CoroutineScope для запуска startBinaryProcess без runBlocking
     private lateinit var serviceScope: CoroutineScope
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -116,17 +110,14 @@ class ProxyService : Service() {
         registerNetworkCallback()
 
         addLog("=== ЗАПУСК ПРОКСИ ===")
-        // P1-2: запуск через корутину на Dispatchers.IO — никакого runBlocking
         serviceScope.launch { startBinaryProcess() }
 
         return START_STICKY
     }
 
-    // P1-2: suspend fun — читает DataStore напрямую без runBlocking
     private suspend fun startBinaryProcess() {
         if (userStopped.get()) return
 
-        // P2-3: applicationContext вместо this@ProxyService
         val cfg = AppPreferences(applicationContext).clientConfigFlow.first()
 
         val customBin = File(filesDir, "custom_vkturn")
@@ -176,7 +167,6 @@ class ProxyService : Service() {
                     val l = line ?: continue
                     addLog(l)
 
-                    // P2-1: сигнализируем результат запуска по первой строке stdout
                     if (!startupEmitted) {
                         val lower = l.lowercase()
                         if (lower.contains("panic") || lower.contains("fatal") ||
@@ -191,17 +181,14 @@ class ProxyService : Service() {
                         startupEmitted = true
                     }
 
-                    // Session Killer: compareAndSet гарантирует что postDelayed вызывается только раз
-                    // даже если две quota-ошибки придут одновременно из одного потока чтения
+                    // compareAndSet гарантирует единственный postDelayed даже при параллельных quota-ошибках
                     if (isQuotaError(l) && sessionKillScheduled.compareAndSet(false, true)) {
                         addLog(">>> QUOTA ERROR — сброс сессии через 2с")
                         handler.postDelayed({
                             sessionKillScheduled.set(false)
                             if (!userStopped.get()) {
                                 restartCount = 0
-                                // P2-5: destroyForcibly() — SIGKILL, нативный процесс не игнорирует
-                                val p = process.get()
-                                p?.destroyForcibly()
+                                process.get()?.destroyForcibly()
                             }
                         }, 2_000)
                     }
@@ -265,7 +252,6 @@ class ProxyService : Service() {
         addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $restartCount/$MAX_RESTARTS) ===")
         updateNotification("VK TURN Proxy", "Переподключение ($restartCount/$MAX_RESTARTS)...")
         handler.postDelayed({
-            // Проверка userStopped + запуск через serviceScope вместо thread {}
             if (!userStopped.get()) serviceScope.launch { startBinaryProcess() }
         }, delay)
     }
@@ -339,7 +325,6 @@ class ProxyService : Service() {
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
         addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
-        // P2-5: destroyForcibly() вместо destroy()
         process.get()?.destroyForcibly()
         serviceScope.cancel()
         if (wakeLock?.isHeld == true) wakeLock?.release()
