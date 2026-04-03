@@ -12,29 +12,7 @@ Android-приложение, которое проксирует WireGuard/Hyst
 
 ## Build Commands
 
-```bash
-# Собрать debug APK
-./gradlew assembleDebug
-
-# Собрать release APK
-./gradlew assembleRelease
-
-# Установить на подключённое устройство
-./gradlew installDebug
-
-# Запустить юнит-тесты
-./gradlew test
-
-# Запустить инструментальные тесты
-./gradlew connectedAndroidTest
-
-# Очистить сборку
-./gradlew clean
-
-# Проверка lint (отключена для release-сборок)
-./gradlew lint
-```
-
+Я всегда билжу сам!
 ## Architecture
 
 Приложение состоит из четырёх основных компонентов:

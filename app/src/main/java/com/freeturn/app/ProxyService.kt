@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 sealed class StartupResult {
     data object Success : StartupResult()
     data class Failed(val message: String) : StartupResult()
+    data class Captcha(val url: String) : StartupResult()
 }
 
 class ProxyService : Service() {
@@ -46,6 +47,9 @@ class ProxyService : Service() {
         val logs = MutableStateFlow<List<String>>(emptyList())
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val startupResult = MutableStateFlow<StartupResult?>(null)
+        val captchaUrl = MutableStateFlow<String?>(null)
+
+        private val REDIRECT_URI_REGEX = Regex("""redirect_uri:(https?://\S+)""")
 
         fun addLog(msg: String) {
             logs.update { current ->
@@ -56,6 +60,10 @@ class ProxyService : Service() {
 
         fun clearLogs() {
             logs.value = emptyList()
+        }
+
+        fun clearCaptcha() {
+            captchaUrl.value = null
         }
     }
 
@@ -156,6 +164,8 @@ class ProxyService : Service() {
         var exitCode = -1
         val startedAt = System.currentTimeMillis()
         var startupEmitted = false
+        var startupFailed = false
+        var captchaDetected = false
         try {
             addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -172,6 +182,22 @@ class ProxyService : Service() {
                     val l = line ?: continue
                     addLog(l)
 
+                    // Детекция капчи: ищем redirect_uri в выводе бинарника
+                    if (l.lowercase().contains("captcha")) {
+                        val match = REDIRECT_URI_REGEX.find(l)
+                        if (match != null) {
+                            captchaUrl.value = match.groupValues[1]
+                            addLog(">>> ОБНАРУЖЕНА КАПЧА — требуется прохождение")
+                            startupResult.value = StartupResult.Captcha(match.groupValues[1])
+                            updateNotification("VK TURN Proxy", "Требуется капча")
+                            captchaDetected = true
+                            startupEmitted = true
+                            // Убиваем процесс — он всё равно в панике
+                            process.get()?.destroyForcibly()
+                            continue
+                        }
+                    }
+
                     // P2-1: сигнализируем результат запуска по первой строке stdout
                     if (!startupEmitted) {
                         val lower = l.lowercase()
@@ -179,6 +205,7 @@ class ProxyService : Service() {
                             lower.contains("rate limit")) {
                             startupResult.value = StartupResult.Failed(l)
                             updateNotification("VK TURN Proxy", "Ошибка подключения")
+                            startupFailed = true
                         } else {
                             startupResult.value = StartupResult.Success
                             updateNotification("VK TURN Proxy", "Прокси активен")
@@ -210,6 +237,7 @@ class ProxyService : Service() {
             if (!startupEmitted) {
                 startupResult.value = StartupResult.Failed(
                     "Процесс завершился без вывода (код: $exitCode)")
+                startupFailed = true
             }
 
         } catch (e: Exception) {
@@ -219,6 +247,17 @@ class ProxyService : Service() {
             when {
                 userStopped.get() -> {
                     isRunning.value = false
+                    stopSelf()
+                }
+                captchaDetected -> {
+                    addLog("=== Ожидание прохождения капчи ===")
+                    isRunning.value = false
+                    stopSelf()
+                }
+                startupFailed -> {
+                    addLog("=== Ошибка при запуске, watchdog не активирован ===")
+                    isRunning.value = false
+                    // Убираем proxyFailed.tryEmit, так как startProxy и так обработает StartupResult.Failed
                     stopSelf()
                 }
                 exitCode == 0 -> {
