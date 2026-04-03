@@ -9,8 +9,8 @@ class ProxyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             "com.freeturn.app.START_PROXY" -> {
-                ProxyService.clearLogs()
-                ProxyService.startupResult.value = null
+                ProxyServiceState.clearLogs()
+                ProxyServiceState.setStartupResult(null)
                 val serviceIntent = Intent(context, ProxyService::class.java)
                 context.startForegroundService(serviceIntent)
             }

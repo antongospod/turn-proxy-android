@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.ProxyService
+import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.SshConfig
@@ -34,7 +35,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sshLog: StateFlow<List<String>> = sshRepository.sshLog
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
-    val logs: StateFlow<List<String>> = ProxyService.logs
+    val logs: StateFlow<List<String>> = ProxyServiceState.logs
     val customKernelExists: StateFlow<Boolean> = proxyManager.customKernelExists
 
     private val _isInitialized = MutableStateFlow(false)
@@ -52,6 +53,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             proxyManager.observeProxyServiceStatus()
         }
         proxyManager.syncInitialState()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        proxyManager.destroy()
     }
 
     val sshConfig: StateFlow<SshConfig> = prefs.sshConfigFlow
@@ -152,7 +158,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearLogs() {
-        ProxyService.clearLogs()
+        ProxyServiceState.clearLogs()
     }
 
     // ── Preferences ────────────────────────────────────────────────────────
@@ -179,13 +185,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetAllSettings(context: Context) {
         viewModelScope.launch {
-            if (ProxyService.isRunning.value) {
+            if (ProxyServiceState.isRunning.value) {
                 context.stopService(Intent(context, ProxyService::class.java))
             }
             prefs.resetAll()
             sshRepository.resetAll()
             proxyManager.clearState()
-            ProxyService.clearLogs()
+            ProxyServiceState.clearLogs()
 
             val intent = (context as? android.app.Activity)?.intent
                 ?: Intent(context, com.freeturn.app.MainActivity::class.java)

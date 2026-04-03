@@ -2,6 +2,10 @@ package com.freeturn.app.domain
 
 object ServerScripts {
 
+    /** Удаляет из строки всё, кроме допустимых символов host:port (защита от shell-инъекций) */
+    private fun shellSafe(value: String): String =
+        value.replace(Regex("[^a-zA-Z0-9._:\\-]"), "")
+
     val checkServerState: String = """
         if ls /opt/vk-turn/server-linux-* >/dev/null 2>&1; then echo "INSTALLED:YES"; else echo "INSTALLED:NO"; fi
         if ps aux | grep -v grep | grep -q "server-linux-"; then echo "RUNNING:YES"; else echo "RUNNING:NO"; fi
@@ -54,13 +58,17 @@ object ServerScripts {
         chmod +x "${'$'}BIN" && echo "DONE"
     """.trimIndent()
 
-    fun startServer(listen: String, connect: String): String = """
-        cd /opt/vk-turn &&
-        ARCH=${'$'}(uname -m);
-        if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
-        nohup ./${'$'}BIN -listen '${listen}' -connect '${connect}' > server.log 2>&1 &
-        echo ${'$'}! > proxy.pid && echo "STARTED"
-    """.trimIndent()
+    fun startServer(listen: String, connect: String): String {
+        val safeListen = shellSafe(listen)
+        val safeConnect = shellSafe(connect)
+        return """
+            cd /opt/vk-turn &&
+            ARCH=${'$'}(uname -m);
+            if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
+            nohup ./${'$'}BIN -listen '${safeListen}' -connect '${safeConnect}' > server.log 2>&1 &
+            echo ${'$'}! > proxy.pid && echo "STARTED"
+        """.trimIndent()
+    }
 
     val stopServer: String = """
         cd /opt/vk-turn &&
