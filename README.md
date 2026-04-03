@@ -1,6 +1,6 @@
 # FreeTurn — Android TURN Proxy
 
-Android-клиент для [vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy) — проброс WireGuard/Hysteria-трафика через TURN-серверы VK Звонков и Яндекс Телемоста.
+Android-клиент для [vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy) — проброс WireGuard/Hysteria-трафика через TURN-серверы VK Звонков.
 
 > **Disclaimer:** Проект предназначен исключительно для образовательных и исследовательских целей.
 
