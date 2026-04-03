@@ -54,7 +54,12 @@ private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.LOGS, Routes.SERVER_MA
 
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
+    val isInitialized by viewModel.isInitialized.collectAsStateWithLifecycle()
     val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
+
+    // Не строим NavHost пока DataStore не загружен — иначе startDestination
+    // захватит дефолтный onboardingDone=false и всегда покажет онбординг
+    if (!isInitialized) return
 
     val startDestination = remember { if (onboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
