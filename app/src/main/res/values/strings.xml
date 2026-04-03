@@ -27,6 +27,8 @@
     <string name="start_proxy">Запустить прокси</string>
     <string name="connection">Соединение</string>
     <string name="not_connected">Не подключено</string>
+    <string name="connected_format">Подключено: %1$s</string>
+    <string name="error_format_short">Ошибка: %1$s</string>
     <string name="change">Изменить</string>
     <string name="configure">Настроить</string>
     <string name="android_client">Android-клиент</string>
