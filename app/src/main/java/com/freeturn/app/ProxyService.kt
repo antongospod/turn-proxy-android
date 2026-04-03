@@ -35,7 +35,6 @@ import kotlinx.coroutines.withContext
 sealed class StartupResult {
     data object Success : StartupResult()
     data class Failed(val message: String) : StartupResult()
-    data class Captcha(val url: String) : StartupResult()
 }
 
 class ProxyService : Service() {
@@ -47,10 +46,7 @@ class ProxyService : Service() {
         val logs = MutableStateFlow<List<String>>(emptyList())
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val startupResult = MutableStateFlow<StartupResult?>(null)
-        val captchaUrl = MutableStateFlow<String?>(null)
-        private val processStdin = AtomicReference<java.io.OutputStream?>(null)
 
-        private val REDIRECT_URI_REGEX = Regex("""redirect_uri:(https?://\S+)""")
 
         fun addLog(msg: String) {
             logs.update { current ->
@@ -63,21 +59,6 @@ class ProxyService : Service() {
             logs.value = emptyList()
         }
 
-        fun clearCaptcha() {
-            captchaUrl.value = null
-        }
-
-        fun sendSuccessToken(token: String) {
-            processStdin.get()?.let { stdin ->
-                try {
-                    stdin.write("$token\n".toByteArray())
-                    stdin.flush()
-                    addLog(">>> Отправляем success_token в процесс")
-                } catch (e: Exception) {
-                    addLog("Ошибка отправки токена: ${e.message}")
-                }
-            } ?: addLog("Ошибка: stdin процесса недоступен")
-        }
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -179,7 +160,6 @@ class ProxyService : Service() {
         val startedAt = System.currentTimeMillis()
         var startupEmitted = false
         var startupFailed = false
-        var captchaDetected = false
         try {
             addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -189,33 +169,12 @@ class ProxyService : Service() {
                     .start()
             }
             process.set(proc)
-            processStdin.set(proc.outputStream)
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
                     val l = line ?: continue
                     addLog(l)
-
-                    // Детекция капчи: ищем redirect_uri в выводе бинарника
-                    if (l.lowercase().contains("captcha")) {
-                        val match = REDIRECT_URI_REGEX.find(l)
-                        if (match != null && !captchaDetected) {
-                            captchaUrl.value = match.groupValues[1]
-                            addLog(">>> ОБНАРУЖЕНА КАПЧА — ожидаем токен через stdin")
-                            startupResult.value = StartupResult.Captcha(match.groupValues[1])
-                            updateNotification("VK TURN Proxy", "Требуется капча")
-                            captchaDetected = true
-                            // НЕ убиваем процесс — Go ждёт success_token из stdin
-                            continue
-                        }
-                    }
-
-                    // После капчи: если токен уже принят и captcha сброшена — снова ловим startup
-                    if (captchaDetected && captchaUrl.value == null) {
-                        captchaDetected = false
-                        startupEmitted = false
-                    }
 
                     // P2-1: сигнализируем результат запуска по первой строке stdout
                     if (!startupEmitted) {
@@ -262,15 +221,9 @@ class ProxyService : Service() {
         } catch (e: Exception) {
             addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
         } finally {
-            processStdin.set(null)
             process.set(null)
             when {
                 userStopped.get() -> {
-                    isRunning.value = false
-                    stopSelf()
-                }
-                captchaDetected -> {
-                    addLog("=== Ожидание прохождения капчи ===")
                     isRunning.value = false
                     stopSelf()
                 }

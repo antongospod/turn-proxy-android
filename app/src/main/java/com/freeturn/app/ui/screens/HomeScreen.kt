@@ -195,14 +195,12 @@ fun HomeScreen(
                     is ProxyState.Running -> stringResource(R.string.proxy_active)
                     is ProxyState.Starting -> stringResource(R.string.proxy_connecting)
                     is ProxyState.Error -> (proxyState as ProxyState.Error).message
-                    is ProxyState.CaptchaRequired -> "Требуется прохождение капчи"
                     else -> stringResource(R.string.proxy_press_to_start)
                 },
                 style = MaterialTheme.typography.titleMedium,
                 color = when (proxyState) {
                     is ProxyState.Running -> StatusGreen
                     is ProxyState.Error -> MaterialTheme.colorScheme.error
-                    is ProxyState.CaptchaRequired -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f)
                 },
                 textAlign = TextAlign.Center
@@ -292,14 +290,6 @@ fun HomeScreen(
         }
     }
 
-    // Диалог капчи VK
-    if (proxyState is ProxyState.CaptchaRequired) {
-        CaptchaWebViewDialog(
-            captchaUrl = (proxyState as ProxyState.CaptchaRequired).url,
-            onCaptchaSolved = { token -> viewModel.onCaptchaSolved(token) },
-            onDismiss = { viewModel.dismissCaptcha() }
-        )
-    }
 }
 
 @Composable

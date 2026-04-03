@@ -42,14 +42,6 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    suspend fun observeCaptchaEvents() {
-        ProxyService.captchaUrl.collect { url ->
-            if (url != null) {
-                _proxyState.value = ProxyState.CaptchaRequired(url)
-            }
-        }
-    }
-
     suspend fun observeProxyServiceStatus() {
         ProxyService.isRunning.collect { running ->
             if (!running && _proxyState.value == ProxyState.Running) {
@@ -93,10 +85,6 @@ class LocalProxyManager(private val context: Context) {
                 stopProxy()
                 setErrorWithAutoReset(result.message)
             }
-            is StartupResult.Captcha -> {
-                // НЕ останавливаем — процесс ждёт токен из stdin
-                _proxyState.value = ProxyState.CaptchaRequired(result.url)
-            }
             is StartupResult.Success -> _proxyState.value = ProxyState.Running
         }
     }
@@ -112,32 +100,6 @@ class LocalProxyManager(private val context: Context) {
         resetJob = scope.launch {
             delay(3500)
             if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
-        }
-    }
-
-    suspend fun onCaptchaSolved(cfg: ClientConfig, successToken: String?) {
-        ProxyService.clearCaptcha()
-
-        if (successToken != null && ProxyService.isRunning.value) {
-            // Процесс жив — шлём токен через stdin, он сам продолжит
-            _proxyState.value = ProxyState.Starting
-            ProxyService.startupResult.value = null
-            ProxyService.sendSuccessToken(successToken)
-
-            val result = withTimeoutOrNull(15_000L) {
-                ProxyService.startupResult.filterNotNull().first()
-            }
-            when (result) {
-                null -> { stopProxy(); setErrorWithAutoReset("Нет ответа после капчи") }
-                is StartupResult.Failed -> { stopProxy(); setErrorWithAutoReset(result.message) }
-                is StartupResult.Captcha -> _proxyState.value = ProxyState.CaptchaRequired(result.url)
-                is StartupResult.Success -> _proxyState.value = ProxyState.Running
-            }
-        } else {
-            // Процесс уже упал — перезапускаем
-            _proxyState.value = ProxyState.Idle
-            delay(1500)
-            startProxy(cfg)
         }
     }
 

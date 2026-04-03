@@ -51,9 +51,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             proxyManager.observeProxyServiceStatus()
         }
-        viewModelScope.launch {
-            proxyManager.observeCaptchaEvents()
-        }
         proxyManager.syncInitialState()
     }
 
@@ -151,17 +148,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopProxy(context: Context) {
-        proxyManager.stopProxy()
-    }
-
-    fun onCaptchaSolved(successToken: String?) {
-        viewModelScope.launch {
-            proxyManager.onCaptchaSolved(clientConfig.value, successToken)
-        }
-    }
-
-    fun dismissCaptcha() {
-        ProxyService.clearCaptcha()
         proxyManager.stopProxy()
     }
 
