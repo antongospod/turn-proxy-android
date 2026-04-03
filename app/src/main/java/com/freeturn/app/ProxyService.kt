@@ -48,6 +48,7 @@ class ProxyService : Service() {
         val proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val startupResult = MutableStateFlow<StartupResult?>(null)
         val captchaUrl = MutableStateFlow<String?>(null)
+        private val processStdin = AtomicReference<java.io.OutputStream?>(null)
 
         private val REDIRECT_URI_REGEX = Regex("""redirect_uri:(https?://\S+)""")
 
@@ -64,6 +65,18 @@ class ProxyService : Service() {
 
         fun clearCaptcha() {
             captchaUrl.value = null
+        }
+
+        fun sendSuccessToken(token: String) {
+            processStdin.get()?.let { stdin ->
+                try {
+                    stdin.write("$token\n".toByteArray())
+                    stdin.flush()
+                    addLog(">>> Отправляем success_token в процесс")
+                } catch (e: Exception) {
+                    addLog("Ошибка отправки токена: ${e.message}")
+                }
+            } ?: addLog("Ошибка: stdin процесса недоступен")
         }
     }
 
@@ -153,6 +166,7 @@ class ProxyService : Service() {
         } else {
             cmdArgs.add(executable)
             cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
+            
             cmdArgs.add(if (cfg.vkLink.contains("yandex")) "-yandex-link" else "-vk-link")
             cmdArgs.add(cfg.vkLink)
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
@@ -175,6 +189,7 @@ class ProxyService : Service() {
                     .start()
             }
             process.set(proc)
+            processStdin.set(proc.outputStream)
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                 var line: String?
@@ -185,17 +200,21 @@ class ProxyService : Service() {
                     // Детекция капчи: ищем redirect_uri в выводе бинарника
                     if (l.lowercase().contains("captcha")) {
                         val match = REDIRECT_URI_REGEX.find(l)
-                        if (match != null) {
+                        if (match != null && !captchaDetected) {
                             captchaUrl.value = match.groupValues[1]
-                            addLog(">>> ОБНАРУЖЕНА КАПЧА — требуется прохождение")
+                            addLog(">>> ОБНАРУЖЕНА КАПЧА — ожидаем токен через stdin")
                             startupResult.value = StartupResult.Captcha(match.groupValues[1])
                             updateNotification("VK TURN Proxy", "Требуется капча")
                             captchaDetected = true
-                            startupEmitted = true
-                            // Убиваем процесс — он всё равно в панике
-                            process.get()?.destroyForcibly()
+                            // НЕ убиваем процесс — Go ждёт success_token из stdin
                             continue
                         }
+                    }
+
+                    // После капчи: если токен уже принят и captcha сброшена — снова ловим startup
+                    if (captchaDetected && captchaUrl.value == null) {
+                        captchaDetected = false
+                        startupEmitted = false
                     }
 
                     // P2-1: сигнализируем результат запуска по первой строке stdout
@@ -243,6 +262,7 @@ class ProxyService : Service() {
         } catch (e: Exception) {
             addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
         } finally {
+            processStdin.set(null)
             process.set(null)
             when {
                 userStopped.get() -> {

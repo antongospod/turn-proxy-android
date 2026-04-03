@@ -154,9 +154,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         proxyManager.stopProxy()
     }
 
-    fun onCaptchaSolved() {
+    fun onCaptchaSolved(successToken: String?) {
         viewModelScope.launch {
-            proxyManager.onCaptchaSolved(clientConfig.value)
+            proxyManager.onCaptchaSolved(clientConfig.value, successToken)
         }
     }
 
