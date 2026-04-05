@@ -74,6 +74,7 @@ fun ClientSetupScreen(
     val proxyListen by viewModel.proxyListen.collectAsStateWithLifecycle()
     val customKernelExists by viewModel.customKernelExists.collectAsStateWithLifecycle()
     val kernelError by viewModel.kernelError.collectAsStateWithLifecycle()
+    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -134,35 +135,36 @@ fun ClientSetupScreen(
             Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
-                value = serverAddress,
-                onValueChange = { serverAddress = it },
+                value = serverAddress.redact(privacyMode),
+                onValueChange = { if (!privacyMode) serverAddress = it },
                 label = { Text(stringResource(R.string.server_address_label)) },
                 placeholder = { Text(stringResource(R.string.server_address_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = privacyMode,
                 supportingText = { Text(stringResource(R.string.server_address_support)) }
             )
 
             OutlinedTextField(
-                value = vkLink,
-                onValueChange = { vkLink = it },
+                value = vkLink.redact(privacyMode),
+                onValueChange = { if (!privacyMode) vkLink = it },
                 label = { Text(stringResource(R.string.vk_link_label)) },
                 placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                readOnly = privacyMode,
                 supportingText = { Text(stringResource(R.string.vk_link_support)) }
             )
 
             OutlinedTextField(
-                value = localPort,
-                onValueChange = { localPort = it },
+                value = localPort.redact(privacyMode),
+                onValueChange = { if (!privacyMode) localPort = it },
                 label = { Text(stringResource(R.string.local_listen_address)) },
                 placeholder = { Text(stringResource(R.string.local_listen_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                supportingText = {
-                    Text(stringResource(R.string.local_listen_support))
-                }
+                readOnly = privacyMode,
+                supportingText = { Text(stringResource(R.string.local_listen_support)) }
             )
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)

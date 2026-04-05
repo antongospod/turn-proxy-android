@@ -78,6 +78,7 @@ fun ServerManagementScreen(
     val savedListen by viewModel.proxyListen.collectAsStateWithLifecycle()
     val savedConnect by viewModel.proxyConnect.collectAsStateWithLifecycle()
     val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
+    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
 
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
@@ -93,7 +94,7 @@ fun ServerManagementScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.server)) },
                 actions = {
-                    SshStatusBadge(sshState = sshState, ip = sshConfig.ip)
+                    SshStatusBadge(sshState = sshState, ip = sshConfig.ip.redact(privacyMode))
                 }
             )
         },

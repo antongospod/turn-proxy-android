@@ -123,4 +123,6 @@
 
     <string name="dynamic_theme_title">Динамическая тема</string>
     <string name="dynamic_theme_desc">Использовать системные цвета (Material You)</string>
+    <string name="privacy_mode_title">Приватный режим</string>
+    <string name="privacy_mode_desc">Скрывает IP и порты</string>
 </resources>
