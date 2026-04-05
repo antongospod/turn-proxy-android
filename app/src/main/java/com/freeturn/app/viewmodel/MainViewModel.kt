@@ -82,6 +82,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { prefs.setDynamicTheme(enabled) }
     }
 
+    private val _privacyMode = MutableStateFlow(false)
+    val privacyMode: StateFlow<Boolean> = _privacyMode.asStateFlow()
+
+    fun setPrivacyMode(enabled: Boolean) { _privacyMode.value = enabled }
+
     // ── SSH ────────────────────────────────────────────────────────────────
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {

@@ -143,6 +143,7 @@ fun HomeScreen(
         }
     }
 
+    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -219,10 +220,10 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(stringResource(R.string.current_settings), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(12.dp))
-                        ConfigRow(stringResource(R.string.server), clientConfig.serverAddress)
+                        ConfigRow(stringResource(R.string.server), clientConfig.serverAddress.redact(privacyMode))
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
                         ConfigRow(stringResource(R.string.transport_protocol), if (clientConfig.useUdp) stringResource(R.string.udp) else stringResource(R.string.tcp))
-                        ConfigRow(stringResource(R.string.local_port), clientConfig.localPort)
+                        ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
                     }
                 }
 
@@ -246,7 +247,7 @@ fun HomeScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         when (sshState) {
-                            is SshConnectionState.Connected -> "SSH: ${(sshState as SshConnectionState.Connected).ip}"
+                            is SshConnectionState.Connected -> "SSH: ${(sshState as SshConnectionState.Connected).ip.redact(privacyMode)}"
                             is SshConnectionState.Connecting -> stringResource(R.string.ssh_connecting)
                             is SshConnectionState.Error -> stringResource(R.string.ssh_error)
                             else -> stringResource(R.string.ssh_disconnected)
@@ -284,6 +285,8 @@ fun HomeScreen(
             InfoBottomSheet(
                 viewModel = viewModel,
                 containerColor = sheetColor,
+                privacyMode = privacyMode,
+                onPrivacyModeChange = { viewModel.setPrivacyMode(it) },
                 onNavigateToSshSetup = {
                     showBottomSheet.value = false
                     onNavigateToSshSetup()
@@ -360,6 +363,8 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 private fun InfoBottomSheet(
     viewModel: MainViewModel,
     containerColor: Color,
+    privacyMode: Boolean,
+    onPrivacyModeChange: (Boolean) -> Unit,
     onNavigateToSshSetup: () -> Unit
 ) {
     val context = LocalContext.current
@@ -390,7 +395,7 @@ private fun InfoBottomSheet(
                     Text(
                         when (sshState) {
                             is SshConnectionState.Connected ->
-                                stringResource(R.string.connected_format, (sshState as SshConnectionState.Connected).ip)
+                                stringResource(R.string.connected_format, (sshState as SshConnectionState.Connected).ip.redact(privacyMode))
                             is SshConnectionState.Connecting ->
                                 stringResource(R.string.ssh_connecting)
                             is SshConnectionState.Error ->
@@ -443,6 +448,20 @@ private fun InfoBottomSheet(
         item { HorizontalDivider() }
 
         // ── Настройки интерфейса ──────────────────────────────────────────
+        item {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.privacy_mode_title)) },
+                supportingContent = { Text(stringResource(R.string.privacy_mode_desc)) },
+                colors = listColors,
+                trailingContent = {
+                    androidx.compose.material3.Switch(
+                        checked = privacyMode,
+                        onCheckedChange = onPrivacyModeChange
+                    )
+                }
+            )
+        }
+
         item {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.dynamic_theme_title)) },
@@ -556,6 +575,8 @@ private fun RepoLinkItem(
     )
 }
 
+
+internal fun String.redact(enabled: Boolean) = if (enabled) "••••••" else this
 
 @Composable
 private fun ConfigRow(label: String, value: String) {
