@@ -14,6 +14,7 @@
     <string name="current_settings">Текущие настройки</string>
     <string name="server">Сервер</string>
     <string name="threads">Потоки</string>
+    <string name="tcp">TCP</string>
     <string name="udp">UDP</string>
     <string name="on">Вкл</string>
     <string name="off">Выкл</string>
