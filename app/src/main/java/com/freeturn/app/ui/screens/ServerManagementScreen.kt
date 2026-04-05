@@ -55,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.ui.HapticUtil
@@ -77,7 +79,7 @@ fun ServerManagementScreen(
     val savedConnect by viewModel.proxyConnect.collectAsStateWithLifecycle()
     val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
 
-    var proxyListen by rememberSaveable(savedListen) { mutableStateOf(savedListen) }
+    var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
 
     val context = LocalContext.current
@@ -155,12 +157,13 @@ fun ServerManagementScreen(
             Text(stringResource(R.string.server_config), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
-                value = proxyListen,
-                onValueChange = { proxyListen = it },
+                value = proxyListenPort,
+                onValueChange = { proxyListenPort = it.filter { c -> c.isDigit() } },
                 label = { Text(stringResource(R.string.listen_port)) },
                 placeholder = { Text(stringResource(R.string.listen_port_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 supportingText = { Text(stringResource(R.string.listen_port_desc)) }
             )
 
@@ -178,7 +181,7 @@ fun ServerManagementScreen(
             FilledTonalButton(
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.saveProxyServerConfig(proxyListen, proxyConnect)
+                    viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
                     viewModel.installServer()
                 },
                 enabled = isConnected && !isWorking,
@@ -195,7 +198,7 @@ fun ServerManagementScreen(
             Button(
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.saveProxyServerConfig(proxyListen, proxyConnect)
+                    viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
                     viewModel.startServer()
                 },
                 enabled = (isConnected && !isWorking
