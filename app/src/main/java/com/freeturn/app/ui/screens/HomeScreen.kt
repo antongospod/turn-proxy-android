@@ -221,7 +221,7 @@ fun HomeScreen(
                         Spacer(Modifier.height(12.dp))
                         ConfigRow(stringResource(R.string.server), clientConfig.serverAddress)
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
-                        ConfigRow(stringResource(R.string.udp), if (clientConfig.useUdp) stringResource(R.string.on) else stringResource(R.string.off))
+                        ConfigRow(stringResource(R.string.transport_protocol), if (clientConfig.useUdp) stringResource(R.string.udp) else stringResource(R.string.tcp))
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort)
                     }
                 }

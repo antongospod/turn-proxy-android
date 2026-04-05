@@ -218,7 +218,7 @@ fun ClientSetupScreen(
                             noDtls = false
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text("TCP") }
+                    ) { Text(stringResource(R.string.tcp)) }
                     SegmentedButton(
                         selected = useUdp,
                         onClick = {
@@ -226,7 +226,7 @@ fun ClientSetupScreen(
                             useUdp = true
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text("UDP") }
+                    ) { Text(stringResource(R.string.udp)) }
                 }
             }
 
