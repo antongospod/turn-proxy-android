@@ -391,7 +391,7 @@ private fun InfoBottomSheet(
                             is SshConnectionState.Connected ->
                                 stringResource(R.string.connected_format, (sshState as SshConnectionState.Connected).ip)
                             is SshConnectionState.Connecting ->
-                                (sshState as SshConnectionState.Connecting).step
+                                stringResource(R.string.ssh_connecting)
                             is SshConnectionState.Error ->
                                 stringResource(R.string.error_format_short, (sshState as SshConnectionState.Error).message)
                             else -> stringResource(R.string.not_connected)

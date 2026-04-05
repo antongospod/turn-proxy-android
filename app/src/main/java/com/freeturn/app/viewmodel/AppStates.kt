@@ -3,7 +3,7 @@ package com.freeturn.app.viewmodel
 // ── SSH connection states ──────────────────────────────────────────────────
 sealed class SshConnectionState {
     object Disconnected : SshConnectionState()
-    data class Connecting(val step: String = "Подключение к серверу...") : SshConnectionState()
+    object Connecting : SshConnectionState()
     data class Connected(val ip: String) : SshConnectionState()
     data class Error(val message: String) : SshConnectionState()
 }

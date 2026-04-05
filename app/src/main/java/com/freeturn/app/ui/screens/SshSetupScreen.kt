@@ -142,7 +142,7 @@ fun SshSetupScreen(
                 )
             } else {
                 Spacer(Modifier.height(32.dp))
-                ConnectionProgressCard(step = (sshState as SshConnectionState.Connecting).step)
+                ConnectionProgressCard(step = stringResource(R.string.ssh_connecting))
             }
 
             Spacer(Modifier.height(24.dp))
