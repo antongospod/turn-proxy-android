@@ -175,12 +175,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ── Custom kernel ──────────────────────────────────────────────────────
+    private val _kernelError = MutableStateFlow<String?>(null)
+    val kernelError: StateFlow<String?> = _kernelError.asStateFlow()
+
     fun setCustomKernel(uri: Uri) {
-        viewModelScope.launch { proxyManager.setCustomKernel(uri) }
+        viewModelScope.launch {
+            _kernelError.value = proxyManager.setCustomKernel(uri)
+        }
     }
 
     fun clearCustomKernel() {
         proxyManager.clearCustomKernel()
+    }
+
+    fun clearKernelError() {
+        _kernelError.value = null
     }
 
     fun resetAllSettings(context: Context) {

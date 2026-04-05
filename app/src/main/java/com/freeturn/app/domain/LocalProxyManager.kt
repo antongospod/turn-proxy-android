@@ -108,17 +108,45 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    suspend fun setCustomKernel(uri: Uri) = withContext(Dispatchers.IO) {
+    suspend fun setCustomKernel(uri: Uri): String? = withContext(Dispatchers.IO) {
         try {
+            val MAX_SIZE = 100L * 1024 * 1024 // 100 MB
+            val ELF_MAGIC = byteArrayOf(0x7F, 0x45, 0x4C, 0x46) // \x7FELF
+
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: return@withContext "Не удалось открыть файл"
+
+            // Читаем первые 4 байта для проверки ELF-магии
+            val header = ByteArray(4)
+            val headerRead = inputStream.read(header)
+            inputStream.close()
+
+            if (headerRead < 4 || !header.contentEquals(ELF_MAGIC)) {
+                return@withContext "Файл не является ELF-бинарником. Убедитесь, что загружаете правильное ядро"
+            }
+
+            // Копируем файл
             val dest = File(context.filesDir, "custom_vkturn")
             context.contentResolver.openInputStream(uri)?.use { input ->
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
+
+            if (dest.length() == 0L) {
+                dest.delete()
+                return@withContext "Файл пустой"
+            }
+            if (dest.length() > MAX_SIZE) {
+                dest.delete()
+                return@withContext "Файл слишком большой (максимум 100 МБ)"
+            }
+
             dest.setExecutable(true)
             withContext(Dispatchers.Main) { _customKernelExists.value = true }
-            ProxyServiceState.addLog("Кастомное ядро установлено: ${dest.length() / 1024} KB")
+            ProxyServiceState.addLog("Кастомное ядро установлено: ${dest.length() / 1024} КБ")
+            null
         } catch (e: Exception) {
             ProxyServiceState.addLog("Ошибка установки ядра: ${e.message}")
+            "Ошибка: ${e.message}"
         }
     }
 
@@ -130,6 +158,7 @@ class LocalProxyManager(private val context: Context) {
 
     fun clearState() {
         _proxyState.value = ProxyState.Idle
+        File(context.filesDir, "custom_vkturn").delete()
         _customKernelExists.value = false
     }
 
