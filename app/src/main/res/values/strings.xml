@@ -46,7 +46,7 @@
     <string name="server_address_label">Адрес vk-turn-proxy сервера</string>
     <string name="server_address_placeholder">1.2.3.4:56000</string>
     <string name="server_address_support">IP и порт vk-turn-proxy на вашем VPS</string>
-    <string name="vk_link_label">Ссылка VK-звонок / Yandex Telemost</string>
+    <string name="vk_link_label">Ссылка VK-звонок</string>
     <string name="vk_link_placeholder">https://vk.com/call/…</string>
     <string name="vk_link_support">VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
@@ -80,7 +80,7 @@
     <string name="error_format">Ошибка: %1$s</string>
     <string name="server_config">Конфигурация сервера</string>
     <string name="listen_port">Порт прослушивания</string>
-    <string name="listen_port_placeholder">0.0.0.0:56000</string>
+    <string name="listen_port_placeholder">56000</string>
     <string name="listen_port_desc">Порт, на котором сервер принимает подключения от клиентов</string>
     <string name="turn_client_address">Адрес TURN‑клиента</string>
     <string name="turn_client_placeholder">127.0.0.1:40537</string>
