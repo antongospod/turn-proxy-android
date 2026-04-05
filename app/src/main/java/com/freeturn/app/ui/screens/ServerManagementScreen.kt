@@ -52,11 +52,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.theme.StatusBlue
 import com.freeturn.app.ui.theme.StatusGreen
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ServerState
@@ -112,7 +114,12 @@ fun ServerManagementScreen(
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(stringResource(R.string.server_status), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
-                    StatusRow(stringResource(R.string.ssh_connection), isConnected)
+                    StatusRow(
+                        label = stringResource(R.string.ssh_connection),
+                        isActive = isConnected,
+                        activeLabel = stringResource(R.string.paired),
+                        activeColor = StatusBlue
+                    )
                     Spacer(Modifier.height(10.dp))
                     StatusRow(stringResource(R.string.vk_turn_proxy), serverKnown?.running == true)
 
@@ -300,7 +307,7 @@ private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .background(if (connected) StatusGreen else MaterialTheme.colorScheme.error, CircleShape)
+                .background(if (connected) StatusBlue else MaterialTheme.colorScheme.error, CircleShape)
         )
         Spacer(Modifier.width(6.dp))
         Text(
@@ -312,7 +319,12 @@ private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
 }
 
 @Composable
-private fun StatusRow(label: String, isActive: Boolean) {
+private fun StatusRow(
+    label: String,
+    isActive: Boolean,
+    activeLabel: String = stringResource(R.string.active),
+    activeColor: Color = StatusGreen
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -324,15 +336,15 @@ private fun StatusRow(label: String, isActive: Boolean) {
                 modifier = Modifier
                     .size(8.dp)
                     .background(
-                        if (isActive) StatusGreen else MaterialTheme.colorScheme.outline,
+                        if (isActive) activeColor else MaterialTheme.colorScheme.outline,
                         CircleShape
                     )
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                if (isActive) stringResource(R.string.active) else stringResource(R.string.inactive),
+                if (isActive) activeLabel else stringResource(R.string.inactive),
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isActive) StatusGreen else MaterialTheme.colorScheme.outline
+                color = if (isActive) activeColor else MaterialTheme.colorScheme.outline
             )
         }
     }

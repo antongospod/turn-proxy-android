@@ -93,6 +93,7 @@
     <string name="ssh_log_title">SSH-лог</string>
     <string name="active">Активно</string>
     <string name="inactive">Неактивно</string>
+    <string name="paired">Сопряжено</string>
 
     <!-- SshSetupScreen -->
     <string name="connect_to_server">Сопряжение с сервером</string>
