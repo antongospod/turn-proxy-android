@@ -63,7 +63,7 @@
     <string name="custom_core">Кастомное ядро</string>
     <string name="builtin_core">Встроенное ядро</string>
     <string name="loaded_from_memory">Загружено из памяти устройства</string>
-    <string name="from_apk">Из APK (libvkturn.so)</string>
+    <string name="from_apk">Из APK</string>
     <string name="btn_load">Загрузить</string>
     <string name="finish_setup">Завершить настройку</string>
 

@@ -432,8 +432,8 @@ private fun InfoBottomSheet(
         item {
             RepoLinkItem(
                 title = stringResource(R.string.proxy_core),
-                subtitle = "alexmac6574/vk-turn-proxy",
-                url = "https://github.com/alexmac6574/vk-turn-proxy",
+                subtitle = "cacggghp/vk-turn-proxy",
+                url = "https://github.com/cacggghp/vk-turn-proxy",
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
                 onOpen = { uriHandler.openUri(it) }
