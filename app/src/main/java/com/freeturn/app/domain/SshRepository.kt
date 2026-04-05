@@ -64,7 +64,7 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
     }
 
     suspend fun connectSsh(config: SshConfig): Pair<Boolean, String?> {
-        _sshState.value = SshConnectionState.Connecting()
+        _sshState.value = SshConnectionState.Connecting
         val result = runSshCommand(config, "Подключение", "echo OK")
         return if (result.trim() == "OK") {
             val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint

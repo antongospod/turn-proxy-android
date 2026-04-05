@@ -26,6 +26,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -193,25 +196,47 @@ fun ClientSetupScreen(
                 )
             }
 
-            SwitchRow(
-                label = stringResource(R.string.udp_mode),
-                description = stringResource(R.string.udp_mode_desc),
-                checked = useUdp,
-                onCheckedChange = {
-                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                    useUdp = it
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column {
+                    Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.transport_protocol_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
                 }
-            )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !useUdp,
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                            useUdp = false
+                            noDtls = false
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text("TCP") }
+                    SegmentedButton(
+                        selected = useUdp,
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                            useUdp = true
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text("UDP") }
+                }
+            }
 
-            SwitchRow(
-                label = stringResource(R.string.no_dtls),
-                description = stringResource(R.string.no_dtls_desc),
-                checked = noDtls,
-                onCheckedChange = {
-                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                    noDtls = it
-                }
-            )
+            if (useUdp) {
+                SwitchRow(
+                    label = stringResource(R.string.no_dtls),
+                    description = stringResource(R.string.no_dtls_desc),
+                    checked = noDtls,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        noDtls = it
+                    }
+                )
+            }
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
