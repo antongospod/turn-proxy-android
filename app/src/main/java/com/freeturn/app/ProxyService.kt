@@ -105,7 +105,7 @@ class ProxyService : Service() {
             customBin.absolutePath
         } else {
             ProxyServiceState.addLog("Используется стандартное ядро из APK")
-            "${applicationInfo.nativeLibraryDir}/client-android-arm64.so"
+            "${applicationInfo.nativeLibraryDir}/libvkturn.so"
         }
 
         val cmdArgs = mutableListOf<String>()

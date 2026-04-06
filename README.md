@@ -145,7 +145,7 @@ nohup ./server-linux-amd64 -listen 0.0.0.0:56000 -connect 127.0.0.1:<порт_wg
 - **JSch** — SSH-клиент
 - **EncryptedSharedPreferences** — шифрование секретов
 - **DataStore** — хранение настроек
-- Нативный бинарник на **Go** — `client-android-arm64.so` (arm64-v8a)
+- Нативный бинарник на **Go** — `libvkturn.so` (arm64-v8a)
 
 ## Сборка
 
