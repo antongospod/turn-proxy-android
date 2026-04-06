@@ -140,7 +140,10 @@ class LocalProxyManager(private val context: Context) {
                 return@withContext "Файл слишком большой (максимум 100 МБ)"
             }
 
-            dest.setExecutable(true)
+            dest.setExecutable(true, false)
+            try {
+                Runtime.getRuntime().exec(arrayOf("chmod", "755", dest.absolutePath)).waitFor()
+            } catch (_: Exception) {}
             withContext(Dispatchers.Main) { _customKernelExists.value = true }
             ProxyServiceState.addLog("Кастомное ядро установлено: ${dest.length() / 1024} КБ")
             null
