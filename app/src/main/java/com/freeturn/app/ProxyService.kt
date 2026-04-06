@@ -181,11 +181,17 @@ class ProxyService : Service() {
             if (!startupEmitted) {
                 ProxyServiceState.setStartupResult(StartupResult.Failed(
                     "Процесс завершился без вывода (код: $exitCode)"))
-                startupFailed = true
             }
 
         } catch (e: Exception) {
-            ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
+            val msg = e.message ?: ""
+            if (msg.contains("error=13") || msg.contains("Permission denied")) {
+                ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: Отказано в запуске ядра — ваше устройство блокирует выполнение файлов из внутреннего хранилища (SELinux/noexec). Используйте встроенное ядро.")
+                ProxyServiceState.setStartupResult(StartupResult.Failed(msg))
+                startupFailed = true
+            } else {
+                ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
+            }
         } finally {
             process.set(null)
             when {
