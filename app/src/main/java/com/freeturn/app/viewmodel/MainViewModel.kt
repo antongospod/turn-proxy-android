@@ -11,6 +11,7 @@ import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.SshConfig
+import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
 import com.freeturn.app.domain.SshRepository
 import com.freeturn.app.ui.HapticUtil
@@ -27,6 +28,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = AppPreferences(application)
     private val sshRepository = SshRepository()
     private val proxyManager = LocalProxyManager(application)
+    private val appUpdater = AppUpdater(application)
 
     val sshState: StateFlow<SshConnectionState> = sshRepository.sshState
     val serverState: StateFlow<ServerState> = sshRepository.serverState
@@ -37,6 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
     val logs: StateFlow<List<String>> = ProxyServiceState.logs
     val customKernelExists: StateFlow<Boolean> = proxyManager.customKernelExists
+    val updateState: StateFlow<UpdateState> = appUpdater.state
 
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
@@ -53,6 +56,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             proxyManager.observeProxyServiceStatus()
         }
         proxyManager.syncInitialState()
+
+        // Автоматическая проверка обновлений при холодном запуске (silent — без ошибок)
+        viewModelScope.launch {
+            appUpdater.checkForUpdate(silent = true)
+        }
     }
 
     override fun onCleared() {
@@ -195,6 +203,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearKernelError() {
         _kernelError.value = null
+    }
+
+    // ── App update ──────────────────────────────────────────────────────
+    fun checkForUpdate() {
+        viewModelScope.launch { appUpdater.checkForUpdate(silent = false) }
+    }
+
+    fun downloadUpdate() {
+        viewModelScope.launch { appUpdater.downloadUpdate() }
+    }
+
+    fun installUpdate() {
+        appUpdater.installUpdate()
+    }
+
+    fun resetUpdateState() {
+        appUpdater.resetState()
     }
 
     fun resetAllSettings(context: Context) {

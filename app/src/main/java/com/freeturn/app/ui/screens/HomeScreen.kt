@@ -39,7 +39,9 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -75,6 +77,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,6 +89,7 @@ import com.freeturn.app.ui.theme.StatusGreenDark
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.viewmodel.UpdateState
 import androidx.core.net.toUri
 
 @SuppressLint("BatteryLife")
@@ -295,7 +299,94 @@ fun HomeScreen(
         }
     }
 
+    UpdateDialogs(viewModel)
 }
+
+// ── Диалоги обновления ────────────────────────────────────────────────────
+
+@Composable
+private fun UpdateDialogs(viewModel: MainViewModel) {
+    val context = LocalContext.current
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    var dismissed by rememberSaveable { mutableStateOf(false) }
+
+    when (val state = updateState) {
+        is UpdateState.Available -> if (!dismissed) {
+            AlertDialog(
+                onDismissRequest = { dismissed = true },
+                title = { Text(stringResource(R.string.update_available_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.update_available, state.version))
+                        if (state.changelog.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                state.changelog,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 10,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        dismissed = true
+                        viewModel.downloadUpdate()
+                    }) { Text(stringResource(R.string.update_download)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { dismissed = true }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        is UpdateState.Downloading -> {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(R.string.update_downloading_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.update_downloading, state.progress))
+                        Spacer(Modifier.height(12.dp))
+                        LinearProgressIndicator(
+                            progress = { state.progress / 100f },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {}
+            )
+        }
+
+        is UpdateState.ReadyToInstall -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.resetUpdateState() },
+                title = { Text(stringResource(R.string.update_ready_title)) },
+                text = { Text(stringResource(R.string.update_ready_desc)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        viewModel.installUpdate()
+                    }) { Text(stringResource(R.string.update_install)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.resetUpdateState() }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        else -> {}
+    }
+}
+
+// ── Кнопка прокси ─────────────────────────────────────────────────────────
 
 @Composable
 private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
@@ -359,6 +450,8 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
     }
 }
 
+// ── Bottom sheet ──────────────────────────────────────────────────────────
+
 @Composable
 private fun InfoBottomSheet(
     viewModel: MainViewModel,
@@ -371,6 +464,7 @@ private fun InfoBottomSheet(
     val uriHandler = LocalUriHandler.current
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
     val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     val appVersion = remember {
@@ -478,6 +572,28 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
+        // ── Обновление ────────────────────────────────────────────────────
+        item {
+            UpdateListItem(
+                state = updateState,
+                colors = listColors,
+                onCheck = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.checkForUpdate()
+                },
+                onDownload = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.downloadUpdate()
+                },
+                onInstall = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.installUpdate()
+                }
+            )
+        }
+
+        item { HorizontalDivider() }
+
         // ── Сброс ─────────────────────────────────────────────────────────
         item {
             ListItem(
@@ -540,6 +656,111 @@ private fun InfoBottomSheet(
         )
     }
 }
+
+// ── Пункт обновления в bottom sheet ───────────────────────────────────────
+
+@Composable
+private fun UpdateListItem(
+    state: UpdateState,
+    colors: ListItemColors,
+    onCheck: () -> Unit,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit
+) {
+    when (state) {
+        is UpdateState.Idle -> {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.update_check)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onCheck)
+            )
+        }
+
+        is UpdateState.Checking -> {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.update_checking)) },
+                colors = colors
+            )
+        }
+
+        is UpdateState.Available -> {
+            ListItem(
+                headlineContent = {
+                    Text(stringResource(R.string.update_available, state.version))
+                },
+                supportingContent = if (state.changelog.isNotEmpty()) {
+                    {
+                        Text(
+                            state.changelog,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else null,
+                colors = colors,
+                trailingContent = {
+                    TextButton(onClick = onDownload) {
+                        Text(stringResource(R.string.update_download))
+                    }
+                }
+            )
+        }
+
+        is UpdateState.Downloading -> {
+            ListItem(
+                headlineContent = {
+                    Text(stringResource(R.string.update_downloading, state.progress))
+                },
+                supportingContent = {
+                    LinearProgressIndicator(
+                        progress = { state.progress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    )
+                },
+                colors = colors
+            )
+        }
+
+        is UpdateState.ReadyToInstall -> {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.update_ready_title)) },
+                colors = colors,
+                trailingContent = {
+                    TextButton(onClick = onInstall) {
+                        Text(stringResource(R.string.update_install))
+                    }
+                }
+            )
+        }
+
+        is UpdateState.NoUpdate -> {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.update_no_update)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onCheck)
+            )
+        }
+
+        is UpdateState.Error -> {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        stringResource(R.string.update_error, state.message),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onCheck)
+            )
+        }
+    }
+}
+
+// ── Общие компоненты ──────────────────────────────────────────────────────
 
 @Composable
 private fun RepoLinkItem(
