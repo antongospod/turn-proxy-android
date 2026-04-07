@@ -44,6 +44,17 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
+    suspend fun observeCaptchaEvents() {
+        ProxyServiceState.captchaUrl.collect { url ->
+            if (url != null) {
+                _proxyState.value = ProxyState.CaptchaRequired(url)
+            } else if (_proxyState.value is ProxyState.CaptchaRequired) {
+                // Капча решена — возвращаемся в Running (ядро продолжает работу)
+                _proxyState.value = ProxyState.Running
+            }
+        }
+    }
+
     suspend fun observeProxyServiceStatus() {
         ProxyServiceState.isRunning.collect { running ->
             if (running && _proxyState.value !is ProxyState.Running && _proxyState.value !is ProxyState.Starting) {
@@ -97,6 +108,13 @@ class LocalProxyManager(private val context: Context) {
     fun stopProxy() {
         context.stopService(Intent(context, ProxyService::class.java))
         _proxyState.value = ProxyState.Idle
+    }
+
+    fun dismissCaptcha() {
+        ProxyServiceState.setCaptchaUrl(null)
+        if (_proxyState.value is ProxyState.CaptchaRequired) {
+            _proxyState.value = ProxyState.Running
+        }
     }
 
     fun setErrorWithAutoReset(message: String) {

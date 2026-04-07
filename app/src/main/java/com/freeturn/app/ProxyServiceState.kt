@@ -28,6 +28,9 @@ object ProxyServiceState {
     private val _startupResult = MutableStateFlow<StartupResult?>(null)
     val startupResult: StateFlow<StartupResult?> = _startupResult.asStateFlow()
 
+    private val _captchaUrl = MutableStateFlow<String?>(null)
+    val captchaUrl: StateFlow<String?> = _captchaUrl.asStateFlow()
+
     fun setRunning(value: Boolean) {
         _isRunning.value = value
     }
@@ -45,6 +48,10 @@ object ProxyServiceState {
             val next = current + msg
             if (next.size > MAX_LOG_LINES) next.drop(next.size - MAX_LOG_LINES) else next
         }
+    }
+
+    fun setCaptchaUrl(url: String?) {
+        _captchaUrl.value = url
     }
 
     fun clearLogs() {

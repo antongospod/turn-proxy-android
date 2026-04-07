@@ -23,6 +23,7 @@ sealed class ProxyState {
     object Starting : ProxyState()
     object Running : ProxyState()
     data class Error(val message: String) : ProxyState()
+    data class CaptchaRequired(val url: String) : ProxyState()
 }
 
 // ── App update states ──────────────────────────────────────────────────────

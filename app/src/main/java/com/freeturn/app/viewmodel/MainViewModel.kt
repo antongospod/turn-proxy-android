@@ -55,6 +55,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             proxyManager.observeProxyServiceStatus()
         }
+        viewModelScope.launch {
+            proxyManager.observeCaptchaEvents()
+        }
         proxyManager.syncInitialState()
 
         // Автоматическая проверка обновлений при холодном запуске (silent — без ошибок)
@@ -168,6 +171,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopProxy() {
         proxyManager.stopProxy()
+    }
+
+    fun dismissCaptcha() {
+        proxyManager.dismissCaptcha()
     }
 
     fun clearLogs() {

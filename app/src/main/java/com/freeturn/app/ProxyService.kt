@@ -20,6 +20,7 @@ import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import java.util.regex.Pattern
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +39,7 @@ class ProxyService : Service() {
 
     companion object {
         const val MAX_RESTARTS = 8
+        private val CAPTCHA_URL_REGEX = Pattern.compile("""(https?://localhost:\d+/not_robot_captcha\S+)""")
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -130,6 +132,7 @@ class ProxyService : Service() {
         val startedAt = System.currentTimeMillis()
         var startupEmitted = false
         var startupFailed = false
+        var captchaActive = false
         try {
             ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -145,6 +148,20 @@ class ProxyService : Service() {
                 while (reader.readLine().also { line = it } != null) {
                     val l = line ?: continue
                     ProxyServiceState.addLog(l)
+
+                    // Детекция капчи: ищем URL localhost с not_robot_captcha
+                    val captchaMatcher = CAPTCHA_URL_REGEX.matcher(l)
+                    if (captchaMatcher.find()) {
+                        val url = captchaMatcher.group(1)!!
+                        ProxyServiceState.setCaptchaUrl(url)
+                        captchaActive = true
+                    }
+
+                    // Капча решена — ядро продолжает работу
+                    if (captchaActive && l.contains("[Captcha] Manual captcha solved") || l.contains("Captcha Solved Successfully")) {
+                        ProxyServiceState.setCaptchaUrl(null)
+                        captchaActive = false
+                    }
 
                     if (!startupEmitted) {
                         val lower = l.lowercase()
@@ -193,6 +210,7 @@ class ProxyService : Service() {
                 ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
             }
         } finally {
+            ProxyServiceState.setCaptchaUrl(null)
             process.set(null)
             when {
                 userStopped.get() -> {
