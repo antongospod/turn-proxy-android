@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Turn Proxy</string>
 
     <!-- HomeScreen -->
     <string name="nav_home">Главная</string>
-    <string name="splash_title">FreeTurn</string>
-    <string name="splash_subtitle">VK TURN Proxy</string>
     <string name="turn_proxy_title">Turn Proxy</string>
     <string name="info_desc">Информация</string>
     <string name="proxy_active">Прокси активен</string>
@@ -16,8 +13,6 @@
     <string name="threads">Потоки</string>
     <string name="tcp">TCP</string>
     <string name="udp">UDP</string>
-    <string name="on">Вкл</string>
-    <string name="off">Выкл</string>
     <string name="local_port">Локальный порт</string>
     <string name="ssh_connecting">SSH: сопряжение…</string>
     <string name="ssh_error">SSH: ошибка</string>
