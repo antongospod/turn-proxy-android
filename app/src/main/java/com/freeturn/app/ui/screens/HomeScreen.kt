@@ -40,7 +40,7 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
@@ -78,7 +78,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -358,7 +357,7 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
                     Column {
                         Text(stringResource(R.string.update_downloading, state.progress))
                         Spacer(Modifier.height(12.dp))
-                        LinearProgressIndicator(
+                        LinearWavyProgressIndicator(
                             progress = { state.progress / 100f },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -672,97 +671,54 @@ private fun UpdateListItem(
     onDownload: () -> Unit,
     onInstall: () -> Unit
 ) {
-    when (state) {
-        is UpdateState.Idle -> {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.update_check)) },
-                colors = colors,
-                modifier = Modifier.clickable(onClick = onCheck)
-            )
-        }
+    val supportingText = when (state) {
+        is UpdateState.Idle -> stringResource(R.string.update_tap_to_check)
+        is UpdateState.Checking -> stringResource(R.string.update_checking)
+        is UpdateState.Available -> stringResource(R.string.update_available, state.version)
+        is UpdateState.Downloading -> stringResource(R.string.update_downloading, state.progress)
+        is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready_desc_short)
+        is UpdateState.NoUpdate -> stringResource(R.string.update_no_update)
+        is UpdateState.Error -> stringResource(R.string.update_error, state.message)
+    }
 
-        is UpdateState.Checking -> {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.update_checking)) },
-                colors = colors
-            )
-        }
-
-        is UpdateState.Available -> {
-            ListItem(
-                headlineContent = {
-                    Text(stringResource(R.string.update_available, state.version))
-                },
-                supportingContent = if (state.changelog.isNotEmpty()) {
-                    {
-                        Text(
-                            state.changelog,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else null,
-                colors = colors,
-                trailingContent = {
-                    TextButton(onClick = onDownload) {
-                        Text(stringResource(R.string.update_download))
-                    }
-                }
-            )
-        }
-
-        is UpdateState.Downloading -> {
-            ListItem(
-                headlineContent = {
-                    Text(stringResource(R.string.update_downloading, state.progress))
-                },
-                supportingContent = {
-                    LinearProgressIndicator(
+    ListItem(
+        headlineContent = {
+            Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleSmall)
+        },
+        supportingContent = {
+            Column {
+                Text(
+                    supportingText,
+                    color = if (state is UpdateState.Error) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (state is UpdateState.Downloading) {
+                    LinearWavyProgressIndicator(
                         progress = { state.progress / 100f },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp)
                     )
-                },
-                colors = colors
-            )
-        }
-
-        is UpdateState.ReadyToInstall -> {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.update_ready_title)) },
-                colors = colors,
-                trailingContent = {
-                    TextButton(onClick = onInstall) {
-                        Text(stringResource(R.string.update_install))
-                    }
                 }
-            )
-        }
-
-        is UpdateState.NoUpdate -> {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.update_no_update)) },
-                colors = colors,
-                modifier = Modifier.clickable(onClick = onCheck)
-            )
-        }
-
-        is UpdateState.Error -> {
-            ListItem(
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.update_error, state.message),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
-                colors = colors,
-                modifier = Modifier.clickable(onClick = onCheck)
-            )
-        }
-    }
+            }
+        },
+        trailingContent = {
+            when (state) {
+                is UpdateState.Available -> TextButton(onClick = onDownload) {
+                    Text(stringResource(R.string.update_download))
+                }
+                is UpdateState.ReadyToInstall -> TextButton(onClick = onInstall) {
+                    Text(stringResource(R.string.update_install))
+                }
+                is UpdateState.Idle, is UpdateState.NoUpdate, is UpdateState.Error ->
+                    TextButton(onClick = onCheck) {
+                        Text(stringResource(R.string.update_check))
+                    }
+                else -> {}
+            }
+        },
+        colors = colors
+    )
 }
 
 // ── Общие компоненты ──────────────────────────────────────────────────────

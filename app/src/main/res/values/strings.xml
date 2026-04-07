@@ -122,7 +122,9 @@
     <string name="skip_setup">Пропустить настройки</string>
 
     <!-- Update -->
-    <string name="update_check">Проверить обновления</string>
+    <string name="update_title">Обновление</string>
+    <string name="update_check">Проверить</string>
+    <string name="update_tap_to_check">Нажмите для проверки</string>
     <string name="update_checking">Проверка…</string>
     <string name="update_available_title">Доступно обновление</string>
     <string name="update_available">Доступна версия %1$s</string>
@@ -131,6 +133,7 @@
     <string name="update_downloading">Загрузка: %1$d%%</string>
     <string name="update_ready_title">Обновление загружено</string>
     <string name="update_ready_desc">APK готов к установке. Установить сейчас?</string>
+    <string name="update_ready_desc_short">Готово к установке</string>
     <string name="update_install">Установить</string>
     <string name="update_no_update">Установлена последняя версия</string>
     <string name="update_error">Ошибка: %1$s</string>
