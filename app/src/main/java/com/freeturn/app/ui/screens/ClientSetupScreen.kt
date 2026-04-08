@@ -87,6 +87,7 @@ fun ClientSetupScreen(
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
+    var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
@@ -100,7 +101,7 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // Работает в обоих режимах — и при онбординге, и как вкладка.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, localPort) {
+    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
@@ -109,6 +110,7 @@ fun ClientSetupScreen(
                 threads       = threads.roundToInt(),
                 useUdp        = useUdp,
                 noDtls        = noDtls,
+                manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim()
             )
         )
@@ -243,6 +245,16 @@ fun ClientSetupScreen(
                     }
                 )
             }
+
+            SwitchRow(
+                label = stringResource(R.string.manual_captcha),
+                description = stringResource(R.string.manual_captcha_desc),
+                checked = manualCaptcha,
+                onCheckedChange = {
+                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                    manualCaptcha = it
+                }
+            )
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 

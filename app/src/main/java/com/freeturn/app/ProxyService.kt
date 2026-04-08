@@ -126,6 +126,7 @@ class ProxyService : Service() {
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
             if (cfg.useUdp) cmdArgs.add("-udp")
             if (cfg.noDtls) cmdArgs.add("-no-dtls")
+            if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
         }
 
         var exitCode = -1

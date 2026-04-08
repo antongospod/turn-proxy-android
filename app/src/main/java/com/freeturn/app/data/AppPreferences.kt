@@ -34,6 +34,7 @@ data class ClientConfig(
     val threads: Int = 4,
     val useUdp: Boolean = true,
     val noDtls: Boolean = false,
+    val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
     val isRawMode: Boolean = false,
     val rawCommand: String = ""
@@ -56,6 +57,7 @@ class AppPreferences(context: Context) {
         val CLIENT_THREADS = intPreferencesKey("client_threads")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
         val CLIENT_NO_DTLS = booleanPreferencesKey("client_no_dtls")
+        val CLIENT_MANUAL_CAPTCHA = booleanPreferencesKey("client_manual_captcha")
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
@@ -108,6 +110,7 @@ class AppPreferences(context: Context) {
                 threads = prefs[CLIENT_THREADS] ?: 4,
                 useUdp = prefs[CLIENT_UDP] ?: true,
                 noDtls = prefs[CLIENT_NO_DTLS] ?: false,
+                manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: ""
@@ -161,6 +164,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_THREADS] = config.threads
             prefs[CLIENT_UDP] = config.useUdp
             prefs[CLIENT_NO_DTLS] = config.noDtls
+            prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
             prefs[CLIENT_LOCAL_PORT] = config.localPort
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand

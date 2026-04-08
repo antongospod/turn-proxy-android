@@ -55,6 +55,8 @@
     <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
     <string name="no_dtls">Без DTLS-шифрования</string>
     <string name="no_dtls_desc">Может ускорить соединение, повышает риск блокировки</string>
+    <string name="manual_captcha">Ручной ввод капчи</string>
+    <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
     <string name="core_title">Ядро</string>
     <string name="custom_core">Кастомное ядро</string>
     <string name="builtin_core">Встроенное ядро</string>
