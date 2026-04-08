@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
@@ -84,7 +83,7 @@ class ProxyService : Service() {
         userStopped.set(false)
         restartCount = 0
 
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
         wakeLock?.acquire(TimeUnit.HOURS.toMillis(24))
 
@@ -266,7 +265,7 @@ class ProxyService : Service() {
 
     private fun registerNetworkCallback() {
         networkInitialized = false
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 if (!networkInitialized) {
@@ -295,7 +294,7 @@ class ProxyService : Service() {
     private fun unregisterNetworkCallback() {
         networkCallback?.let { cb ->
             try {
-                (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                (getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
                     .unregisterNetworkCallback(cb)
             } catch (_: Exception) {}
         }

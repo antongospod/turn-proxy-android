@@ -96,8 +96,7 @@ import androidx.core.net.toUri
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
-    onNavigateToSshSetup: () -> Unit,
-    onNavigateToClientSetup: () -> Unit = {}
+    onNavigateToSshSetup: () -> Unit
 ) {
     val context = LocalContext.current
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()

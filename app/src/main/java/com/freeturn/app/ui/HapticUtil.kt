@@ -3,7 +3,6 @@ package com.freeturn.app.ui
 import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
-import kotlinx.coroutines.DelicateCoroutinesApi
 
 /**
  * Apple-like haptic patterns for a tactile, musical feel.

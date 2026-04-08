@@ -195,8 +195,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 composable(Routes.HOME) {
                     HomeScreen(
                         viewModel = viewModel,
-                        onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) },
-                        onNavigateToClientSetup = { navController.navigate(Routes.CLIENT_SETUP) }
+                        onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) }
                     )
                 }
 

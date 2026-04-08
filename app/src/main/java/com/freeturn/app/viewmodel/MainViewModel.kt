@@ -32,8 +32,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val sshState: StateFlow<SshConnectionState> = sshRepository.sshState
     val serverState: StateFlow<ServerState> = sshRepository.serverState
-    val serverVersion: StateFlow<String?> = sshRepository.serverVersion
-    val serverLogs: StateFlow<String?> = sshRepository.serverLogs
     val sshLog: StateFlow<List<String>> = sshRepository.sshLog
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
@@ -114,10 +112,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun disconnectSsh() {
-        sshRepository.disconnect()
-    }
-
     fun reconnectSsh() {
         viewModelScope.launch {
             val cfg = sshRepository.activeSshConfig
@@ -128,14 +122,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ── Server management ──────────────────────────────────────────────────
-    fun checkServerState(config: SshConfig? = null) {
-        viewModelScope.launch { sshRepository.checkServerState(config ?: sshConfig.value) }
-    }
-
-    fun fetchServerVersion(config: SshConfig? = null) {
-        viewModelScope.launch { sshRepository.fetchServerVersion(config ?: sshConfig.value) }
-    }
-
     fun installServer() {
         viewModelScope.launch { sshRepository.installServer() }
     }
@@ -152,14 +138,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopServer() {
         viewModelScope.launch { sshRepository.stopServer() }
-    }
-
-    fun fetchServerLogs() {
-        viewModelScope.launch { sshRepository.fetchServerLogs() }
-    }
-
-    fun clearSshLog() {
-        sshRepository.clearSshLog()
     }
 
     // ── Local proxy ────────────────────────────────────────────────────────
