@@ -88,6 +88,9 @@
     <string name="start_server">Запустить сервер</string>
     <string name="stop_server">Остановить сервер</string>
     <string name="continue_client_setup">Продолжить настройку клиента</string>
+    <string name="vless_mode">VLESS-режим</string>
+    <string name="vless_mode_desc">Проброс VLESS через TURN-туннель (требует -vless на сервере)</string>
+    <string name="server_running_vless">Сервер запущен в VLESS-режиме</string>
     <string name="ssh_log_title">SSH-лог</string>
     <string name="active">Активно</string>
     <string name="inactive">Неактивно</string>

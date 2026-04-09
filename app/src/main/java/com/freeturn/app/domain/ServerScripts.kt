@@ -8,14 +8,12 @@ object ServerScripts {
 
     val checkServerState: String = """
         if ls /opt/vk-turn/server-linux-* >/dev/null 2>&1; then echo "INSTALLED:YES"; else echo "INSTALLED:NO"; fi
-        if ps aux | grep -v grep | grep -q "server-linux-"; then echo "RUNNING:YES"; else echo "RUNNING:NO"; fi
-    """.trimIndent()
-
-    val fetchServerVersion: String = """
-        cd /opt/vk-turn 2>/dev/null &&
-        ARCH=${'$'}(uname -m);
-        if [ "${'$'}ARCH" = "x86_64" ]; then BIN="./server-linux-amd64"; else BIN="./server-linux-arm64"; fi;
-        timeout 2 ${'$'}BIN -version 2>&1 | head -1
+        if ps aux | grep -v grep | grep -q "server-linux-"; then
+            echo "RUNNING:YES"
+            if ps aux | grep -v grep | grep "server-linux-" | grep -q "\-vless"; then echo "VLESS:YES"; else echo "VLESS:NO"; fi
+        else
+            echo "RUNNING:NO"
+        fi
     """.trimIndent()
 
     val installServer: String = """
@@ -58,14 +56,15 @@ object ServerScripts {
         chmod +x "${'$'}BIN" && echo "DONE"
     """.trimIndent()
 
-    fun startServer(listen: String, connect: String): String {
+    fun startServer(listen: String, connect: String, vlessMode: Boolean = false): String {
         val safeListen = shellSafe(listen)
         val safeConnect = shellSafe(connect)
+        val vlessFlag = if (vlessMode) " -vless" else ""
         return """
             cd /opt/vk-turn &&
             ARCH=${'$'}(uname -m);
             if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi;
-            nohup ./${'$'}BIN -listen '${safeListen}' -connect '${safeConnect}' > server.log 2>&1 &
+            nohup ./${'$'}BIN -listen '${safeListen}' -connect '${safeConnect}'${vlessFlag} > server.log 2>&1 &
             echo ${'$'}! > proxy.pid && echo "STARTED"
         """.trimIndent()
     }

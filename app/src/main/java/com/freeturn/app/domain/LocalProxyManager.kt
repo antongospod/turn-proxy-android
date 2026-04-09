@@ -45,11 +45,11 @@ class LocalProxyManager(private val context: Context) {
     }
 
     suspend fun observeCaptchaEvents() {
-        ProxyServiceState.captchaUrl.collect { url ->
-            if (url != null) {
-                _proxyState.value = ProxyState.CaptchaRequired(url)
+        ProxyServiceState.captchaSession.collect { session ->
+            if (session != null) {
+                _proxyState.value = ProxyState.CaptchaRequired(session.url, session.sessionId)
             } else if (_proxyState.value is ProxyState.CaptchaRequired) {
-                // Капча решена — возвращаемся в Running (ядро продолжает работу)
+                // Капча-сессия закрыта — возвращаемся в Running (ядро продолжает работу)
                 _proxyState.value = ProxyState.Running
             }
         }
@@ -111,7 +111,7 @@ class LocalProxyManager(private val context: Context) {
     }
 
     fun dismissCaptcha() {
-        ProxyServiceState.setCaptchaUrl(null)
+        ProxyServiceState.setCaptchaSession(null)
         if (_proxyState.value is ProxyState.CaptchaRequired) {
             _proxyState.value = ProxyState.Running
         }

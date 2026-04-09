@@ -99,7 +99,7 @@ fun ClientSetupScreen(
     }
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
-    // Работает в обоих режимах — и при онбординге, и как вкладка.
+    // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
     LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort) {
         delay(600)
         viewModel.saveClientConfig(
@@ -110,7 +110,8 @@ fun ClientSetupScreen(
                 useUdp        = useUdp,
                 noDtls        = noDtls,
                 manualCaptcha = manualCaptcha,
-                localPort     = localPort.trim()
+                localPort     = localPort.trim(),
+                vlessMode     = saved.vlessMode
             )
         )
     }
@@ -132,7 +133,7 @@ fun ClientSetupScreen(
         ) {
             Spacer(Modifier.height(4.dp))
 
-            // ── Подключение ───────────────────────────────────────────────
+            // Подключение
             Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
@@ -170,7 +171,7 @@ fun ClientSetupScreen(
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-            // ── Параметры ─────────────────────────────────────────────────
+            // Параметры
             Text(stringResource(R.string.parameters_title), style = MaterialTheme.typography.titleMedium)
 
             Column {
@@ -203,46 +204,58 @@ fun ClientSetupScreen(
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column {
-                    Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        stringResource(R.string.transport_protocol_desc),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            SwitchRow(
+                label = stringResource(R.string.vless_mode),
+                description = stringResource(R.string.vless_mode_desc),
+                checked = saved.vlessMode,
+                onCheckedChange = {
+                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                    viewModel.setVlessMode(it)
+                }
+            )
+
+            if (!saved.vlessMode) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.transport_protocol_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = false
+                                noDtls = false
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) { Text(stringResource(R.string.tcp)) }
+                        SegmentedButton(
+                            selected = useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = true
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) { Text(stringResource(R.string.udp)) }
+                    }
+                }
+
+                if (useUdp) {
+                    SwitchRow(
+                        label = stringResource(R.string.no_dtls),
+                        description = stringResource(R.string.no_dtls_desc),
+                        checked = noDtls,
+                        onCheckedChange = {
+                            HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                            noDtls = it
+                        }
                     )
                 }
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !useUdp,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            useUdp = false
-                            noDtls = false
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.tcp)) }
-                    SegmentedButton(
-                        selected = useUdp,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            useUdp = true
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.udp)) }
-                }
-            }
-
-            if (useUdp) {
-                SwitchRow(
-                    label = stringResource(R.string.no_dtls),
-                    description = stringResource(R.string.no_dtls_desc),
-                    checked = noDtls,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        noDtls = it
-                    }
-                )
             }
 
             SwitchRow(
@@ -257,7 +270,7 @@ fun ClientSetupScreen(
 
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-            // ── Ядро ──────────────────────────────────────────────────────
+            // Ядро
             Text(stringResource(R.string.core_title), style = MaterialTheme.typography.titleMedium)
 
             Card(

@@ -38,7 +38,10 @@ class ProxyService : Service() {
 
     companion object {
         const val MAX_RESTARTS = 8
-        private val CAPTCHA_URL_REGEX = Pattern.compile("""(https?://localhost:\d+/not_robot_captcha\S+)""")
+        // Жёстко привязываемся к строке-объявлению капчи в бинарнике, чтобы
+        // случайные localhost-URL в других логах не открывали диалог.
+        private val CAPTCHA_URL_REGEX =
+            Pattern.compile("""Open this URL in your browser:\s*(https?://\S+)""")
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -123,7 +126,8 @@ class ProxyService : Service() {
             cmdArgs.add(cfg.vkLink)
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
-            if (cfg.useUdp) cmdArgs.add("-udp")
+            if (cfg.vlessMode) cmdArgs.add("-vless")
+            else if (cfg.useUdp) cmdArgs.add("-udp")
             if (cfg.noDtls) cmdArgs.add("-no-dtls")
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
         }
@@ -133,6 +137,7 @@ class ProxyService : Service() {
         var startupEmitted = false
         var startupFailed = false
         var captchaActive = false
+        var captchaSessionCounter = 0L
         try {
             ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -149,17 +154,34 @@ class ProxyService : Service() {
                     val l = line ?: continue
                     ProxyServiceState.addLog(l)
 
-                    // Детекция капчи: ищем URL localhost с not_robot_captcha
-                    val captchaMatcher = CAPTCHA_URL_REGEX.matcher(l)
-                    if (captchaMatcher.find()) {
-                        val url = captchaMatcher.group(1)!!
-                        ProxyServiceState.setCaptchaUrl(url)
+                    // Старт новой капча-сессии: бинарник логирует это перед открытием
+                    // локального HTTP-сервера капчи. Сам URL прилетает следующей строкой.
+                    if (l.contains("Triggering manual captcha fallback")) {
                         captchaActive = true
                     }
 
-                    // Капча решена — ядро продолжает работу
-                    if (captchaActive && l.contains("[Captcha] Manual captcha solved") || l.contains("Captcha Solved Successfully")) {
-                        ProxyServiceState.setCaptchaUrl(null)
+                    // Детекция URL ручной капчи. Каждый раз выдаём новый sessionId,
+                    // чтобы диалог пересоздавал WebView, даже если URL не поменялся
+                    // (бинарник всегда использует http://localhost:8765).
+                    val captchaMatcher = CAPTCHA_URL_REGEX.matcher(l)
+                    if (captchaMatcher.find()) {
+                        val url = captchaMatcher.group(1)!!
+                        captchaSessionCounter += 1
+                        ProxyServiceState.setCaptchaSession(
+                            CaptchaSession(url, captchaSessionCounter)
+                        )
+                        captchaActive = true
+                    }
+
+                    // Капча-сессия закончилась: бинарник либо завершил auth-чейн
+                    // (Failed/Success), либо сама капча провалилась (timeout). Закрываем
+                    // диалог — следующая капча-сессия откроет его заново через новый sessionId.
+                    if (captchaActive && (
+                            l.contains("[VK Auth] Failed") ||
+                            l.contains("[VK Auth] Success") ||
+                            (l.contains("[Captcha]") && l.contains("failed"))
+                        )) {
+                        ProxyServiceState.setCaptchaSession(null)
                         captchaActive = false
                     }
 
@@ -210,7 +232,7 @@ class ProxyService : Service() {
                 ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
             }
         } finally {
-            ProxyServiceState.setCaptchaUrl(null)
+            ProxyServiceState.setCaptchaSession(null)
             process.set(null)
             when {
                 userStopped.get() -> {
@@ -238,7 +260,7 @@ class ProxyService : Service() {
         }
     }
 
-    // ── Watchdog ──────────────────────────────────────────────────────────────
+    // Watchdog
 
     private fun scheduleWatchdogRestart() {
         restartCount++
@@ -259,7 +281,7 @@ class ProxyService : Service() {
         }, delay)
     }
 
-    // ── Network Handover ──────────────────────────────────────────────────────
+    // Network handover
 
     private var networkDebounceJob: kotlinx.coroutines.Job? = null
 
@@ -301,7 +323,7 @@ class ProxyService : Service() {
         networkCallback = null
     }
 
-    // ── Notification ─────────────────────────────────────────────────────────
+    // Notification
 
     private fun updateNotification(title: String, text: String) {
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
@@ -314,7 +336,7 @@ class ProxyService : Service() {
         getSystemService(NotificationManager::class.java).notify(1, notification)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Helpers
 
     private fun isQuotaError(line: String): Boolean {
         val l = line.lowercase()

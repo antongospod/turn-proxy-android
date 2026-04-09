@@ -130,6 +130,114 @@ nohup ./server-linux-amd64 -listen 0.0.0.0:56000 -connect 127.0.0.1:<порт_wg
 ```
 </details>
 
+## VLESS-режим
+
+Можно использовать VLESS через флаг `-vless`. В этом режиме вместо UDP-пакетов пробрасываются TCP-соединения через TURN-туннель с помощью KCP и smux.
+
+### Настройка
+1. На VPS установить Xray с VLESS inbound
+2. Запустить `server` с флагом `-vless` - **Если вы сопряжены по ssh в приложении, то при вкл свитчбокса
+на экране "Клиент", на сервере автоматический перезапустится бинарник с нужным флагом**
+3. На клиенте запустить `client` с флагом `-vless`
+4. Настроить Xray/v2rayN клиент с VLESS outbound на `127.0.0.1:9000`
+
+### Сервер (VPS)
+```
+./server -listen 0.0.0.0:56000 -connect 127.0.0.1:443 -vless
+```
+
+### Клиент
+```
+./client -peer <ip сервера>:56000 -vk-link <VK ссылка> -listen 127.0.0.1:9000 -vless
+```
+
+<details>
+
+<summary>
+Xray клиент (config.json)
+</summary>
+
+```json
+{
+    "inbounds": [
+        {
+            "protocol": "socks",
+            "listen": "127.0.0.1",
+            "port": 1080,
+            "settings": {
+                "udp": true
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": ["http", "tls"]
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": "127.0.0.1",
+                        "port": 9000,
+                        "users": [
+                            {
+                                "id": "<UUID>",
+                                "encryption": "none"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "none"
+            }
+        }
+    ]
+}
+```
+
+</details>
+
+<details>
+
+<summary>
+Xray сервер (config.json)
+</summary>
+
+```json
+{
+    "inbounds": [
+        {
+            "protocol": "vless",
+            "listen": "127.0.0.1",
+            "port": 443,
+            "settings": {
+                "clients": [
+                    {
+                        "id": "<тот же UUID>",
+                        "level": 0
+                    }
+                ],
+                "decryption": "none"
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom",
+            "settings": {
+                "domainStrategy": "UseIPv4"
+            }
+        }
+    ]
+}
+```
+
+</details>
+
 ## Решение проблем
 
 | Проблема | Решение |
@@ -146,14 +254,6 @@ nohup ./server-linux-amd64 -listen 0.0.0.0:56000 -connect 127.0.0.1:<порт_wg
 - **EncryptedSharedPreferences** — шифрование секретов
 - **DataStore** — хранение настроек
 - Нативный бинарник на **Go** — `libvkturn.so` (arm64-v8a)
-
-## Сборка
-
-```bash
-./gradlew assembleRelease
-```
-
-APK: `app/build/outputs/apk/release/app-release.apk`
 
 ## Благодарности
 

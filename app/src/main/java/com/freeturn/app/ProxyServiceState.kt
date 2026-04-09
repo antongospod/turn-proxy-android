@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
+ * Сессия ручной капчи. sessionId позволяет диалогу различать соседние
+ * капча-сессии с одинаковым URL и пересоздавать WebView через `key(sessionId)`.
+ */
+data class CaptchaSession(val url: String, val sessionId: Long)
+
+/**
  * Централизованное состояние прокси-сервиса.
  * Публичный API — только read-only Flow, мутация через явные методы.
  */
@@ -28,8 +34,8 @@ object ProxyServiceState {
     private val _startupResult = MutableStateFlow<StartupResult?>(null)
     val startupResult: StateFlow<StartupResult?> = _startupResult.asStateFlow()
 
-    private val _captchaUrl = MutableStateFlow<String?>(null)
-    val captchaUrl: StateFlow<String?> = _captchaUrl.asStateFlow()
+    private val _captchaSession = MutableStateFlow<CaptchaSession?>(null)
+    val captchaSession: StateFlow<CaptchaSession?> = _captchaSession.asStateFlow()
 
     fun setRunning(value: Boolean) {
         _isRunning.value = value
@@ -50,8 +56,8 @@ object ProxyServiceState {
         }
     }
 
-    fun setCaptchaUrl(url: String?) {
-        _captchaUrl.value = url
+    fun setCaptchaSession(session: CaptchaSession?) {
+        _captchaSession.value = session
     }
 
     fun clearLogs() {

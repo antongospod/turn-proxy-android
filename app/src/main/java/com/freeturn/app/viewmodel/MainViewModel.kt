@@ -96,7 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPrivacyMode(enabled: Boolean) { _privacyMode.value = enabled }
 
-    // ── SSH ────────────────────────────────────────────────────────────────
+    // SSH
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
             prefs.saveSshConfig(config)
@@ -121,7 +121,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Server management ──────────────────────────────────────────────────
+    // Server management
     fun installServer() {
         viewModelScope.launch { sshRepository.installServer() }
     }
@@ -133,14 +133,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
             return
         }
-        viewModelScope.launch { sshRepository.startServer(l, c) }
+        val vless = clientConfig.value.vlessMode
+        viewModelScope.launch { sshRepository.startServer(l, c, vless) }
     }
 
     fun stopServer() {
         viewModelScope.launch { sshRepository.stopServer() }
     }
 
-    // ── Local proxy ────────────────────────────────────────────────────────
+    /** Переключает VLESS-режим. Если SSH подключён и сервер запущен — автоперезапуск. */
+    fun setVlessMode(enabled: Boolean) {
+        val current = clientConfig.value
+        if (current.vlessMode == enabled) return
+        viewModelScope.launch {
+            prefs.saveClientConfig(current.copy(vlessMode = enabled))
+            val serverRunning = (serverState.value as? ServerState.Known)?.running == true
+            if (serverRunning) {
+                sshRepository.stopServer()
+                startServer()
+            }
+        }
+    }
+
+    // Local proxy
     fun startProxy() {
         viewModelScope.launch {
             proxyManager.startProxy(clientConfig.value)
@@ -159,7 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ProxyServiceState.clearLogs()
     }
 
-    // ── Preferences ────────────────────────────────────────────────────────
+    // Preferences
     fun saveClientConfig(config: ClientConfig) {
         viewModelScope.launch { prefs.saveClientConfig(config) }
     }
@@ -172,7 +187,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { prefs.setOnboardingDone(true) }
     }
 
-    // ── Custom kernel ──────────────────────────────────────────────────────
+    // Custom kernel
     private val _kernelError = MutableStateFlow<String?>(null)
     val kernelError: StateFlow<String?> = _kernelError.asStateFlow()
 
@@ -190,7 +205,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _kernelError.value = null
     }
 
-    // ── App update ──────────────────────────────────────────────────────
+    // App update
     fun checkForUpdate() {
         viewModelScope.launch { appUpdater.checkForUpdate(silent = false) }
     }

@@ -105,7 +105,7 @@ fun HomeScreen(
     val clientConfig by viewModel.clientConfig.collectAsStateWithLifecycle()
     val isConfigured = sshConfig.ip.isNotBlank()
 
-    // ── Запрос разрешений при первом открытии главного экрана ─────────────
+    // Запрос разрешений при первом открытии главного экрана
     val batteryOptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { /* пользователь закрыл диалог батареи — результат нас не интересует */ }
@@ -227,7 +227,12 @@ fun HomeScreen(
                         Spacer(Modifier.height(12.dp))
                         ConfigRow(stringResource(R.string.server), clientConfig.serverAddress.redact(privacyMode))
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
-                        ConfigRow(stringResource(R.string.transport_protocol), if (clientConfig.useUdp) stringResource(R.string.udp) else stringResource(R.string.tcp))
+                        ConfigRow(
+                            stringResource(R.string.transport_protocol),
+                            if (clientConfig.vlessMode) "VLESS"
+                            else if (clientConfig.useUdp) stringResource(R.string.udp)
+                            else stringResource(R.string.tcp)
+                        )
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
                     }
                 }
@@ -304,7 +309,7 @@ fun HomeScreen(
 
 }
 
-// ── Диалоги обновления ────────────────────────────────────────────────────
+// Диалоги обновления
 
 @Composable
 private fun UpdateDialogs(viewModel: MainViewModel) {
@@ -392,7 +397,7 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
     }
 }
 
-// ── Кнопка прокси ─────────────────────────────────────────────────────────
+// Кнопка прокси
 
 @Composable
 private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
@@ -456,7 +461,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
     }
 }
 
-// ── Bottom sheet ──────────────────────────────────────────────────────────
+// Bottom sheet
 
 @Composable
 private fun InfoBottomSheet(
@@ -486,7 +491,7 @@ private fun InfoBottomSheet(
             .fillMaxWidth()
             .navigationBarsPadding()
     ) {
-        // ── Соединение ────────────────────────────────────────────────────
+        // Соединение
         item {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.connection), style = MaterialTheme.typography.titleSmall) },
@@ -522,7 +527,7 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
-        // ── Ссылки ────────────────────────────────────────────────────────
+        // Ссылки
         item {
             RepoLinkItem(
                 title = stringResource(R.string.android_client),
@@ -547,7 +552,7 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
-        // ── Настройки интерфейса ──────────────────────────────────────────
+        // Настройки интерфейса
         item {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.privacy_mode_title)) },
@@ -578,7 +583,7 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
-        // ── Обновление ────────────────────────────────────────────────────
+        // Обновление
         item {
             UpdateListItem(
                 state = updateState,
@@ -600,7 +605,7 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
-        // ── Сброс ─────────────────────────────────────────────────────────
+        // Сброс
         item {
             ListItem(
                 headlineContent = {
@@ -626,7 +631,7 @@ private fun InfoBottomSheet(
             )
         }
 
-        // ── Версия ────────────────────────────────────────────────────────
+        // Версия
         item {
             Text(
                 text = "v$appVersion",
@@ -663,7 +668,7 @@ private fun InfoBottomSheet(
     }
 }
 
-// ── Пункт обновления в bottom sheet ───────────────────────────────────────
+// Пункт обновления в bottom sheet
 
 @Composable
 private fun UpdateListItem(
@@ -723,7 +728,7 @@ private fun UpdateListItem(
     )
 }
 
-// ── Общие компоненты ──────────────────────────────────────────────────────
+// Общие компоненты
 
 @Composable
 private fun RepoLinkItem(

@@ -103,7 +103,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 modifier = Modifier.statusBarsPadding() // Добавляем отступ для статус-бара сверху
             ) {
 
-                // ── Онбординг-мастер (без нижнего меню) ──────────────────────────
+                // Онбординг-мастер (без нижнего меню)
 
                 composable(Routes.ONBOARDING) {
                     OnboardingScreen(
@@ -156,7 +156,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                     )
                 }
 
-                // ── Основной поток (с нижним меню) ───────────────────────────────
+                // Основной поток (с нижним меню)
 
                 composable(Routes.SSH_SETUP) {
                     SshSetupScreen(
@@ -206,12 +206,17 @@ fun AppNavigation(viewModel: MainViewModel) {
         }
     }
 
-    // Диалог капчи поверх любого экрана
-    if (proxyState is ProxyState.CaptchaRequired) {
-        CaptchaWebViewDialog(
-            captchaUrl = (proxyState as ProxyState.CaptchaRequired).url,
-            onDismiss = { viewModel.dismissCaptcha() }
-        )
+    // Диалог капчи поверх любого экрана. Оборачиваем в key(sessionId), чтобы для
+    // каждой новой капча-сессии Compose пересоздавал диалог и WebView грузил URL заново
+    // (бинарник цикличит креды и для каждой выдаёт новую капчу с тем же localhost-URL).
+    val captchaState = proxyState as? ProxyState.CaptchaRequired
+    if (captchaState != null) {
+        androidx.compose.runtime.key(captchaState.sessionId) {
+            CaptchaWebViewDialog(
+                captchaUrl = captchaState.url,
+                onDismiss = { viewModel.dismissCaptcha() }
+            )
+        }
     }
 }
 

@@ -23,9 +23,6 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
     private val _serverState = MutableStateFlow<ServerState>(ServerState.Unknown)
     val serverState: StateFlow<ServerState> = _serverState.asStateFlow()
 
-    private val _serverVersion = MutableStateFlow<String?>(null)
-    val serverVersion: StateFlow<String?> = _serverVersion.asStateFlow()
-
     private val _serverLogs = MutableStateFlow<String?>(null)
     val serverLogs: StateFlow<String?> = _serverLogs.asStateFlow()
 
@@ -43,10 +40,8 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         }
     }
 
-    private fun logCommand(target: String, cmd: String) {
+    private fun logCommand(target: String) {
         appendSshLog("  ssh $target")
-        cmd.lines().filter { it.isNotBlank() }.forEach { appendSshLog("  $ $it") }
-        appendSshLog("  ---")
     }
 
     private val SshConfig.fp get() = hostFingerprint.ifEmpty { null }
@@ -54,7 +49,7 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
 
     suspend fun runSshCommand(cfg: SshConfig, label: String, cmd: String): String {
         appendSshLog("", "=== $label [${timestamp()}] ===")
-        logCommand("${cfg.username}@${cfg.ip}:${cfg.port}", cmd)
+        logCommand("${cfg.username}@${cfg.ip}:${cfg.port}")
         val result = sshManager.executeSilentCommand(
             cfg.ip, cfg.port, cfg.username, cfg.password, cmd,
             knownFingerprint = cfg.fp, sshKey = cfg.key
@@ -82,7 +77,6 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         activeSshConfig = null
         _sshState.value = SshConnectionState.Disconnected
         _serverState.value = ServerState.Unknown
-        _serverVersion.value = null
     }
 
     suspend fun checkServerState(config: SshConfig? = null) {
@@ -97,20 +91,15 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         _serverState.value = if (result.startsWith("ERROR")) {
             ServerState.Error(result.removePrefix("ERROR: "))
         } else {
+            val running = result.contains("RUNNING:YES")
+            val vlessMode = if (running) result.contains("VLESS:YES") else null
             val known = ServerState.Known(
                 installed = result.contains("INSTALLED:YES"),
-                running = result.contains("RUNNING:YES")
+                running = running,
+                vlessMode = vlessMode
             )
-            if (known.installed) fetchServerVersion(cfg)
             known
         }
-    }
-
-    suspend fun fetchServerVersion(config: SshConfig? = null) {
-        val cfg = config ?: activeSshConfig ?: return
-        if (cfg.ip.isEmpty()) return
-        val out = runSshCommand(cfg, "Запрос версии", ServerScripts.fetchServerVersion)
-        _serverVersion.value = out.trim().takeIf { it.isNotEmpty() && !it.startsWith("ERROR") }
     }
 
     suspend fun installServer() {
@@ -132,12 +121,12 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         }
     }
 
-    suspend fun startServer(listen: String, connect: String): Boolean {
+    suspend fun startServer(listen: String, connect: String, vlessMode: Boolean = false): Boolean {
         val cfg = activeSshConfig ?: return false
         if (cfg.ip.isEmpty()) return false
-        
+
         _serverState.value = ServerState.Working("Запуск сервера...")
-        runSshCommand(cfg, "Запуск", ServerScripts.startServer(listen, connect))
+        runSshCommand(cfg, "Запуск", ServerScripts.startServer(listen, connect, vlessMode))
         delay(2000)
         checkServerState(cfg)
         return true

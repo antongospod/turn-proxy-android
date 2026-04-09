@@ -124,7 +124,7 @@ class AppUpdater(private val context: Context) {
         _state.value = UpdateState.Idle
     }
 
-    // ── Private ───────────────────────────────────────────────────────────
+    // Private
 
     private fun fetchLatestRelease(): JSONObject? {
         val connection = URL(RELEASES_URL).openConnection() as HttpURLConnection

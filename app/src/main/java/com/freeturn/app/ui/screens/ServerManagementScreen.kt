@@ -177,6 +177,15 @@ fun ServerManagementScreen(
                 supportingText = { Text(stringResource(R.string.turn_client_desc)) }
             )
 
+            // Индикатор VLESS-режима сервера
+            if (serverKnown?.running == true && serverKnown.vlessMode == true) {
+                Text(
+                    text = stringResource(R.string.server_running_vless),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = StatusBlue
+                )
+            }
+
             // Action buttons
             FilledTonalButton(
                 onClick = {
@@ -250,7 +259,7 @@ fun ServerManagementScreen(
                 }
             }
 
-            // ── SSH-лог (вывод всех команд) ────────────────────────────────
+            // SSH-лог (вывод всех команд)
             if (sshLog.isNotEmpty()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(20.dp)) {

@@ -37,7 +37,8 @@ data class ClientConfig(
     val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
     val isRawMode: Boolean = false,
-    val rawCommand: String = ""
+    val rawCommand: String = "",
+    val vlessMode: Boolean = false
 )
 
 // P2-3 / P3-6: всегда используем applicationContext, чтобы lazy-init encryptedPrefs
@@ -61,6 +62,7 @@ class AppPreferences(context: Context) {
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
+        val CLIENT_VLESS = booleanPreferencesKey("client_vless")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
@@ -115,7 +117,8 @@ class AppPreferences(context: Context) {
                 manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
-                rawCommand = prefs[CLIENT_RAW_CMD] ?: ""
+                rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
+                vlessMode = prefs[CLIENT_VLESS] ?: false
             )
         }
 
@@ -170,6 +173,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_LOCAL_PORT] = config.localPort
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
+            prefs[CLIENT_VLESS] = config.vlessMode
         }
     }
 
