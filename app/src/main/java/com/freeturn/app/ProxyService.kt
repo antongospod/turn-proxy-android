@@ -132,6 +132,7 @@ class ProxyService : Service() {
             else if (cfg.useUdp) cmdArgs.add("-udp")
             if (cfg.noDtls) cmdArgs.add("-no-dtls")
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
+            if (cfg.forceTurnPort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
         }
 
         // Кастомное ядро лежит в filesDir, откуда SELinux (untrusted_app) запрещает execve.

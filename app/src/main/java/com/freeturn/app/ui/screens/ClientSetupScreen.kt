@@ -88,6 +88,7 @@ fun ClientSetupScreen(
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
+    var forcePort443 by rememberSaveable(saved.forceTurnPort443) { mutableStateOf(saved.forceTurnPort443) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
@@ -100,18 +101,19 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort) {
+    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, forcePort443) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
-                serverAddress = serverAddress.trim(),
-                vkLink        = vkLink.trim(),
-                threads       = threads.roundToInt(),
-                useUdp        = useUdp,
-                noDtls        = noDtls,
-                manualCaptcha = manualCaptcha,
-                localPort     = localPort.trim(),
-                vlessMode     = saved.vlessMode
+                serverAddress    = serverAddress.trim(),
+                vkLink           = vkLink.trim(),
+                threads          = threads.roundToInt(),
+                useUdp           = useUdp,
+                noDtls           = noDtls,
+                manualCaptcha    = manualCaptcha,
+                localPort        = localPort.trim(),
+                vlessMode        = saved.vlessMode,
+                forceTurnPort443 = forcePort443
             )
         )
     }
@@ -265,6 +267,16 @@ fun ClientSetupScreen(
                 onCheckedChange = {
                     HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                     manualCaptcha = it
+                }
+            )
+
+            SwitchRow(
+                label = stringResource(R.string.force_turn_port_443),
+                description = stringResource(R.string.force_turn_port_443_desc),
+                checked = forcePort443,
+                onCheckedChange = {
+                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                    forcePort443 = it
                 }
             )
 

@@ -57,6 +57,8 @@
     <string name="no_dtls_desc">Может ускорить соединение, повышает риск блокировки</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
+    <string name="force_turn_port_443">TURN-порт 443</string>
+    <string name="force_turn_port_443_desc">Использовать порт 443 вместо стандартного. Помогает в сетях, где порт 19302 заблокирован</string>
     <string name="core_title">Ядро</string>
     <string name="custom_core">Кастомное ядро</string>
     <string name="builtin_core">Встроенное ядро</string>
