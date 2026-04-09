@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -104,7 +105,8 @@ class ProxyService : Service() {
         val cfg = AppPreferences(applicationContext).clientConfigFlow.first()
 
         val customBin = File(filesDir, "custom_vkturn")
-        val executable = if (customBin.exists()) {
+        val useCustom = customBin.exists()
+        val executable = if (useCustom) {
             ProxyServiceState.addLog("Используется кастомное ядро из памяти телефона")
             customBin.absolutePath
         } else {
@@ -121,7 +123,7 @@ class ProxyService : Service() {
         } else {
             cmdArgs.add(executable)
             cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
-            
+
             cmdArgs.add(if (cfg.vkLink.contains("yandex")) "-yandex-link" else "-vk-link")
             cmdArgs.add(cfg.vkLink)
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
@@ -130,6 +132,19 @@ class ProxyService : Service() {
             else if (cfg.useUdp) cmdArgs.add("-udp")
             if (cfg.noDtls) cmdArgs.add("-no-dtls")
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
+        }
+
+        // Кастомное ядро лежит в filesDir, откуда SELinux (untrusted_app) запрещает execve.
+        // Запускаем через системный линкер: /system/bin/linker* — ему execve разрешён,
+        // а целевой ELF мапится как данные. Работает для PIE-бинарников
+        // (Go-сборки android/arm64 PIE по умолчанию).
+        if (useCustom) {
+            val linker = if (Build.SUPPORTED_ABIS.firstOrNull()?.contains("64") == true) {
+                "/system/bin/linker64"
+            } else {
+                "/system/bin/linker"
+            }
+            cmdArgs.add(0, linker)
         }
 
         var exitCode = -1
