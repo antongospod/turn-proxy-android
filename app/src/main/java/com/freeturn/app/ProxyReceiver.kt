@@ -3,6 +3,7 @@ package com.freeturn.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 
 class ProxyReceiver : BroadcastReceiver() {
 
@@ -12,7 +13,11 @@ class ProxyReceiver : BroadcastReceiver() {
                 ProxyServiceState.clearLogs()
                 ProxyServiceState.setStartupResult(null)
                 val serviceIntent = Intent(context, ProxyService::class.java)
-                context.startForegroundService(serviceIntent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
             }
             "com.freeturn.app.STOP_PROXY" -> {
                 val serviceIntent = Intent(context, ProxyService::class.java)

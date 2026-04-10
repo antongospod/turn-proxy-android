@@ -41,7 +41,8 @@
         <service
             android:name=".ProxyService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="29">
             <!--
                 Обязательное свойство для foregroundServiceType="specialUse".
                 Без него Google Play отклоняет приложение.

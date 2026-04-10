@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.freeturn.app"
-        minSdk = 26
+        minSdk = 23
         targetSdk = 36
         versionCode = 13
         versionName = "1.7.0"

@@ -29,7 +29,7 @@ Android-клиент для [vk-turn-proxy](https://github.com/cacggghp/vk-turn-
 
 ## Требования
 
-- Android 8.0+ (API 26)
+- Android 6.0+ (API 23)
 - ARM64-устройство (arm64-v8a)
 - VPS с установленным WireGuard или Hysteria
 - Ссылка на VK Звонок

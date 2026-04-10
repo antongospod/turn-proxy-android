@@ -3,6 +3,7 @@ package com.freeturn.app.domain
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
@@ -87,7 +88,12 @@ class LocalProxyManager(private val context: Context) {
 
         ProxyServiceState.clearLogs()
         ProxyServiceState.setStartupResult(null)
-        context.startForegroundService(Intent(context, ProxyService::class.java))
+        val intent = Intent(context, ProxyService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
 
         val result = withTimeoutOrNull(5_000L) {
             ProxyServiceState.startupResult.filterNotNull().first()
