@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -59,8 +60,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.ui.theme.StatusBlue
-import com.freeturn.app.ui.theme.StatusGreen
+import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
@@ -105,206 +105,205 @@ fun ServerManagementScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(4.dp))
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Spacer(Modifier.height(4.dp))
 
-            // Status card
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.server_status), style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(16.dp))
-                    StatusRow(
-                        label = stringResource(R.string.ssh_connection),
-                        isActive = isConnected,
-                        activeLabel = stringResource(R.string.paired),
-                        activeColor = StatusBlue
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    StatusRow(stringResource(R.string.vk_turn_proxy), serverKnown?.running == true)
+                // Status card
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(stringResource(R.string.server_status), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(16.dp))
+                        StatusRow(
+                            label = stringResource(R.string.ssh_connection),
+                            isActive = isConnected,
+                            activeLabel = stringResource(R.string.paired),
+                            activeColor = MaterialTheme.extendedColorScheme.info
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        StatusRow(stringResource(R.string.vk_turn_proxy), serverKnown?.running == true)
 
-                    when (serverState) {
-                        is ServerState.Checking -> {
-                            Spacer(Modifier.height(12.dp))
-                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        when (serverState) {
+                            is ServerState.Checking -> {
+                                Spacer(Modifier.height(12.dp))
+                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                            is ServerState.Working -> {
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    (serverState as ServerState.Working).action,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                            is ServerState.Error -> {
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    stringResource(R.string.error_format, (serverState as ServerState.Error).message),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            else -> {}
                         }
-                        is ServerState.Working -> {
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                (serverState as ServerState.Working).action,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        }
-                        is ServerState.Error -> {
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                stringResource(R.string.error_format, (serverState as ServerState.Error).message),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                        else -> {}
                     }
                 }
-            }
 
-            // Server config
-            Text(stringResource(R.string.server_config), style = MaterialTheme.typography.titleMedium)
+                // Server config
+                Text(stringResource(R.string.server_config), style = MaterialTheme.typography.titleMedium)
 
-            OutlinedTextField(
-                value = proxyListenPort,
-                onValueChange = { proxyListenPort = it.filter { c -> c.isDigit() } },
-                label = { Text(stringResource(R.string.listen_port)) },
-                placeholder = { Text(stringResource(R.string.listen_port_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                supportingText = { Text(stringResource(R.string.listen_port_desc)) }
-            )
-
-            OutlinedTextField(
-                value = proxyConnect,
-                onValueChange = { proxyConnect = it },
-                label = { Text(stringResource(R.string.turn_client_address)) },
-                placeholder = { Text(stringResource(R.string.turn_client_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                supportingText = { Text(stringResource(R.string.turn_client_desc)) }
-            )
-
-            // Индикатор VLESS-режима сервера
-            if (serverKnown?.running == true && serverKnown.vlessMode == true) {
-                Text(
-                    text = stringResource(R.string.server_running_vless),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = StatusBlue
+                OutlinedTextField(
+                    value = proxyListenPort,
+                    onValueChange = { proxyListenPort = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.listen_port)) },
+                    placeholder = { Text(stringResource(R.string.listen_port_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    supportingText = { Text(stringResource(R.string.listen_port_desc)) }
                 )
-            }
 
-            // Action buttons
-            FilledTonalButton(
-                onClick = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
-                    viewModel.installServer()
-                },
-                enabled = isConnected && !isWorking,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = MaterialTheme.shapes.large
-            ) {
-                Icon(painterResource(R.drawable.cloud_download_24px), null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (serverKnown?.installed == true) stringResource(R.string.update) else stringResource(R.string.install))
-            }
-
-            Button(
-                onClick = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
-                    viewModel.startServer()
-                },
-                enabled = (isConnected && !isWorking
-                        && serverKnown?.installed == true) && !serverKnown.running,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = MaterialTheme.shapes.large
-            ) {
-                Icon(painterResource(R.drawable.play_arrow_24px), null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.start_server))
-            }
-
-            OutlinedButton(
-                onClick = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.stopServer()
-                },
-                enabled = isConnected && !isWorking && serverKnown?.running == true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = MaterialTheme.shapes.large,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
+                OutlinedTextField(
+                    value = proxyConnect,
+                    onValueChange = { proxyConnect = it },
+                    label = { Text(stringResource(R.string.turn_client_address)) },
+                    placeholder = { Text(stringResource(R.string.turn_client_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = { Text(stringResource(R.string.turn_client_desc)) }
                 )
-            ) {
-                Icon(painterResource(R.drawable.stop_24px), null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.stop_server))
-            }
 
-            if (serverKnown?.running == true) {
-                Spacer(Modifier.height(4.dp))
+                // Индикатор VLESS-режима сервера
+                if (serverKnown?.running == true && serverKnown.vlessMode == true) {
+                    Text(
+                        text = stringResource(R.string.server_running_vless),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.extendedColorScheme.info
+                    )
+                }
+
+                // Action buttons
+                FilledTonalButton(
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
+                        viewModel.installServer()
+                    },
+                    enabled = isConnected && !isWorking,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Icon(painterResource(R.drawable.cloud_download_24px), null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (serverKnown?.installed == true) stringResource(R.string.update) else stringResource(R.string.install))
+                }
+
                 Button(
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        onContinue()
+                        viewModel.saveProxyServerConfig("0.0.0.0:$proxyListenPort", proxyConnect)
+                        viewModel.startServer()
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    enabled = (isConnected && !isWorking
+                            && serverKnown?.installed == true) && !serverKnown.running,
+                    modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
                 ) {
-                    Text(stringResource(R.string.continue_client_setup))
+                    Icon(painterResource(R.drawable.play_arrow_24px), null)
                     Spacer(Modifier.width(8.dp))
-                    Icon(painterResource(R.drawable.arrow_forward_24px), null)
+                    Text(stringResource(R.string.start_server))
                 }
-            }
 
-            // SSH-лог (вывод всех команд)
-            if (sshLog.isNotEmpty()) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.ssh_log_title), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(12.dp))
-                        val listState = rememberLazyListState()
-                        LaunchedEffect(sshLog.size) {
-                            if (sshLog.isNotEmpty()) listState.animateScrollToItem(sshLog.lastIndex)
-                        }
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 400.dp)
-                                    .padding(10.dp)
+                OutlinedButton(
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        viewModel.stopServer()
+                    },
+                    enabled = isConnected && !isWorking && serverKnown?.running == true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(painterResource(R.drawable.stop_24px), null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.stop_server))
+                }
+
+                if (serverKnown?.running == true) {
+                    Spacer(Modifier.height(4.dp))
+                    Button(
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            onContinue()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Text(stringResource(R.string.continue_client_setup))
+                        Spacer(Modifier.width(8.dp))
+                        Icon(painterResource(R.drawable.arrow_forward_24px), null)
+                    }
+                }
+
+                // SSH-лог (вывод всех команд)
+                if (sshLog.isNotEmpty()) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(stringResource(R.string.ssh_log_title), style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(12.dp))
+                            val listState = rememberLazyListState()
+                            LaunchedEffect(sshLog.size) {
+                                if (sshLog.isNotEmpty()) listState.animateScrollToItem(sshLog.lastIndex)
+                            }
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
                             ) {
-                                items(sshLog) { line ->
-                                    val isHeader = line.startsWith("===")
-                                    val isError = line.contains("ERROR", ignoreCase = true) ||
-                                                  line.contains("error", ignoreCase = true) ||
-                                                  line.contains("failed", ignoreCase = true)
-                                    Text(
-                                        text = line,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = FontFamily.Monospace
-                                        ),
-                                        color = when {
-                                            isHeader -> MaterialTheme.colorScheme.primary
-                                            isError  -> MaterialTheme.colorScheme.error
-                                            else     -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                    )
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 400.dp)
+                                        .padding(10.dp)
+                                ) {
+                                    items(sshLog) { line ->
+                                        val isHeader = line.startsWith("===")
+                                        val isError = line.contains("ERROR", ignoreCase = true) ||
+                                                      line.contains("error", ignoreCase = true) ||
+                                                      line.contains("failed", ignoreCase = true)
+                                        Text(
+                                            text = line,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontFamily = FontFamily.Monospace
+                                            ),
+                                            color = when {
+                                                isHeader -> MaterialTheme.colorScheme.primary
+                                                isError  -> MaterialTheme.colorScheme.error
+                                                else     -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -312,6 +311,8 @@ fun ServerManagementScreen(
 @Composable
 private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
     val connected = sshState is SshConnectionState.Connected
+    val dotColor = if (connected) MaterialTheme.extendedColorScheme.info
+                   else MaterialTheme.colorScheme.error
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(end = 16.dp)
@@ -319,13 +320,13 @@ private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .background(if (connected) StatusBlue else MaterialTheme.colorScheme.error, CircleShape)
+                .background(dotColor, CircleShape)
         )
         Spacer(Modifier.width(6.dp))
         Text(
             if (connected) ip else stringResource(R.string.not_connected),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -335,7 +336,7 @@ private fun StatusRow(
     label: String,
     isActive: Boolean,
     activeLabel: String = stringResource(R.string.active),
-    activeColor: Color = StatusGreen
+    activeColor: Color = MaterialTheme.extendedColorScheme.success
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -132,294 +133,299 @@ fun ClientSetupScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(4.dp))
-
-            // Подключение
-            Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
-
-            OutlinedTextField(
-                value = serverAddress.redact(privacyMode),
-                onValueChange = { if (!privacyMode) serverAddress = it },
-                label = { Text(stringResource(R.string.server_address_label)) },
-                placeholder = { Text(stringResource(R.string.server_address_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                readOnly = privacyMode,
-                supportingText = { Text(stringResource(R.string.server_address_support)) }
-            )
-
-            OutlinedTextField(
-                value = vkLink.redact(privacyMode),
-                onValueChange = { if (!privacyMode) vkLink = it },
-                label = { Text(stringResource(R.string.vk_link_label)) },
-                placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                readOnly = privacyMode,
-                supportingText = { Text(stringResource(R.string.vk_link_support)) }
-            )
-
-            OutlinedTextField(
-                value = localPort.redact(privacyMode),
-                onValueChange = { if (!privacyMode) localPort = it },
-                label = { Text(stringResource(R.string.local_listen_address)) },
-                placeholder = { Text(stringResource(R.string.local_listen_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                readOnly = privacyMode,
-                supportingText = { Text(stringResource(R.string.local_listen_support)) }
-            )
-
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-
-            // Параметры
-            Text(stringResource(R.string.parameters_title), style = MaterialTheme.typography.titleMedium)
-
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.threads_format, threads.roundToInt()), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.threads_recommendation),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-                Slider(
-                    value = threads,
-                    onValueChange = {
-                        val newInt = it.roundToInt()
-                        if (newInt != lastSliderInt) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                            lastSliderInt = newInt
-                        }
-                        threads = it
-                    },
-                    valueRange = 1f..8f,
-                    steps = 6,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            SwitchRow(
-                label = stringResource(R.string.vless_mode),
-                description = stringResource(R.string.vless_mode_desc),
-                checked = saved.vlessMode,
-                onCheckedChange = {
-                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                    viewModel.setVlessMode(it)
-                }
-            )
-
-            if (!saved.vlessMode) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.transport_protocol_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = !useUdp,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                useUdp = false
-                                noDtls = false
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) { Text(stringResource(R.string.tcp)) }
-                        SegmentedButton(
-                            selected = useUdp,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                useUdp = true
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) { Text(stringResource(R.string.udp)) }
-                    }
-                }
-
-                if (useUdp) {
-                    SwitchRow(
-                        label = stringResource(R.string.no_dtls),
-                        description = stringResource(R.string.no_dtls_desc),
-                        checked = noDtls,
-                        onCheckedChange = {
-                            HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                            noDtls = it
-                        }
-                    )
-                }
-            }
-
-            SwitchRow(
-                label = stringResource(R.string.manual_captcha),
-                description = stringResource(R.string.manual_captcha_desc),
-                checked = manualCaptcha,
-                onCheckedChange = {
-                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                    manualCaptcha = it
-                }
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column {
-                    Text(stringResource(R.string.dns_mode_title), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        stringResource(R.string.dns_mode_desc),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                }
-                val dnsOptions = listOf(
-                    DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
-                    DnsMode.UDP to stringResource(R.string.dns_mode_udp),
-                    DnsMode.DOH to stringResource(R.string.dns_mode_doh)
-                )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    dnsOptions.forEachIndexed { idx, (value, label) ->
-                        SegmentedButton(
-                            selected = dnsMode == value,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                dnsMode = value
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
-                        ) { Text(label) }
-                    }
-                }
-            }
-
-            SwitchRow(
-                label = stringResource(R.string.force_port_443),
-                description = stringResource(R.string.force_port_443_desc),
-                checked = forcePort443,
-                onCheckedChange = {
-                    HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                    forcePort443 = it
-                }
-            )
-
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-
-            // Ядро
-            Text(stringResource(R.string.core_title), style = MaterialTheme.typography.titleMedium)
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (customKernelExists)
-                        MaterialTheme.colorScheme.secondaryContainer
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
-                )
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Spacer(Modifier.height(4.dp))
+
+                // Подключение
+                Text(stringResource(R.string.connection_title), style = MaterialTheme.typography.titleMedium)
+
+                OutlinedTextField(
+                    value = serverAddress.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) serverAddress = it },
+                    label = { Text(stringResource(R.string.server_address_label)) },
+                    placeholder = { Text(stringResource(R.string.server_address_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = privacyMode,
+                    supportingText = { Text(stringResource(R.string.server_address_support)) }
+                )
+
+                OutlinedTextField(
+                    value = vkLink.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) vkLink = it },
+                    label = { Text(stringResource(R.string.vk_link_label)) },
+                    placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = privacyMode,
+                    supportingText = { Text(stringResource(R.string.vk_link_support)) }
+                )
+
+                OutlinedTextField(
+                    value = localPort.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) localPort = it },
+                    label = { Text(stringResource(R.string.local_listen_address)) },
+                    placeholder = { Text(stringResource(R.string.local_listen_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = privacyMode,
+                    supportingText = { Text(stringResource(R.string.local_listen_support)) }
+                )
+
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+
+                // Параметры
+                Text(stringResource(R.string.parameters_title), style = MaterialTheme.typography.titleMedium)
+
+                Column {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.threads_format, threads.roundToInt()), style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(R.string.threads_recommendation),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Slider(
+                        value = threads,
+                        onValueChange = {
+                            val newInt = it.roundToInt()
+                            if (newInt != lastSliderInt) {
+                                HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                                lastSliderInt = newInt
+                            }
+                            threads = it
+                        },
+                        valueRange = 1f..8f,
+                        steps = 6,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                SwitchRow(
+                    label = stringResource(R.string.vless_mode),
+                    description = stringResource(R.string.vless_mode_desc),
+                    checked = saved.vlessMode,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setVlessMode(it)
+                    }
+                )
+
+                if (!saved.vlessMode) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column {
+                            Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(R.string.transport_protocol_desc),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = !useUdp,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    useUdp = false
+                                    noDtls = false
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            ) { Text(stringResource(R.string.tcp)) }
+                            SegmentedButton(
+                                selected = useUdp,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    useUdp = true
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            ) { Text(stringResource(R.string.udp)) }
+                        }
+                    }
+
+                    if (useUdp) {
+                        SwitchRow(
+                            label = stringResource(R.string.no_dtls),
+                            description = stringResource(R.string.no_dtls_desc),
+                            checked = noDtls,
+                            onCheckedChange = {
+                                HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                                noDtls = it
+                            }
+                        )
+                    }
+                }
+
+                SwitchRow(
+                    label = stringResource(R.string.manual_captcha),
+                    description = stringResource(R.string.manual_captcha_desc),
+                    checked = manualCaptcha,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        manualCaptcha = it
+                    }
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.dns_mode_title), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.dns_mode_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val dnsOptions = listOf(
+                        DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
+                        DnsMode.UDP to stringResource(R.string.dns_mode_udp),
+                        DnsMode.DOH to stringResource(R.string.dns_mode_doh)
+                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        dnsOptions.forEachIndexed { idx, (value, label) ->
+                            SegmentedButton(
+                                selected = dnsMode == value,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    dnsMode = value
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
+                            ) { Text(label) }
+                        }
+                    }
+                }
+
+                SwitchRow(
+                    label = stringResource(R.string.force_port_443),
+                    description = stringResource(R.string.force_port_443_desc),
+                    checked = forcePort443,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        forcePort443 = it
+                    }
+                )
+
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+
+                // Ядро
+                Text(stringResource(R.string.core_title), style = MaterialTheme.typography.titleMedium)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (customKernelExists)
+                            MaterialTheme.colorScheme.secondaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    if (customKernelExists) R.drawable.check_circle_24px
+                                    else R.drawable.memory_24px
+                                ),
+                                contentDescription = null,
+                                tint = if (customKernelExists)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    if (customKernelExists) stringResource(R.string.custom_core)
+                                    else stringResource(R.string.builtin_core),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    if (customKernelExists) stringResource(R.string.loaded_from_memory)
+                                    else stringResource(R.string.from_apk),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (customKernelExists) {
+                            IconButton(onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                viewModel.clearCustomKernel()
+                            }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.delete_24px),
+                                    contentDescription = stringResource(R.string.reset),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        } else {
+                            FilledTonalButton(onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                viewModel.clearKernelError()
+                                kernelPickerLauncher.launch(arrayOf("*/*"))
+                            }) {
+                                Text(stringResource(R.string.btn_load))
+                            }
+                        }
+                    }
+                }
+
+                if (kernelError != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            painter = painterResource(
-                                if (customKernelExists) R.drawable.check_circle_24px
-                                else R.drawable.memory_24px
-                            ),
+                            painter = painterResource(R.drawable.error_24px),
                             contentDescription = null,
-                            tint = if (customKernelExists)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                if (customKernelExists) stringResource(R.string.custom_core)
-                                else stringResource(R.string.builtin_core),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                if (customKernelExists) stringResource(R.string.loaded_from_memory)
-                                else stringResource(R.string.from_apk),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                            )
-                        }
-                    }
-                    if (customKernelExists) {
-                        IconButton(onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            viewModel.clearCustomKernel()
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.delete_24px),
-                                contentDescription = stringResource(R.string.reset),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    } else {
-                        FilledTonalButton(onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            viewModel.clearKernelError()
-                            kernelPickerLauncher.launch(arrayOf("*/*"))
-                        }) {
-                            Text(stringResource(R.string.btn_load))
-                        }
+                        Text(
+                            kernelError!!,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
-            }
 
-            if (kernelError != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.error_24px),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        kernelError!!,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                // Кнопка «Завершить» — только в онбординг-флоу
+                if (showFinishButton && onFinish != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = onFinish,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = serverAddress.isNotBlank() && vkLink.isNotBlank(),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Text(stringResource(R.string.finish_setup), style = MaterialTheme.typography.labelLarge)
+                    }
                 }
-            }
 
-            // Кнопка «Завершить» — только в онбординг-флоу
-            if (showFinishButton && onFinish != null) {
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = onFinish,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = serverAddress.isNotBlank() && vkLink.isNotBlank(),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Text(stringResource(R.string.finish_setup), style = MaterialTheme.typography.labelLarge)
-                }
+                Spacer(Modifier.height(24.dp))
             }
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -441,7 +447,7 @@ private fun SwitchRow(
             Text(
                 description,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)

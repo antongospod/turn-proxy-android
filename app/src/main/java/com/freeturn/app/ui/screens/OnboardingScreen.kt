@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.res.painterResource
 import com.freeturn.app.R
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -110,7 +109,7 @@ fun OnboardingScreen(
                 Text(
                     text = stringResource(R.string.onboarding_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
@@ -153,11 +152,8 @@ fun OnboardingScreen(
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         onSetupServer()
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = MaterialTheme.shapes.large,
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Icon(painterResource(R.drawable.wifi_24px), contentDescription = null)
                     Spacer(Modifier.width(10.dp))

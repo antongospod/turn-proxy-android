@@ -83,9 +83,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.ui.theme.StatusBlue
-import com.freeturn.app.ui.theme.StatusGreen
-import com.freeturn.app.ui.theme.StatusGreenDark
+import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SshConnectionState
@@ -205,10 +203,10 @@ fun HomeScreen(
                 },
                 style = MaterialTheme.typography.titleMedium,
                 color = when (proxyState) {
-                    is ProxyState.Running -> StatusGreen
+                    is ProxyState.Running -> MaterialTheme.extendedColorScheme.success
                     is ProxyState.Error -> MaterialTheme.colorScheme.error
                     is ProxyState.CaptchaRequired -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 textAlign = TextAlign.Center
             )
@@ -249,7 +247,8 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                if (sshState is SshConnectionState.Connected) StatusBlue
+                                if (sshState is SshConnectionState.Connected)
+                                    MaterialTheme.extendedColorScheme.info
                                 else MaterialTheme.colorScheme.outline,
                                 CircleShape
                             )
@@ -263,7 +262,7 @@ fun HomeScreen(
                             else -> stringResource(R.string.ssh_disconnected)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (sshState !is SshConnectionState.Connected) {
                         Spacer(Modifier.width(8.dp))
@@ -272,8 +271,7 @@ fun HomeScreen(
                                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                                 viewModel.reconnectSsh()
                             },
-                            enabled = sshState !is SshConnectionState.Connecting,
-                            modifier = Modifier.height(28.dp)
+                            enabled = sshState !is SshConnectionState.Connecting
                         ) {
                             Text(stringResource(R.string.reconnect), style = MaterialTheme.typography.labelSmall)
                         }
@@ -401,9 +399,10 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
 
 @Composable
 private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
+    val extended = MaterialTheme.extendedColorScheme
     val containerColor by animateColorAsState(
         targetValue = when (state) {
-            is ProxyState.Running -> StatusGreenDark
+            is ProxyState.Running -> extended.successContainer
             is ProxyState.Error -> MaterialTheme.colorScheme.errorContainer
             is ProxyState.Starting -> MaterialTheme.colorScheme.secondaryContainer
             else -> MaterialTheme.colorScheme.primaryContainer
@@ -413,7 +412,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
     )
     val contentColor by animateColorAsState(
         targetValue = when (state) {
-            is ProxyState.Running -> StatusGreen
+            is ProxyState.Running -> extended.onSuccessContainer
             is ProxyState.Error -> MaterialTheme.colorScheme.onErrorContainer
             is ProxyState.Starting -> MaterialTheme.colorScheme.onSecondaryContainer
             else -> MaterialTheme.colorScheme.onPrimaryContainer
@@ -435,7 +434,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             .clip(CircleShape),
         shape = CircleShape,
         color = containerColor,
-        shadowElevation = if (state is ProxyState.Running) 12.dp else 4.dp
+        tonalElevation = if (state is ProxyState.Running) 6.dp else 1.dp
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -561,7 +560,13 @@ private fun InfoBottomSheet(
                 trailingContent = {
                     androidx.compose.material3.Switch(
                         checked = privacyMode,
-                        onCheckedChange = onPrivacyModeChange
+                        onCheckedChange = {
+                            HapticUtil.perform(
+                                context,
+                                if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF
+                            )
+                            onPrivacyModeChange(it)
+                        }
                     )
                 }
             )
@@ -575,7 +580,13 @@ private fun InfoBottomSheet(
                 trailingContent = {
                     androidx.compose.material3.Switch(
                         checked = dynamicTheme,
-                        onCheckedChange = { viewModel.setDynamicTheme(it) }
+                        onCheckedChange = {
+                            HapticUtil.perform(
+                                context,
+                                if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF
+                            )
+                            viewModel.setDynamicTheme(it)
+                        }
                     )
                 }
             )
@@ -776,7 +787,7 @@ private fun ConfigRow(label: String, value: String) {
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(value, style = MaterialTheme.typography.bodySmall)
     }
