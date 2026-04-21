@@ -42,9 +42,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
+    // Начальное значение, прочитанное из DataStore до первой recomposition.
+    // Хранится отдельно, чтобы startDestination не захватил дефолтный false из onboardingDone.
+    private val _initialOnboardingDone = MutableStateFlow(false)
+    val initialOnboardingDone: StateFlow<Boolean> = _initialOnboardingDone.asStateFlow()
+
     init {
         viewModelScope.launch {
-            prefs.onboardingDoneFlow.first()
+            val done = prefs.onboardingDoneFlow.first()
+            _initialOnboardingDone.value = done  // до isInitialized, чтобы значение было готово
             _isInitialized.value = true
         }
         viewModelScope.launch {

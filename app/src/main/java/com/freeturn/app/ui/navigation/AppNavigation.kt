@@ -69,7 +69,10 @@ fun AppNavigation(viewModel: MainViewModel) {
 
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
     val tgSubscribeShown by viewModel.tgSubscribeShown.collectAsStateWithLifecycle()
-    val startDestination = remember { if (onboardingDone) Routes.HOME else Routes.ONBOARDING }
+    val initialOnboardingDone by viewModel.initialOnboardingDone.collectAsStateWithLifecycle()
+    // initialOnboardingDone гарантированно выставлен до isInitialized=true (один coroutine),
+    // поэтому remember здесь безопасно захватывает правильное значение.
+    val startDestination = remember { if (initialOnboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route

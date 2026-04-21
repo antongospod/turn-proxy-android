@@ -82,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.MainViewModel
@@ -147,6 +149,7 @@ fun HomeScreen(
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
@@ -296,8 +299,11 @@ fun HomeScreen(
                 privacyMode = privacyMode,
                 onPrivacyModeChange = { viewModel.setPrivacyMode(it) },
                 onNavigateToSshSetup = {
-                    showBottomSheet.value = false
-                    onNavigateToSshSetup()
+                    scope.launch {
+                        bottomSheetState.hide()
+                        showBottomSheet.value = false
+                        onNavigateToSshSetup()
+                    }
                 }
             )
         }
