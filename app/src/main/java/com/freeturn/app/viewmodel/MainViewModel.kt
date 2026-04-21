@@ -35,6 +35,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sshLog: StateFlow<List<String>> = sshRepository.sshLog
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
+    val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
     val logs: StateFlow<List<String>> = ProxyServiceState.logs
     val customKernelExists: StateFlow<Boolean> = proxyManager.customKernelExists
     val updateState: StateFlow<UpdateState> = appUpdater.state
@@ -42,15 +43,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
-    // Начальное значение, прочитанное из DataStore до первой recomposition.
-    // Хранится отдельно, чтобы startDestination не захватил дефолтный false из onboardingDone.
     private val _initialOnboardingDone = MutableStateFlow(false)
     val initialOnboardingDone: StateFlow<Boolean> = _initialOnboardingDone.asStateFlow()
+
+    private val _initialTgSubscribeShown = MutableStateFlow(false)
+    val initialTgSubscribeShown: StateFlow<Boolean> = _initialTgSubscribeShown.asStateFlow()
 
     init {
         viewModelScope.launch {
             val done = prefs.onboardingDoneFlow.first()
-            _initialOnboardingDone.value = done  // до isInitialized, чтобы значение было готово
+            val tgShown = prefs.tgSubscribeShownFlow.first()
+            _initialOnboardingDone.value = done
+            _initialTgSubscribeShown.value = tgShown
             _isInitialized.value = true
         }
         viewModelScope.launch {
@@ -60,11 +64,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             proxyManager.observeProxyServiceStatus()
         }
         viewModelScope.launch {
+            proxyManager.observeConnectionStats()
+        }
+        viewModelScope.launch {
             proxyManager.observeCaptchaEvents()
         }
         proxyManager.syncInitialState()
 
-        // Автоматическая проверка обновлений при холодном запуске (silent — без ошибок)
         viewModelScope.launch {
             appUpdater.checkForUpdate(silent = true)
         }

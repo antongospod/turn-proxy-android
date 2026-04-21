@@ -20,8 +20,14 @@ sealed class ServerState {
 // Local proxy client states
 sealed class ProxyState {
     object Idle : ProxyState()
+    // Процесс поднимается, ещё не было ни одной строки, которая подтвердила бы
+    // работу соединения — жёлтый.
     object Starting : ProxyState()
-    object Running : ProxyState()
+    // Процесс работает, но ни один поток/сессия не подключены (active == 0) — жёлтый.
+    // total == 0 означает, что мы пока не знаем целевое число потоков.
+    data class Connecting(val active: Int, val total: Int) : ProxyState()
+    // Хотя бы один поток/сессия подключены — зелёный. active <= total.
+    data class Running(val active: Int, val total: Int) : ProxyState()
     data class Error(val message: String) : ProxyState()
     data class CaptchaRequired(val url: String, val sessionId: Long = 0L) : ProxyState()
 }

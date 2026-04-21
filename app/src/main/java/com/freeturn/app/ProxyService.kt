@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.DnsMode
@@ -47,6 +48,19 @@ class ProxyService : Service() {
         // случайные localhost-URL в других логах не открывали диалог.
         private val CAPTCHA_URL_REGEX =
             Pattern.compile("""Open this URL in your browser:\s*(https?://\S+)""")
+
+        // События жизненного цикла соединений, публикуемые ядром (client/main.go).
+        // Не-VLESS: несколько потоков со своим [STREAM N], у каждого свой Established/Closed.
+        private val STREAM_ESTABLISHED_REGEX =
+            Pattern.compile("""\[STREAM (\d+)\] Established DTLS connection""")
+        private val STREAM_CLOSED_REGEX =
+            Pattern.compile("""\[STREAM (\d+)\] Closed DTLS connection""")
+        // VLESS: ядро само пишет агрегированное число активных сессий.
+        private val VLESS_ACTIVE_REGEX =
+            Pattern.compile("""\[session \d+\] (?:connected|disconnected) \(active: (\d+)\)""")
+        // VLESS: целевое число сессий приходит в этой строке до первого connected.
+        private val VLESS_TOTAL_REGEX =
+            Pattern.compile("""VLESS mode: waiting for sessions to connect \(total: (\d+)\)""")
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -139,7 +153,6 @@ class ProxyService : Service() {
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
             if (cfg.vlessMode) cmdArgs.add("-vless")
             else if (cfg.useUdp) cmdArgs.add("-udp")
-            if (cfg.noDtls) cmdArgs.add("-no-dtls")
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
             // -dns передаём только если пользователь выбрал не-дефолт: ядро по
             // умолчанию уже использует auto (UDP/53 с sticky-fallback на DoH).
@@ -168,6 +181,33 @@ class ProxyService : Service() {
         var startupEmitted = false
         var startupFailed = false
         var captchaSessionCounter = 0L
+
+        // --- Трекинг активных соединений для индикации состояния в UI. ---
+        // Не-VLESS: каждый поток логирует свой [STREAM N] Established/Closed парой
+        // (defer Closed ставится ДО логирования Established, см. client/main.go).
+        // Считаем именно инкрементами, а не множеством уникальных ID: в ядре есть
+        // особенность — первый поток запускается с id=1 и цикл снова итерируется
+        // с i=1, из-за чего один streamID дублируется при -n N. Для счётчика это
+        // безопасно (на два Established придёт два Closed), для Set это давало
+        // бы заниженное число активных (N-1 вместо N).
+        var nonVlessActive = 0
+        // Для не-VLESS целевое число потоков известно из конфига (-n). Если threads == 0,
+        // ядро запускает один поток, считаем total = 1.
+        val nonVlessTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1
+        var vlessActive = 0
+        var vlessTotal = 0
+        var isVless = cfg.vlessMode
+
+        fun publishStats() {
+            val stats = if (isVless) {
+                ConnectionStats(vlessActive, vlessTotal)
+            } else {
+                ConnectionStats(nonVlessActive, nonVlessTotal)
+            }
+            ProxyServiceState.setConnectionStats(stats)
+        }
+        // Сброс на старте сессии (в том числе на watchdog-рестарте).
+        publishStats()
         try {
             ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
@@ -207,18 +247,62 @@ class ProxyService : Service() {
                         ProxyServiceState.setCaptchaSession(null)
                     }
 
+                    // Парсинг событий жизненного цикла соединений. Обновляем stats
+                    // и используем первое "реально подключилось" как сигнал успешного старта.
+                    var statsChanged = false
+                    STREAM_ESTABLISHED_REGEX.matcher(l).let { m ->
+                        if (m.find()) {
+                            nonVlessActive += 1
+                            statsChanged = true
+                            isVless = false
+                        }
+                    }
+                    STREAM_CLOSED_REGEX.matcher(l).let { m ->
+                        if (m.find()) {
+                            if (nonVlessActive > 0) nonVlessActive -= 1
+                            statsChanged = true
+                        }
+                    }
+                    VLESS_TOTAL_REGEX.matcher(l).let { m ->
+                        if (m.find()) {
+                            vlessTotal = m.group(1)!!.toInt()
+                            isVless = true
+                            statsChanged = true
+                        }
+                    }
+                    VLESS_ACTIVE_REGEX.matcher(l).let { m ->
+                        if (m.find()) {
+                            vlessActive = m.group(1)!!.toInt()
+                            isVless = true
+                            statsChanged = true
+                        }
+                    }
+                    if (statsChanged) publishStats()
+
+                    // Startup: ядро упало с panic/fatal/rate limit ДО того, как удалось
+                    // подключиться — считаем запуск неудачным. Первая строка без этих
+                    // маркеров больше не трактуется как Success (ядро могло написать
+                    // "Connecting..." и только потом упасть).
                     if (!startupEmitted) {
                         val lower = l.lowercase()
-                        if (lower.contains("panic") || lower.contains("fatal") ||
-                            lower.contains("rate limit")) {
-                            ProxyServiceState.setStartupResult(StartupResult.Failed(l))
-                            updateNotification("Ошибка подключения")
-                            startupFailed = true
-                        } else {
-                            ProxyServiceState.setStartupResult(StartupResult.Success)
-                            updateNotification("Прокси активен")
+                        val hasFatal = lower.contains("panic") || lower.contains("fatal") ||
+                            lower.contains("rate limit")
+                        val hasConnection = (isVless && vlessActive > 0) ||
+                            (!isVless && nonVlessActive > 0)
+                        when {
+                            hasFatal -> {
+                                ProxyServiceState.setStartupResult(StartupResult.Failed(l))
+                                updateNotification("Ошибка подключения")
+                                startupFailed = true
+                                startupEmitted = true
+                            }
+                            hasConnection -> {
+                                ProxyServiceState.setStartupResult(StartupResult.Success)
+                                ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
+                                updateNotification("Прокси активен")
+                                startupEmitted = true
+                            }
                         }
-                        startupEmitted = true
                     }
 
                     // compareAndSet гарантирует единственный postDelayed даже при параллельных quota-ошибках
@@ -255,6 +339,9 @@ class ProxyService : Service() {
             }
         } finally {
             ProxyServiceState.setCaptchaSession(null)
+            // Процесс мёртв — активных соединений нет. При watchdog-рестарте
+            // publishStats на новом старте снова выставит правильный target.
+            ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
             process.set(null)
             when {
                 userStopped.get() -> {
@@ -372,6 +459,8 @@ class ProxyService : Service() {
         super.onDestroy()
         userStopped.set(true)
         ProxyServiceState.setRunning(false)
+        ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
+        ProxyServiceState.clearConnectedSince()
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
         ProxyServiceState.addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")

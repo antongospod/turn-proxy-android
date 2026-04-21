@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import com.freeturn.app.ConnectionStats
 import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
@@ -50,25 +51,70 @@ class LocalProxyManager(private val context: Context) {
             if (session != null) {
                 _proxyState.value = ProxyState.CaptchaRequired(session.url, session.sessionId)
             } else if (_proxyState.value is ProxyState.CaptchaRequired) {
-                // Капча-сессия закрыта — возвращаемся в Running (ядро продолжает работу)
-                _proxyState.value = ProxyState.Running
+                val s = ProxyServiceState.connectionStats.value
+                _proxyState.value = if (s.active > 0) {
+                    ProxyState.Running(s.active, s.total)
+                } else {
+                    ProxyState.Connecting(s.active, s.total)
+                }
             }
         }
     }
 
     suspend fun observeProxyServiceStatus() {
         ProxyServiceState.isRunning.collect { running ->
-            if (running && _proxyState.value !is ProxyState.Running && _proxyState.value !is ProxyState.Starting) {
-                // Сервис запущен внешним источником (например, ProxyReceiver)
-                _proxyState.value = ProxyState.Running
-            } else if (!running && _proxyState.value is ProxyState.Running) {
-                _proxyState.value = ProxyState.Idle
+            val current = _proxyState.value
+            if (running) {
+                if (current !is ProxyState.Running &&
+                    current !is ProxyState.Connecting &&
+                    current !is ProxyState.Starting) {
+                    _proxyState.value = ProxyState.Starting
+                }
+            } else {
+                if (current is ProxyState.Running ||
+                    current is ProxyState.Connecting ||
+                    current is ProxyState.Starting ||
+                    current is ProxyState.CaptchaRequired) {
+                    _proxyState.value = ProxyState.Idle
+                }
             }
         }
     }
 
+    /**
+     * Переводит UI в Connecting/Running в зависимости от числа активных каналов.
+     * - active == 0 + процесс жив → жёлтый (Connecting).
+     * - active  > 0               → зелёный (Running).
+     *
+     * Captcha и Error имеют приоритет и не перезаписываются, пока активны.
+     * Starting тоже не трогаем: он снимается StartupResult-логикой в startProxy.
+     */
+    suspend fun observeConnectionStats() {
+        ProxyServiceState.connectionStats.collect { stats ->
+            val current = _proxyState.value
+            if (current is ProxyState.Error || current is ProxyState.CaptchaRequired) return@collect
+            if (!ProxyServiceState.isRunning.value) return@collect
+
+            val next: ProxyState = if (stats.active > 0) {
+                ProxyState.Running(stats.active, stats.total)
+            } else {
+                ProxyState.Connecting(stats.active, stats.total)
+            }
+
+            if (current is ProxyState.Starting && stats.active == 0) return@collect
+            _proxyState.value = next
+        }
+    }
+
     fun syncInitialState() {
-        if (ProxyServiceState.isRunning.value) _proxyState.value = ProxyState.Running
+        if (ProxyServiceState.isRunning.value) {
+            val s = ProxyServiceState.connectionStats.value
+            _proxyState.value = if (s.active > 0) {
+                ProxyState.Running(s.active, s.total)
+            } else {
+                ProxyState.Connecting(s.active, s.total)
+            }
+        }
     }
 
     suspend fun startProxy(cfg: ClientConfig) {
@@ -88,6 +134,8 @@ class LocalProxyManager(private val context: Context) {
 
         ProxyServiceState.clearLogs()
         ProxyServiceState.setStartupResult(null)
+        ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
+        ProxyServiceState.clearConnectedSince()
         val intent = Intent(context, ProxyService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
@@ -95,19 +143,29 @@ class LocalProxyManager(private val context: Context) {
             context.startService(intent)
         }
 
-        val result = withTimeoutOrNull(5_000L) {
+        val result = withTimeoutOrNull(20_000L) {
             ProxyServiceState.startupResult.filterNotNull().first()
         }
 
         if (_proxyState.value is ProxyState.Error) return
 
         when (result) {
-            null -> setErrorWithAutoReset("Прокси не запустился")
+            null -> {
+                stopProxy()
+                setErrorWithAutoReset("Прокси не запустился")
+            }
             is StartupResult.Failed -> {
                 stopProxy()
                 setErrorWithAutoReset(result.message)
             }
-            is StartupResult.Success -> _proxyState.value = ProxyState.Running
+            is StartupResult.Success -> {
+                val s = ProxyServiceState.connectionStats.value
+                _proxyState.value = if (s.active > 0) {
+                    ProxyState.Running(s.active, s.total)
+                } else {
+                    ProxyState.Connecting(s.active, s.total)
+                }
+            }
         }
     }
 
@@ -119,7 +177,12 @@ class LocalProxyManager(private val context: Context) {
     fun dismissCaptcha() {
         ProxyServiceState.setCaptchaSession(null)
         if (_proxyState.value is ProxyState.CaptchaRequired) {
-            _proxyState.value = ProxyState.Running
+            val s = ProxyServiceState.connectionStats.value
+            _proxyState.value = if (s.active > 0) {
+                ProxyState.Running(s.active, s.total)
+            } else {
+                ProxyState.Connecting(s.active, s.total)
+            }
         }
     }
 
