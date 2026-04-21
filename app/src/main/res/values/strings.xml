@@ -39,12 +39,12 @@
     <!-- ClientSetupScreen -->
     <string name="client_title">Клиент</string>
     <string name="connection_title">Подключение</string>
-    <string name="server_address_label">Адрес vk-turn-proxy сервера</string>
+    <string name="server_address_label">Адрес turn-proxy сервера</string>
     <string name="server_address_placeholder">1.2.3.4:56000</string>
-    <string name="server_address_support">IP и порт vk-turn-proxy на вашем VPS</string>
-    <string name="vk_link_label">Ссылка VK-звонок</string>
-    <string name="vk_link_placeholder">https://vk.com/call/…</string>
-    <string name="vk_link_support">VK: Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
+    <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
+    <string name="call_link_label">Ссылка на звонок</string>
+    <string name="call_link_placeholder">https://site.ru/call/…</string>
+    <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
@@ -53,12 +53,10 @@
     <string name="threads_recommendation">Рекомендуется 4–8</string>
     <string name="transport_protocol">Транспорт</string>
     <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
-    <string name="no_dtls">Без DTLS-шифрования</string>
-    <string name="no_dtls_desc">Может ускорить соединение, повышает риск блокировки</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
     <string name="force_port_443">TURN на порту 443</string>
-    <string name="force_port_443_desc">Подменяет порт VK TURN на 443 (-port 443). Помогает, если оператор режет нестандартные порты</string>
+    <string name="force_port_443_desc">Помогает, если оператор режет нестандартные порты</string>
     <string name="dns_mode_title">DNS-резолвер</string>
     <string name="dns_mode_desc">Авто — пробует системный DNS, переключается на DNS-over-HTTPS при блокировке</string>
     <string name="dns_mode_auto">Авто</string>
@@ -145,8 +143,8 @@
     <string name="update_no_update">Установлена последняя версия</string>
     <string name="update_error">Ошибка: %1$s</string>
 
-    <string name="debug_mode">Дебаг-режим</string>
-    <string name="debug_mode_desc">Расширенный вывод в логах (-debug)</string>
+    <string name="debug_mode">Debug-режим</string>
+    <string name="debug_mode_desc">Расширенный вывод в логах</string>
 
     <string name="dynamic_theme_title">Динамическая тема</string>
     <string name="dynamic_theme_desc">Использовать системные цвета (Material You)</string>

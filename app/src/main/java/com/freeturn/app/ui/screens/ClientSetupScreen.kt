@@ -87,7 +87,6 @@ fun ClientSetupScreen(
     var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
-    var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
@@ -105,7 +104,7 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
+    LaunchedEffect(serverAddress, vkLink, threads, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
@@ -113,7 +112,6 @@ fun ClientSetupScreen(
                 vkLink        = vkLink.trim(),
                 threads       = threads.roundToInt(),
                 useUdp        = useUdp,
-                noDtls        = noDtls,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
                 vlessMode     = saved.vlessMode,
@@ -164,12 +162,12 @@ fun ClientSetupScreen(
                 OutlinedTextField(
                     value = vkLink.redact(privacyMode),
                     onValueChange = { if (!privacyMode) vkLink = it },
-                    label = { Text(stringResource(R.string.vk_link_label)) },
-                    placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
+                    label = { Text(stringResource(R.string.call_link_label)) },
+                    placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     readOnly = privacyMode,
-                    supportingText = { Text(stringResource(R.string.vk_link_support)) }
+                    supportingText = { Text(stringResource(R.string.call_link_support)) }
                 )
 
                 OutlinedTextField(
@@ -212,75 +210,11 @@ fun ClientSetupScreen(
                             }
                             threads = it
                         },
-                        valueRange = 1f..8f,
-                        steps = 6,
+                        valueRange = 1f..16f,
+                        steps = 14,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-
-                SwitchRow(
-                    label = stringResource(R.string.vless_mode),
-                    description = stringResource(R.string.vless_mode_desc),
-                    checked = saved.vlessMode,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setVlessMode(it)
-                    }
-                )
-
-                if (!saved.vlessMode) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column {
-                            Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                stringResource(R.string.transport_protocol_desc),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = !useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = false
-                                    noDtls = false
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                            ) { Text(stringResource(R.string.tcp)) }
-                            SegmentedButton(
-                                selected = useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = true
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                            ) { Text(stringResource(R.string.udp)) }
-                        }
-                    }
-
-                    if (useUdp) {
-                        SwitchRow(
-                            label = stringResource(R.string.no_dtls),
-                            description = stringResource(R.string.no_dtls_desc),
-                            checked = noDtls,
-                            onCheckedChange = {
-                                HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                                noDtls = it
-                            }
-                        )
-                    }
-                }
-
-                SwitchRow(
-                    label = stringResource(R.string.manual_captcha),
-                    description = stringResource(R.string.manual_captcha_desc),
-                    checked = manualCaptcha,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        manualCaptcha = it
-                    }
-                )
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column {
@@ -309,6 +243,58 @@ fun ClientSetupScreen(
                         }
                     }
                 }
+
+                if (!saved.vlessMode) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column {
+                            Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(R.string.transport_protocol_desc),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = !useUdp,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    useUdp = false
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            ) { Text(stringResource(R.string.tcp)) }
+                            SegmentedButton(
+                                selected = useUdp,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    useUdp = true
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            ) { Text(stringResource(R.string.udp)) }
+                        }
+                    }
+
+                }
+
+                SwitchRow(
+                    label = stringResource(R.string.vless_mode),
+                    description = stringResource(R.string.vless_mode_desc),
+                    checked = saved.vlessMode,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setVlessMode(it)
+                    }
+                )
+
+                SwitchRow(
+                    label = stringResource(R.string.manual_captcha),
+                    description = stringResource(R.string.manual_captcha_desc),
+                    checked = manualCaptcha,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        manualCaptcha = it
+                    }
+                )
 
                 SwitchRow(
                     label = stringResource(R.string.force_port_443),

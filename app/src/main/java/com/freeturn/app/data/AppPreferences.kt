@@ -35,7 +35,6 @@ data class ClientConfig(
     val vkLink: String = "",
     val threads: Int = 4,
     val useUdp: Boolean = true,
-    val noDtls: Boolean = false,
     val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
     val isRawMode: Boolean = false,
@@ -70,7 +69,6 @@ class AppPreferences(context: Context) {
         val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
         val CLIENT_THREADS = intPreferencesKey("client_threads")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
-        val CLIENT_NO_DTLS = booleanPreferencesKey("client_no_dtls")
         val CLIENT_MANUAL_CAPTCHA = booleanPreferencesKey("client_manual_captcha")
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
@@ -135,7 +133,6 @@ class AppPreferences(context: Context) {
                 vkLink = prefs[CLIENT_VK_LINK] ?: "",
                 threads = prefs[CLIENT_THREADS] ?: 4,
                 useUdp = prefs[CLIENT_UDP] ?: true,
-                noDtls = prefs[CLIENT_NO_DTLS] ?: false,
                 manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
@@ -198,8 +195,9 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_VK_LINK] = config.vkLink
             prefs[CLIENT_THREADS] = config.threads
             prefs[CLIENT_UDP] = config.useUdp
-            prefs[CLIENT_NO_DTLS] = config.noDtls
             prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
+            // Мигрируем старый ключ: noDtls удалён из приложения.
+            prefs.remove(booleanPreferencesKey("client_no_dtls"))
             prefs[CLIENT_LOCAL_PORT] = config.localPort
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand

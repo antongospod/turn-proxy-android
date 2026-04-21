@@ -82,8 +82,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.MainViewModel
@@ -100,6 +98,8 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
+    val connectedSince by viewModel.connectedSince.collectAsStateWithLifecycle()
+    val uptimeText = rememberProxyUptime(connectedSince)
     val sshState by viewModel.sshState.collectAsStateWithLifecycle()
     val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
     val clientConfig by viewModel.clientConfig.collectAsStateWithLifecycle()
@@ -149,7 +149,6 @@ fun HomeScreen(
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
@@ -157,6 +156,12 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.turn_proxy_title)) },
                 actions = {
+                    IconButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        onNavigateToSshSetup()
+                    }) {
+                        Icon(painterResource(R.drawable.key_24px), contentDescription = stringResource(R.string.connection))
+                    }
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         showBottomSheet.value = true
@@ -185,7 +190,7 @@ fun HomeScreen(
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
                             viewModel.startProxy()
                         }
-                        is ProxyState.Running -> {
+                        is ProxyState.Running, is ProxyState.Connecting, is ProxyState.Starting -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
                             viewModel.stopProxy()
                         }
@@ -197,14 +202,28 @@ fun HomeScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = when (proxyState) {
-                    is ProxyState.Running -> stringResource(R.string.proxy_active)
+                text = when (val s = proxyState) {
+                    is ProxyState.Running -> {
+                        val base = stringResource(R.string.proxy_active)
+                        val counts = if (s.total > 0) "${s.active}/${s.total}" else "${s.active}"
+                        if (uptimeText != null) "$base — $counts · $uptimeText"
+                        else "$base — $counts"
+                    }
+                    is ProxyState.Connecting -> {
+                        val base = stringResource(R.string.proxy_connecting)
+                        val counts = if (s.total > 0) " — ${s.active}/${s.total}" else ""
+                        // Таймер всё ещё показываем: сессия не завершилась, просто
+                        // потоки временно отвалились и ядро переподключается.
+                        if (uptimeText != null) "$base$counts · $uptimeText" else "$base$counts"
+                    }
                     is ProxyState.Starting -> stringResource(R.string.proxy_connecting)
-                    is ProxyState.Error -> (proxyState as ProxyState.Error).message
+                    is ProxyState.Error -> s.message
                     is ProxyState.CaptchaRequired -> "Требуется прохождение капчи"
                     else -> stringResource(R.string.proxy_press_to_start)
                 },
-                style = MaterialTheme.typography.titleMedium,
+                // "tnum" — tabular numbers: все цифры одинаковой ширины. Без него
+                // тикающий таймер и меняющийся счётчик N/M сдвигают остальной текст.
+                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                 color = when (proxyState) {
                     is ProxyState.Running -> MaterialTheme.extendedColorScheme.success
                     is ProxyState.Error -> MaterialTheme.colorScheme.error
@@ -297,14 +316,7 @@ fun HomeScreen(
                 viewModel = viewModel,
                 containerColor = sheetColor,
                 privacyMode = privacyMode,
-                onPrivacyModeChange = { viewModel.setPrivacyMode(it) },
-                onNavigateToSshSetup = {
-                    scope.launch {
-                        bottomSheetState.hide()
-                        showBottomSheet.value = false
-                        onNavigateToSshSetup()
-                    }
-                }
+                onPrivacyModeChange = { viewModel.setPrivacyMode(it) }
             )
         }
     }
@@ -411,7 +423,8 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
         targetValue = when (state) {
             is ProxyState.Running -> extended.successContainer
             is ProxyState.Error -> MaterialTheme.colorScheme.errorContainer
-            is ProxyState.Starting -> MaterialTheme.colorScheme.secondaryContainer
+            is ProxyState.Starting, is ProxyState.Connecting ->
+                MaterialTheme.colorScheme.secondaryContainer
             else -> MaterialTheme.colorScheme.primaryContainer
         },
         animationSpec = tween(600),
@@ -421,14 +434,15 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
         targetValue = when (state) {
             is ProxyState.Running -> extended.onSuccessContainer
             is ProxyState.Error -> MaterialTheme.colorScheme.onErrorContainer
-            is ProxyState.Starting -> MaterialTheme.colorScheme.onSecondaryContainer
+            is ProxyState.Starting, is ProxyState.Connecting ->
+                MaterialTheme.colorScheme.onSecondaryContainer
             else -> MaterialTheme.colorScheme.onPrimaryContainer
         },
         animationSpec = tween(600),
         label = "btn_fg"
     )
     val scale by animateFloatAsState(
-        targetValue = if (state is ProxyState.Starting) 0.96f else 1f,
+        targetValue = if (state is ProxyState.Starting || state is ProxyState.Connecting) 0.96f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "btn_scale"
     )
@@ -449,7 +463,8 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             when (state) {
-                is ProxyState.Starting -> CircularWavyProgressIndicator(color = contentColor)
+                is ProxyState.Starting, is ProxyState.Connecting ->
+                    CircularWavyProgressIndicator(color = contentColor)
                 is ProxyState.Running -> Icon(
                     painterResource(R.drawable.check_circle_24px), stringResource(R.string.proxy_active_stop),
                     Modifier.size(52.dp), tint = contentColor
@@ -475,12 +490,10 @@ private fun InfoBottomSheet(
     viewModel: MainViewModel,
     containerColor: Color,
     privacyMode: Boolean,
-    onPrivacyModeChange: (Boolean) -> Unit,
-    onNavigateToSshSetup: () -> Unit
+    onPrivacyModeChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val sshState by viewModel.sshState.collectAsStateWithLifecycle()
     val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
@@ -490,7 +503,6 @@ private fun InfoBottomSheet(
         catch (_: Exception) { "—" }
     }
 
-    val isConnected = sshState is SshConnectionState.Connected
     val listColors = ListItemDefaults.colors(containerColor = containerColor)
 
     LazyColumn(
@@ -498,36 +510,22 @@ private fun InfoBottomSheet(
             .fillMaxWidth()
             .navigationBarsPadding()
     ) {
-        // Соединение
+        // Обновление
         item {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.connection), style = MaterialTheme.typography.titleSmall) },
+            UpdateListItem(
+                state = updateState,
                 colors = listColors,
-                supportingContent = {
-                    Text(
-                        when (sshState) {
-                            is SshConnectionState.Connected ->
-                                stringResource(R.string.connected_format, (sshState as SshConnectionState.Connected).ip.redact(privacyMode))
-                            is SshConnectionState.Connecting ->
-                                stringResource(R.string.ssh_connecting)
-                            is SshConnectionState.Error ->
-                                stringResource(R.string.error_format_short, (sshState as SshConnectionState.Error).message)
-                            else -> stringResource(R.string.not_connected)
-                        }
-                    )
+                onCheck = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.checkForUpdate()
                 },
-                trailingContent = {
-                    if (isConnected) {
-                        TextButton(onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            onNavigateToSshSetup()
-                        }) { Text(stringResource(R.string.change)) }
-                    } else {
-                        TextButton(onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            onNavigateToSshSetup()
-                        }) { Text(stringResource(R.string.configure)) }
-                    }
+                onDownload = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.downloadUpdate()
+                },
+                onInstall = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    viewModel.installUpdate()
                 }
             )
         }
@@ -560,7 +558,7 @@ private fun InfoBottomSheet(
         item {
             RepoLinkItem(
                 title = stringResource(R.string.tg_channel),
-                subtitle = stringResource(R.string.tg_channel_subtitle),
+                subtitle = null,
                 url = "https://t.me/+53nh4UNiSv5lNTgy",
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
@@ -607,28 +605,6 @@ private fun InfoBottomSheet(
                             viewModel.setDynamicTheme(it)
                         }
                     )
-                }
-            )
-        }
-
-        item { HorizontalDivider() }
-
-        // Обновление
-        item {
-            UpdateListItem(
-                state = updateState,
-                colors = listColors,
-                onCheck = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.checkForUpdate()
-                },
-                onDownload = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.downloadUpdate()
-                },
-                onInstall = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.installUpdate()
                 }
             )
         }
@@ -763,7 +739,7 @@ private fun UpdateListItem(
 @Composable
 private fun RepoLinkItem(
     title: String,
-    subtitle: String,
+    subtitle: String?,
     url: String,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     onHaptic: () -> Unit,
@@ -772,13 +748,13 @@ private fun RepoLinkItem(
     ListItem(
         headlineContent = { Text(title) },
         colors = ListItemDefaults.colors(containerColor = containerColor),
-        supportingContent = {
+        supportingContent = if (subtitle != null) ({
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary
             )
-        },
+        }) else null,
         trailingContent = {
             Icon(
                 painterResource(R.drawable.open_in_new_24px),
@@ -796,6 +772,39 @@ private fun RepoLinkItem(
 
 
 internal fun String.redact(enabled: Boolean) = if (enabled) "••••••" else this
+
+/**
+ * Форматирует uptime прокси в «mm:ss» или «h:mm:ss», тикая раз в секунду.
+ *
+ * Источник времени — `SystemClock.elapsedRealtime()`, как и у `connectedSince`
+ * в `ProxyServiceState`: это устойчиво к переводу системных часов (обычный
+ * `System.currentTimeMillis()` при изменении времени показал бы отрицательные
+ * или разорванные интервалы).
+ *
+ * Возвращает null, если прокси ни разу не подключался в текущей сессии.
+ */
+@Composable
+private fun rememberProxyUptime(connectedSince: Long?): String? {
+    if (connectedSince == null) return null
+    // Тик состояния, принудительно переформатирующий строку раз в секунду.
+    // Пересоздаётся при смене connectedSince (новая сессия).
+    val tick = androidx.compose.runtime.produceState(initialValue = 0L, connectedSince) {
+        while (true) {
+            value = android.os.SystemClock.elapsedRealtime()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+    val now = tick.value.coerceAtLeast(connectedSince)
+    val totalSec = ((now - connectedSince) / 1_000).coerceAtLeast(0)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    // Ведущий ноль у минут, чтобы строка не прыгала при переходе 9:59 → 10:00.
+    // Вместе с fontFeatureSettings="tnum" у Text это даёт полностью стабильную
+    // ширину в первый час работы. Смена ширины остаётся только на переходе
+    // 59:59 → 1:00:00 (раз за сессию) и 9:59:59 → 10:00:00.
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+}
 
 @Composable
 private fun ConfigRow(label: String, value: String) {

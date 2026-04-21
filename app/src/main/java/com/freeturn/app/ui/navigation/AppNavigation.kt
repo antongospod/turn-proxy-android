@@ -14,7 +14,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,30 +60,22 @@ private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.LOGS, Routes.SERVER_MA
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val isInitialized by viewModel.isInitialized.collectAsStateWithLifecycle()
-    val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
 
     // Не строим NavHost пока DataStore не загружен — иначе startDestination
     // захватит дефолтный onboardingDone=false и всегда покажет онбординг
     if (!isInitialized) return
 
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
-    val tgSubscribeShown by viewModel.tgSubscribeShown.collectAsStateWithLifecycle()
     val initialOnboardingDone by viewModel.initialOnboardingDone.collectAsStateWithLifecycle()
-    // initialOnboardingDone гарантированно выставлен до isInitialized=true (один coroutine),
-    // поэтому remember здесь безопасно захватывает правильное значение.
+    val initialTgSubscribeShown by viewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
     val startDestination = remember { if (initialOnboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showNavSuite = currentRoute in BOTTOM_NAV_ROUTES
 
-    var showTgDialog by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(onboardingDone, tgSubscribeShown) {
-        if (onboardingDone && !tgSubscribeShown) showTgDialog = true
-    }
+    var showTgDialog by rememberSaveable { mutableStateOf(!initialTgSubscribeShown && initialOnboardingDone) }
 
-    // Адаптивно: bar на телефоне, rail на ширинах ≥600dp, drawer — при расширенном классе.
-    // На экранах онбординга и SSH-setup навигация скрыта через NavigationSuiteType.None.
     val adaptiveType = NavigationSuiteScaffoldDefaults
         .calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
     val layoutType = if (showNavSuite) adaptiveType else NavigationSuiteType.None
