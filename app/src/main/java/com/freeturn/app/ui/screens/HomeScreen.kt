@@ -75,6 +75,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
@@ -419,6 +421,12 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
 @Composable
 private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
     val extended = MaterialTheme.extendedColorScheme
+    val buttonLabel = when (state) {
+        is ProxyState.Starting, is ProxyState.Connecting -> stringResource(R.string.proxy_connecting)
+        is ProxyState.Running -> stringResource(R.string.proxy_active_stop)
+        is ProxyState.Error -> stringResource(R.string.proxy_error_restart)
+        else -> stringResource(R.string.start_proxy)
+    }
     val containerColor by animateColorAsState(
         targetValue = when (state) {
             is ProxyState.Running -> extended.successContainer
@@ -452,7 +460,8 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
         modifier = Modifier
             .size(148.dp)
             .scale(scale)
-            .clip(CircleShape),
+            .clip(CircleShape)
+            .semantics { contentDescription = buttonLabel },
         shape = CircleShape,
         color = containerColor,
         tonalElevation = if (state is ProxyState.Running) 6.dp else 1.dp

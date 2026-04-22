@@ -243,7 +243,7 @@ private fun FormSection(
                 }) {
                     Icon(
                         painterResource(if (showPassword) R.drawable.visibility_off_24px else R.drawable.visibility_24px),
-                        contentDescription = null
+                        contentDescription = if (showPassword) stringResource(R.string.hide_password) else stringResource(R.string.show_password)
                     )
                 }
             },

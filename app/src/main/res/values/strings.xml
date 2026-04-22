@@ -102,6 +102,8 @@
     <string name="paired">Сопряжено</string>
 
     <!-- SshSetupScreen -->
+    <string name="show_password">Показать пароль</string>
+    <string name="hide_password">Скрыть пароль</string>
     <string name="connect_to_server">Сопряжение с сервером</string>
     <string name="back">Назад</string>
     <string name="server_data">Данные сервера</string>
@@ -150,6 +152,11 @@
     <string name="dynamic_theme_desc">Использовать системные цвета (Material You)</string>
     <string name="privacy_mode_title">Приватный режим</string>
     <string name="privacy_mode_desc">Скрывает IP и порты</string>
+
+    <!-- CaptchaWebViewDialog -->
+    <string name="captcha_title">Проверка VK</string>
+    <string name="captcha_subtitle">Пройдите проверку для продолжения</string>
+    <string name="captcha_close">Закрыть</string>
 
     <!-- Telegram -->
     <string name="tg_channel">Telegram-канал</string>
