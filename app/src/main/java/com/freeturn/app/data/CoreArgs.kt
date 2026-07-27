@@ -32,9 +32,14 @@ CoreArgs {
             add("-obf-key"); add(srv.obfKey)
         }
         if (cfg.manualCaptcha) add("-manual-captcha")
-        val browser = cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
-        if (cfg.provider == Provider.VK && browser != Browser.FIREFOX) { add("-browser"); add(browser) }
-        if (cfg.provider == Provider.VK) { add("-platform"); add("mobile") }
+        if (cfg.provider == Provider.VK) {
+            val browser = when {
+                cfg.manualCaptcha -> Browser.CHROME
+                else -> cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
+            }
+            add("-browser"); add(browser)
+            add("-platform"); add("mobile")
+        }
         if (cfg.debugMode) add("-debug")
         val manualDns = DnsList.normalize(cfg.customDns)
         when {

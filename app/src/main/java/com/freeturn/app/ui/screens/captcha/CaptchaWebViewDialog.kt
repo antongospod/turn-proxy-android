@@ -121,8 +121,7 @@ private fun CaptchaWebView(url: String) {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    // Капча грузит ресурсы VK через loopback-прокси - навигация не
-                    // должна утекать во внешний браузер.
+                    settings.userAgentString = settings.userAgentString.replace("; wv)", ")")
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
                             view: WebView,

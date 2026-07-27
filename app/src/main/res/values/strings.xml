@@ -219,10 +219,10 @@
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
     <string name="client_browser_title">Профиль VK-авторизации</string>
-    <string name="client_browser_desc">Профиль TLS и User-Agent для входа в VK.</string>
+    <string name="client_browser_desc">Профиль TLS и User-Agent для входа в VK. Влияет на прохождение капчи: Chrome собирает те же сенсоры, что ждёт VK.</string>
     <string name="client_browser_label">Профиль</string>
     <string name="browser_firefox">Firefox</string>
-    <string name="browser_chrome">Chrome</string>
+    <string name="browser_chrome">Chrome (рекомендуется)</string>
     <string name="browser_safari">Safari</string>
     <string name="use_carrier_dns">DNS оператора связи</string>
     <string name="use_carrier_dns_desc">Использовать DNS текущей сети вместо системного резолвера</string>

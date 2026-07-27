@@ -18,8 +18,9 @@ object Browser {
     const val FIREFOX = "firefox"
     const val CHROME = "chrome"
     const val SAFARI = "safari"
-    const val DEFAULT = SAFARI
-    val VALUES = listOf(FIREFOX, CHROME, SAFARI)
+
+    const val DEFAULT = CHROME
+    val VALUES = listOf(CHROME, SAFARI, FIREFOX)
 }
 
 object ObfProfile {
