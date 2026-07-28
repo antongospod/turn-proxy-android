@@ -7,12 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,11 +34,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
@@ -57,6 +52,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
@@ -67,6 +63,7 @@ import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.ui.theme.Spacing
+import kotlin.math.ceil
 
 /** Герой главного экрана: кнопка-тоггл, строка статуса и пилюля счётчика/uptime. */
 @Composable
@@ -123,6 +120,12 @@ private fun HeroToggleButton(
         HeroKind.Error -> stringResource(R.string.proxy_error_restart)
         HeroKind.Idle -> stringResource(R.string.start_proxy)
     }
+    // Форма, размер и цвет тянутся одними и теми же спеками - иначе переход распадается на слои.
+    val colorSpec = MaterialTheme.motionScheme.slowEffectsSpec<Color>()
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fastEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+
     val containerColor by animateColorAsState(
         targetValue = when (kind) {
             HeroKind.Running -> extended.successContainer
@@ -130,7 +133,7 @@ private fun HeroToggleButton(
             HeroKind.Busy -> MaterialTheme.colorScheme.secondaryContainer
             HeroKind.Idle -> MaterialTheme.colorScheme.primaryContainer
         },
-        animationSpec = tween(500),
+        animationSpec = colorSpec,
         label = "btn_bg"
     )
     val contentColor by animateColorAsState(
@@ -140,12 +143,13 @@ private fun HeroToggleButton(
             HeroKind.Busy -> MaterialTheme.colorScheme.onSecondaryContainer
             HeroKind.Idle -> MaterialTheme.colorScheme.onPrimaryContainer
         },
-        animationSpec = tween(500),
+        animationSpec = colorSpec,
         label = "btn_fg"
     )
-    val scale by animateFloatAsState(
-        targetValue = if (kind == HeroKind.Busy) 0.96f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+    // scale/rotation читаются внутри graphicsLayer (фаза отрисовки) - иначе каждый кадр рекомпозирует кнопку.
+    val scale = animateFloatAsState(
+        targetValue = if (kind == HeroKind.Busy) 0.94f else 1f,
+        animationSpec = spatialSpec,
         label = "btn_scale"
     )
 
@@ -158,25 +162,18 @@ private fun HeroToggleButton(
         },
         reducedMotion = reducedMotion
     )
-
-    // Вращаем фигуру, пока идёт подключение.
-    val rotation = if (kind == HeroKind.Busy && !reducedMotion) {
-        val spin = rememberInfiniteTransition(label = "hero_spin")
-        val angle by spin.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(8_000, easing = LinearEasing)),
-            label = "hero_angle"
-        )
-        angle
-    } else 0f
+    val rotation = rememberHeroSpin(spinning = kind == HeroKind.Busy && !reducedMotion)
 
     Surface(
         onClick = onClick,
         modifier = Modifier
             .size(148.dp)
-            .scale(scale)
-            .graphicsLayer { rotationZ = rotation }
+            // Один слой на scale+rotation: два graphicsLayer поверх generic-outline дают лишний рендер-нод.
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+                rotationZ = rotation.value
+            }
             .semantics { contentDescription = buttonLabel },
         shape = heroShape,
         color = containerColor,
@@ -186,7 +183,7 @@ private fun HeroToggleButton(
             // Контр-вращение: крутится только фигура.
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = -rotation },
+                .graphicsLayer { rotationZ = -rotation.value },
             contentAlignment = Alignment.Center
         ) {
             if (reducedMotion) {
@@ -195,8 +192,8 @@ private fun HeroToggleButton(
                 AnimatedContent(
                     targetState = kind,
                     transitionSpec = {
-                        (fadeIn(tween(220)) + scaleIn(initialScale = 0.6f, animationSpec = tween(260)))
-                            .togetherWith(fadeOut(tween(120)) + scaleOut(targetScale = 0.6f, animationSpec = tween(120)))
+                        (fadeIn(effectsSpec) + scaleIn(spatialSpec, initialScale = 0.85f))
+                            .togetherWith(fadeOut(fastEffectsSpec) + scaleOut(fastEffectsSpec, targetScale = 0.85f))
                     },
                     label = "hero_icon"
                 ) { k ->
@@ -207,22 +204,43 @@ private fun HeroToggleButton(
     }
 }
 
+/** Непрерывное вращение фигуры с доводом до полного оборота на выходе. */
+@Composable
+private fun rememberHeroSpin(spinning: Boolean): State<Float> {
+    val angle = remember { Animatable(0f) }
+    val settleSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    LaunchedEffect(spinning) {
+        if (spinning) {
+            // Один длинный проход вместо infiniteRepeatable: перезапуск tween даёт микро-рывок на стыке.
+            angle.animateTo(angle.value + 360f * 240, tween(240 * 8_000, easing = LinearEasing))
+        } else if (angle.value != 0f) {
+            // Пружина подхватывает текущую скорость - вместо мгновенного сброса на 0.
+            angle.animateTo(ceil(angle.value / 360f) * 360f, settleSpec)
+            angle.snapTo(0f)
+        }
+    }
+    return angle.asState()
+}
+
 @Composable
 private fun HeroIcon(kind: HeroKind, tint: Color) {
-    when (kind) {
-        HeroKind.Busy -> LoadingIndicator(color = tint, modifier = Modifier.size(64.dp))
-        HeroKind.Running -> Icon(
-            painterResource(R.drawable.check_circle_24px), null,
-            Modifier.size(52.dp), tint = tint
-        )
-        HeroKind.Error -> Icon(
-            painterResource(R.drawable.error_24px), null,
-            Modifier.size(52.dp), tint = tint
-        )
-        HeroKind.Idle -> Icon(
-            painterResource(R.drawable.play_arrow_24px), null,
-            Modifier.size(52.dp), tint = tint
-        )
+    // Фиксированный слот: смена иконки не меняет размер контента (иначе AnimatedContent тянет ещё и размер).
+    Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
+        when (kind) {
+            HeroKind.Busy -> LoadingIndicator(color = tint, modifier = Modifier.size(64.dp))
+            HeroKind.Running -> Icon(
+                painterResource(R.drawable.check_circle_24px), null,
+                Modifier.size(52.dp), tint = tint
+            )
+            HeroKind.Error -> Icon(
+                painterResource(R.drawable.error_24px), null,
+                Modifier.size(52.dp), tint = tint
+            )
+            HeroKind.Idle -> Icon(
+                painterResource(R.drawable.play_arrow_24px), null,
+                Modifier.size(52.dp), tint = tint
+            )
+        }
     }
 }
 
@@ -241,9 +259,12 @@ private fun StatusLabel(state: ProxyState, reducedMotion: Boolean) {
             is ProxyState.Error, is ProxyState.CaptchaRequired -> MaterialTheme.colorScheme.error
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = tween(400),
+        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
         label = "status_color"
     )
+    val enterSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val exitSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val slideSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val text: @Composable (String) -> Unit = { value ->
         Text(
             text = value,
@@ -259,8 +280,8 @@ private fun StatusLabel(state: ProxyState, reducedMotion: Boolean) {
         AnimatedContent(
             targetState = label,
             transitionSpec = {
-                (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 3 })
-                    .togetherWith(fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 3 })
+                (fadeIn(enterSpec) + slideInVertically(slideSpec) { it / 3 })
+                    .togetherWith(fadeOut(exitSpec) + slideOutVertically(slideSpec) { -it / 3 })
             },
             label = "status_label"
         ) { value -> text(value) }
@@ -287,8 +308,10 @@ private fun StatsPill(state: ProxyState, kind: HeroKind, uptimeText: String?) {
         if (pillText != null) lastText = pillText
         AnimatedVisibility(
             visible = pillText != null,
-            enter = fadeIn(tween(220)) + scaleIn(initialScale = 0.8f, animationSpec = tween(260)),
-            exit = fadeOut(tween(120)) + scaleOut(targetScale = 0.8f, animationSpec = tween(120))
+            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()) +
+                scaleIn(MaterialTheme.motionScheme.defaultSpatialSpec(), initialScale = 0.8f),
+            exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
+                scaleOut(MaterialTheme.motionScheme.fastEffectsSpec(), targetScale = 0.8f)
         ) {
             Surface(
                 shape = CircleShape,
@@ -311,28 +334,39 @@ private fun StatsPill(state: ProxyState, kind: HeroKind, uptimeText: String?) {
 private fun rememberMorphingShape(target: RoundedPolygon, reducedMotion: Boolean): Shape {
     var from by remember { mutableStateOf(target) }
     var to by remember { mutableStateOf(target) }
-    if (to !== target) {
-        from = to
-        to = target
-    }
     val morph = remember(from, to) { Morph(from, to) }
     val progress = remember { Animatable(1f) }
     val spec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
-    LaunchedEffect(to) {
-        if (from !== to) {
-            progress.snapTo(0f)
-            if (reducedMotion) progress.snapTo(1f) else progress.animateTo(1f, spec)
+    val catchUpSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+
+    LaunchedEffect(target) {
+        if (target === to) return@LaunchedEffect
+        if (reducedMotion) {
+            from = target
+            to = target
+            progress.snapTo(1f)
+            return@LaunchedEffect
         }
+        // Новый Morph стартует от `to`, поэтому недокрученный старый сначала доводим до конца:
+        // иначе форма прыгает с текущего кадра на `to` (главный источник рывка при быстрой смене состояний).
+        if (progress.value < 1f) progress.animateTo(1f, catchUpSpec)
+        from = to
+        to = target
+        progress.snapTo(0f)
+        progress.animateTo(1f, spec)
     }
-    return MorphShape(morph, progress.value)
+    // Общий буфер пути: MorphShape пересоздаётся каждый кадр морфа, аллокация Path на кадр не нужна.
+    val buffer = remember { android.graphics.Path() }
+    return MorphShape(morph, progress.value, buffer)
 }
 
 private class MorphShape(
     private val morph: Morph,
-    private val progress: Float
+    private val progress: Float,
+    private val buffer: android.graphics.Path
 ) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val path = morph.toPath(progress.coerceIn(0f, 1f)).asComposePath()
+        val path = morph.toPath(progress.coerceIn(0f, 1f), buffer).asComposePath()
         val matrix = Matrix()
         matrix.scale(size.width, size.height)
         path.transform(matrix)
