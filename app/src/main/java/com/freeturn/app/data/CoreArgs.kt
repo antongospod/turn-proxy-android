@@ -53,13 +53,13 @@ CoreArgs {
     // Секреты: лог виден на экране и шарится пользователем.
     private val SENSITIVE_FLAGS = setOf("-obf-key", "-link", "-client-id")
 
-    fun redactForLog(args: List<String>): String = buildString {
+    fun redactForLog(args: List<String>, privacy: Boolean): String = buildString {
         var i = 0
         while (i < args.size) {
             val arg = args[i]
             if (isNotEmpty()) append(' ')
             append(arg)
-            if (arg in SENSITIVE_FLAGS && i + 1 < args.size) {
+            if (privacy && arg in SENSITIVE_FLAGS && i + 1 < args.size) {
                 append(' ').append("••••••")
                 i += 2
             } else {

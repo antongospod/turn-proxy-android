@@ -100,6 +100,7 @@ class CoreProcessController(
         val cfg = prefs.clientConfigFlow.first()
         ProxyServiceState.setLogsEnabled(cfg.logsEnabled)
         val srv = prefs.serverOptsFlow.first()
+        val privacy = prefs.privacyModeFlow.first()
 
         val libDir = File(context.applicationInfo.nativeLibraryDir)
         val executableFile = libDir.listFiles { f ->
@@ -148,7 +149,7 @@ class CoreProcessController(
         }
         publishStats()
         try {
-            ProxyServiceState.addLog("Команда: ${CoreArgs.redactForLog(cmdArgs)}")
+            ProxyServiceState.addLog("Команда: ${CoreArgs.redactForLog(cmdArgs, privacy)}")
 
             val proc = withContext(Dispatchers.IO) {
                 // Легаси: сносим осиротевшие профили захвата (сам механизм захвата удалён).
