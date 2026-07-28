@@ -205,11 +205,6 @@ fun ClientSetupScreen(
                     },
                     manualCaptcha = saved.manualCaptcha,
                     onManualCaptcha = { v -> clientEdit { it.copy(manualCaptcha = v) } },
-                    browser = saved.browser,
-                    onBrowser = { v ->
-                        HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                        clientEdit { it.copy(browser = v) }
-                    },
                     showBond = effectiveTcpForward,
                     bond = saved.bond,
                     // bond триггерит рестарт прокси только у активного; иначе пишем данные.

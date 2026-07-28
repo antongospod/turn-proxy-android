@@ -14,15 +14,6 @@ object Provider {
     val VALUES = listOf(VK)
 }
 
-object Browser {
-    const val FIREFOX = "firefox"
-    const val CHROME = "chrome"
-    const val SAFARI = "safari"
-
-    const val DEFAULT = CHROME
-    val VALUES = listOf(CHROME, SAFARI, FIREFOX)
-}
-
 object ObfProfile {
     const val NONE = "none"
     const val RTPOPUS = "rtpopus"

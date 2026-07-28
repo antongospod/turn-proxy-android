@@ -1,6 +1,5 @@
 package com.freeturn.app.data
 
-import com.freeturn.app.data.config.Browser
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.DnsMode
 import com.freeturn.app.data.config.ObfProfile
@@ -32,14 +31,7 @@ CoreArgs {
             add("-obf-key"); add(srv.obfKey)
         }
         if (cfg.manualCaptcha) add("-manual-captcha")
-        if (cfg.provider == Provider.VK) {
-            val browser = when {
-                cfg.manualCaptcha -> Browser.CHROME
-                else -> cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
-            }
-            add("-browser"); add(browser)
-            add("-platform"); add("mobile")
-        }
+        if (cfg.provider == Provider.VK) { add("-platform"); add("mobile") }
         if (cfg.debugMode) add("-debug")
         val manualDns = DnsList.normalize(cfg.customDns)
         when {
