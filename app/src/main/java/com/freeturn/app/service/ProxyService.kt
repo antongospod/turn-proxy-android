@@ -119,6 +119,7 @@ class ProxyService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         controller.beginShutdown()
+        ProxyServiceState.markTeardownStarted()
         ProxyServiceState.setRunning(false)
         ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
         ProxyServiceState.clearConnectedSince()

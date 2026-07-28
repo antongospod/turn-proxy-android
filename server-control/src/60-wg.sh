@@ -88,6 +88,7 @@ _wg_write_client_conf() {  # PRIV ADDR SRVPUB  -> $WG_CLIENT_CONF
 [Interface]
 PrivateKey = $1
 Address = $2/32
+MTU = $WG_MTU
 DNS = $ARG_DNS
 
 [Peer]
@@ -217,6 +218,15 @@ _wg_port_free_check() {
     esac
 }
 
+# MSS clamp для TCP через туннель. -o: ответный SYN-ACK из инета несёт MSS 1460,
+# режем по PMTU интерфейса. -i: страховка от клиента, забывшего MTU - ограничиваем
+# то, что ему будут слать. ACTION - -A (PostUp) или -D (PostDown); IFACE - имя или
+# %i для conf (wg-quick подставит сам).
+_wg_mss_rule() {  # ACTION IFACE -> строка iptables-команд
+    printf 'iptables -t mangle %s FORWARD -o %s -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; ' "$1" "$2"
+    printf 'iptables -t mangle %s FORWARD -i %s -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss %s' "$1" "$2" "$((WG_MTU - 40))"
+}
+
 _wg_create_fresh() {
     local wan postup="" postdown="" sp spub cp cpub kd
     echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-free-turn-proxy-wg.conf 2>/dev/null || true
@@ -229,8 +239,8 @@ _wg_create_fresh() {
     fi
     [ -z "$wan" ] && log "WAN interface not detected; NAT skipped"
     if [ -n "$wan" ]; then
-        postup="PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $wan -j MASQUERADE"
-        postdown="PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $wan -j MASQUERADE"
+        postup="PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $wan -j MASQUERADE; $(_wg_mss_rule -A '%i')"
+        postdown="PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $wan -j MASQUERADE; $(_wg_mss_rule -D '%i')"
     fi
 
     kd=$(mktemp -d 2>/dev/null) || fail internal "mktemp -d failed"
@@ -244,6 +254,7 @@ _wg_create_fresh() {
 $WG_MARKER
 Address = $WG_NET.1/24
 ListenPort = $ARG_WG_PORT
+MTU = $WG_MTU
 PrivateKey = $sp
 $postup
 $postdown
@@ -368,12 +379,72 @@ _wg_migrate_legacy() {
     sysctl -qw net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
 }
 
+# Вставить строку в [Interface] (после заголовка секции). Возврат 1 - conf не тронут.
+_wg_insert_interface_line() {  # CONF LINE
+    local tmp="$1.mig"
+    awk -v m="$2" '{print} !d && /^[[:space:]]*\[Interface\]/{print m; d=1}' "$1" > "$tmp" \
+        || { rm -f "$tmp"; return 1; }
+    [ -s "$tmp" ] || { rm -f "$tmp"; return 1; }
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$1"
+}
+
+# У conf есть MTU в [Interface] (до первого [Peer])?
+_wg_conf_has_mtu() {  # CONF
+    [ -f "$1" ] || return 1
+    sed -n '/^[[:space:]]*\[Peer\]/q; p' "$1" | grep -qiE '^[[:space:]]*MTU[[:space:]]*='
+}
+
+# TODO: миграция серверов, поднятых до появления WG_MTU/MSS clamp. Правки применяются
+# вживую (down/up рвал бы туннели гостей), conf доедет при следующем старте.
+# Удалить, когда все установки пройдут через актуальный _wg_create_fresh.
+_wg_migrate_mtu() {
+    wg_is_ours || return 0
+
+    if ! _wg_conf_has_mtu "$WG_CONF"; then
+        _wg_insert_interface_line "$WG_CONF" "MTU = $WG_MTU" \
+            && log "migrated: MTU = $WG_MTU -> $WG_CONF"
+    fi
+    # Клиентский conf валиден - _wg_ensure_owner_client его не переген-т, дописываем сами.
+    if [ -f "$WG_CLIENT_CONF" ] && ! _wg_conf_has_mtu "$WG_CLIENT_CONF"; then
+        _wg_insert_interface_line "$WG_CLIENT_CONF" "MTU = $WG_MTU" \
+            && log "migrated: MTU = $WG_MTU -> $WG_CLIENT_CONF"
+    fi
+
+    if grep -q '^[[:space:]]*PostUp[[:space:]]*=' "$WG_CONF" && ! grep -q 'TCPMSS' "$WG_CONF"; then
+        local tmp="$WG_CONF.mig"
+        # awk в условии if: под set -e его падение иначе убило бы весь control.sh.
+        if awk -v u="; $(_wg_mss_rule -A '%i')" -v d="; $(_wg_mss_rule -D '%i')" '
+            /^[[:space:]]*PostUp[[:space:]]*=/   { print $0 u; next }
+            /^[[:space:]]*PostDown[[:space:]]*=/ { print $0 d; next }
+            { print }' "$WG_CONF" > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+            chmod 600 "$tmp"; mv -f "$tmp" "$WG_CONF"
+            log "migrated: MSS clamp -> $WG_CONF"
+        else
+            rm -f "$tmp"
+        fi
+    fi
+
+    _wg_mtu_apply_live
+}
+
+# Донести MTU/clamp до поднятого интерфейса: wg syncconf их не применяет.
+_wg_mtu_apply_live() {
+    ip link show "$WG_IFACE" >/dev/null 2>&1 || return 0
+    ip link set dev "$WG_IFACE" mtu "$WG_MTU" >/dev/null 2>&1 || true
+    command -v iptables >/dev/null 2>&1 || return 0
+    # -D перед -A вместо -C: правил два, проверять цепочку дороже, чем снять и вернуть.
+    eval "$(_wg_mss_rule -D "$WG_IFACE")" >/dev/null 2>&1 || true
+    eval "$(_wg_mss_rule -A "$WG_IFACE")" >/dev/null 2>&1 || true
+}
+
 # Идемпотентный бутстрап ft-wg0. Требует root.
 wg_ensure() {
     _wg_tools_ensure
     mkdir -p "$WG_DIR"
     _wg_migrate_legacy
     if wg_present; then
+        _wg_migrate_mtu
         _wg_up || fail wg_up_failed "wg-quick up $WG_IFACE failed; see logs"
         _wg_ensure_owner_client
     else

@@ -5,7 +5,6 @@ import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.ssh.SshRepository
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
 
 class ProxyOrchestrator(
     private val prefs: AppPreferences,
@@ -54,9 +53,6 @@ class ProxyOrchestrator(
     suspend fun restartProxyIfRunning() {
         if (!ProxyServiceState.isRunning.value) return
         proxyManager.stopProxy()
-        withTimeoutOrNull(10_000) {
-            ProxyServiceState.isRunning.first { !it }
-        }
         proxyManager.startProxy(prefs.clientConfigFlow.first())
     }
 

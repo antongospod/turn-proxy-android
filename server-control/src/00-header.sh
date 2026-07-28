@@ -35,6 +35,9 @@ WG_CONF="$WG_DIR/$WG_IFACE.conf"
 WG_MARKER="# managed-by: free-turn-proxy"
 WG_NET="${FT_WG_NET:-10.13.13}"
 WG_CLIENT_CONF="$PREFIX/wireguard-client.conf"
+# Туннель идёт поверх TURN (STUN-обёртка + UDP + IP): дефолтные 1420 не пролезают,
+# сервер->клиент рвётся фрагментацией. 1280 - минимум IPv6, живёт на любом пути.
+WG_MTU="${FT_WG_MTU:-1280}"
 
 RELEASES_URL="https://github.com/samosvalishe/free-turn-proxy/releases"
 BASE_URL="$RELEASES_URL/latest/download"

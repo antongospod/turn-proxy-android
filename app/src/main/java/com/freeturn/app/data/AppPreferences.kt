@@ -292,7 +292,7 @@ class AppPreferences(context: Context) {
             val active = data.activeId?.takeIf { id -> data.servers.any { it.id == id } }
                 ?: data.servers.firstOrNull()?.id
             active?.let { prefs[ACTIVE_SERVER_ID] = it }
-            data.ownClientId?.takeIf { ClientId.isValid(it) }?.let { prefs[OWN_CLIENT_ID] = it }
+            prefs[OWN_CLIENT_ID] = data.ownClientId
             prefs[DYNAMIC_THEME] = data.dynamicTheme
             prefs[NERD_MODE] = data.nerdMode
             prefs[PRIVACY_MODE] = data.privacyMode

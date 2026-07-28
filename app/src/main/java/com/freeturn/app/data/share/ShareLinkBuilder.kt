@@ -31,14 +31,13 @@ object ShareLinkBuilder {
             streamsPerCred = server.client.streamsPerCred,
             clientId = clientId.trim(),
             name = userName.trim(),
-            wgConf = wgConf?.let(::normalizeConf).orEmpty(),
-            mtu = server.client.wireGuardMtu
+            wgConf = wgConf?.let(::normalizeConf).orEmpty()
         ).encode()
     }
 
     /**
      * Срезает комментарии, пустые строки и MTU из WG-conf - короче ссылка, плотнее QR.
-     * MTU едет отдельным полем ссылки (единственный источник), в conf не дублируется.
+     * MTU не передаём: получатель подставляет свой (константа туннеля).
      */
     internal fun normalizeConf(conf: String): String =
         conf.lineSequence()

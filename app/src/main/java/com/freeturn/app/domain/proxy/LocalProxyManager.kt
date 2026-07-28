@@ -170,9 +170,14 @@ class LocalProxyManager(private val launcher: ProxyServiceLauncher) {
         }
     }
 
-    fun stopProxy() {
+    /** Ждёт фактического доламывания сервиса: `stopService` асинхронен, см. `teardownComplete`. */
+    suspend fun stopProxy() {
         launcher.stop()
         _proxyState.value = ProxyState.Idle
+        withTimeoutOrNull(10_000) {
+            ProxyServiceState.isRunning.first { !it }
+            ProxyServiceState.teardownComplete.first { it }
+        }
     }
 
     fun dismissCaptcha() {

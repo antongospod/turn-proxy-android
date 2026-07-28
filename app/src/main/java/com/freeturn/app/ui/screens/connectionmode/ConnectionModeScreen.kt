@@ -98,17 +98,13 @@ fun ConnectionModeScreen(
 
     var wgConfig by remember(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
     var wgName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
-    var wgMtu by remember(saved.wireGuardMtu) { mutableStateOf(saved.wireGuardMtu.toString()) }
 
     fun persistWg(vpn: Boolean = isVpn) {
         clientEdit {
             it.copy(
                 tunnelTransport = if (vpn) TunnelTransport.WIREGUARD else TunnelTransport.NONE,
                 wireGuardConfig = wgConfig.trim(),
-                wireGuardTunnelName = wgName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
-                wireGuardMtu = wgMtu.toIntOrNull()
-                    ?.coerceIn(ClientConfig.MIN_WG_MTU, ClientConfig.MAX_WG_MTU)
-                    ?: ClientConfig.DEFAULT_WG_MTU
+                wireGuardTunnelName = wgName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME }
             )
         }
     }
@@ -118,15 +114,10 @@ fun ConnectionModeScreen(
 
     var wgDirty by remember(serverId) { mutableStateOf(false) }
     var pendingSave by remember(serverId) { mutableStateOf(false) }
-    LaunchedEffect(wgConfig, wgName, wgMtu) {
+    LaunchedEffect(wgConfig, wgName) {
         if (!wgDirty) { wgDirty = true; return@LaunchedEffect }
         pendingSave = true
         delay(600)
-        // Пустой/вне диапазона MTU подтягиваем в поле к валидному - UI = сохранённое.
-        val normalizedMtu = wgMtu.toIntOrNull()
-            ?.coerceIn(ClientConfig.MIN_WG_MTU, ClientConfig.MAX_WG_MTU)
-            ?: ClientConfig.DEFAULT_WG_MTU
-        if (wgMtu != normalizedMtu.toString()) wgMtu = normalizedMtu.toString()
         persistWg()
         pendingSave = false
     }
@@ -145,7 +136,6 @@ fun ConnectionModeScreen(
                 }
                 if (!text.isNullOrBlank()) {
                     wgConfig = text
-                    extractMtu(text)?.let { wgMtu = it.toString() }
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                 }
             }
@@ -221,8 +211,6 @@ fun ConnectionModeScreen(
                         onWgConfig = { wgConfig = it },
                         wgName = wgName,
                         onWgName = { wgName = it },
-                        mtu = wgMtu,
-                        onMtu = { wgMtu = it },
                         privacyMode = privacyMode,
                         onLoadFile = { filePicker.launch("*/*") }
                     )
@@ -255,18 +243,4 @@ fun ConnectionModeScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     }
-}
-
-private fun extractMtu(conf: String): Int? {
-    var inInterface = false
-    conf.lineSequence().forEach { line ->
-        val section = line.trim()
-        if (section.startsWith("[") && section.endsWith("]")) {
-            inInterface = section.equals("[Interface]", ignoreCase = true)
-        } else if (inInterface && section.startsWith("MTU", ignoreCase = true) &&
-            section.contains("=")) {
-            return section.substringAfter("=").trim().toIntOrNull()?.takeIf { it > 0 }
-        }
-    }
-    return null
 }

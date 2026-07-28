@@ -76,21 +76,6 @@ class FreeturnLinkTest {
     }
 
     @Test
-    fun `mtu round trips when non default`() {
-        val original = FreeturnLink(provider = "vk", peer = "1.2.3.4:56000", mtu = 1400)
-        assertEquals(1400, FreeturnLink.parse(original.encode()).getOrThrow().mtu)
-    }
-
-    @Test
-    fun `mtu omitted from json when default`() {
-        val link = FreeturnLink(provider = "vk", peer = "1.2.3.4:56000")
-        val payload = link.encode().removePrefix(FreeturnLink.SCHEME)
-        val json = String(Base64.getUrlDecoder().decode(payload), Charsets.UTF_8)
-        assertFalse(json.contains("mtu"))
-        assertEquals(1280, FreeturnLink.parse(link.encode()).getOrThrow().mtu)
-    }
-
-    @Test
     fun `obf none is omitted entirely`() {
         val link = FreeturnLink(provider = "vk", peer = "1.2.3.4:56000", obfProfile = "none", obfKey = "ff".repeat(32))
         val parsed = FreeturnLink.parse(link.encode()).getOrThrow()

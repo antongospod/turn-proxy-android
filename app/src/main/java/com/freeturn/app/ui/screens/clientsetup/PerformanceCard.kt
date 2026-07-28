@@ -1,20 +1,13 @@
 package com.freeturn.app.ui.screens.clientsetup
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
-import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.components.SettingsSliderRow
 import kotlin.math.roundToInt
 
 /** Производительность: потоки и потоки-на-аккаунт. */
@@ -29,7 +22,7 @@ internal fun PerformanceCard(
     SectionLabel(stringResource(R.string.client_section_performance))
     SettingsCard {
         SettingsFieldSlot {
-            SliderRow(
+            SettingsSliderRow(
                 valueLabel = stringResource(R.string.threads_format, threads.roundToInt()),
                 hint = stringResource(R.string.threads_recommendation),
                 value = threads,
@@ -40,7 +33,7 @@ internal fun PerformanceCard(
         }
         SettingsRowDivider()
         SettingsFieldSlot {
-            SliderRow(
+            SettingsSliderRow(
                 valueLabel = stringResource(R.string.streams_per_cred_format, streamsPerCred.roundToInt()),
                 hint = stringResource(R.string.streams_per_cred_recommendation),
                 value = streamsPerCred,
@@ -50,34 +43,4 @@ internal fun PerformanceCard(
             )
         }
     }
-}
-
-/**
- * Ползунок с подписью-значением и пояснением. onTick щёлкает на каждое целочисленное
- * деление (а не на каждый float-кадр) - состояние держится локально внутри строки.
- */
-@Composable
-private fun SliderRow(
-    valueLabel: String,
-    hint: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    onValueChange: (Float) -> Unit,
-    onTick: () -> Unit
-) {
-    var lastInt by remember { mutableIntStateOf(value.roundToInt()) }
-    SettingsControlLabel(title = valueLabel, desc = hint)
-    Slider(
-        value = value,
-        onValueChange = {
-            val newInt = it.roundToInt()
-            if (newInt != lastInt) {
-                onTick()
-                lastInt = newInt
-            }
-            onValueChange(it)
-        },
-        valueRange = valueRange,
-        modifier = Modifier.fillMaxWidth()
-    )
 }

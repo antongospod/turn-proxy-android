@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.SectionLabel
@@ -27,8 +25,6 @@ internal fun WireGuardConfigCard(
     onWgConfig: (String) -> Unit,
     wgName: String,
     onWgName: (String) -> Unit,
-    mtu: String,
-    onMtu: (String) -> Unit,
     privacyMode: Boolean,
     onLoadFile: () -> Unit
 ) {
@@ -65,15 +61,6 @@ internal fun WireGuardConfigCard(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 readOnly = privacyMode
-            )
-            OutlinedTextField(
-                value = mtu,
-                onValueChange = { v -> onMtu(v.filter { it.isDigit() }) },
-                label = { Text(stringResource(R.string.wireguard_mtu)) },
-                supportingText = { Text(stringResource(R.string.wireguard_mtu_hint)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
     }

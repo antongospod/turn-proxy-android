@@ -27,7 +27,7 @@ class ProxyViewModel(
     }
 
     fun stopProxy() {
-        proxyManager.stopProxy()
+        viewModelScope.launch { proxyManager.stopProxy() }
     }
 
     fun dismissCaptcha() {

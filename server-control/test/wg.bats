@@ -13,6 +13,22 @@ setup() {
     export FT_WG_DIR="$BATS_TEST_TMPDIR/wg"
     export FT_WG_IFACE="ft-wg0"
     mkdir -p "$FT_PREFIX" "$FT_WG_DIR"
+
+    # ip/iptables заглушаем: FT_*-override не покрывают _wg_mtu_apply_live, и на машине
+    # с боевым ft-wg0 тесты правили бы MTU живого туннеля и mangle-цепочку.
+    STUB_BIN="$BATS_TEST_TMPDIR/bin"
+    STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
+    mkdir -p "$STUB_BIN"; : > "$STUB_LOG"
+    for c in ip iptables; do
+        cat > "$STUB_BIN/$c" <<EOF
+#!/bin/sh
+echo "\$(basename "\$0") \$*" >> "$STUB_LOG"
+exit 0
+EOF
+        chmod +x "$STUB_BIN/$c"
+    done
+    export PATH="$STUB_BIN:$PATH"
+
     # shellcheck disable=SC1090
     source "$LIB"
     set +e            # bats-ассерты несовместимы с унаследованным errexit
@@ -114,6 +130,60 @@ _write_legacy() { printf '%s\n' "$@" > "$FT_WG_DIR/wg0.conf"; }
     run _wg_migrate_legacy
     [ "$status" -eq 0 ]
     [ ! -f "$FT_WG_DIR/ft-wg0.conf" ]
+}
+
+@test "_wg_conf_has_mtu: MTU только в [Peer] -> 1" {
+    _write_conf "[Interface]" "Address = 10.13.13.1/24" "[Peer]" "MTU = 1420"
+    run _wg_conf_has_mtu "$FT_WG_DIR/ft-wg0.conf"
+    [ "$status" -eq 1 ]
+}
+
+@test "_wg_conf_has_mtu: MTU в [Interface] -> 0" {
+    _write_conf "[Interface]" "MTU = 1280" "Address = 10.13.13.1/24" "[Peer]"
+    _wg_conf_has_mtu "$FT_WG_DIR/ft-wg0.conf"
+}
+
+@test "_wg_migrate_mtu: старый conf получает MTU и clamp в PostUp/PostDown" {
+    _write_conf "[Interface]" "$WG_MARKER" "Address = 10.13.13.1/24" "ListenPort = 51820" \
+                "PostUp = iptables -A FORWARD -i %i -j ACCEPT" \
+                "PostDown = iptables -D FORWARD -i %i -j ACCEPT" \
+                "" "[Peer]" "AllowedIPs = 10.13.13.2/32"
+    _wg_migrate_mtu
+    local conf="$FT_WG_DIR/ft-wg0.conf"
+    grep -qx "MTU = $WG_MTU" "$conf"
+    grep -q '^PostUp = .*TCPMSS --clamp-mss-to-pmtu' "$conf"
+    grep -q "^PostDown = .*TCPMSS --set-mss $((WG_MTU - 40))" "$conf"
+    # peer-секция не задета
+    grep -q '10.13.13.2/32' "$conf"
+    # правки доехали до живого интерфейса
+    grep -qx "ip link set dev ft-wg0 mtu $WG_MTU" "$STUB_LOG"
+    grep -q "^iptables .*TCPMSS" "$STUB_LOG"
+}
+
+@test "_wg_migrate_mtu: повторный прогон не дублирует MTU/clamp" {
+    _write_conf "[Interface]" "$WG_MARKER" "Address = 10.13.13.1/24" \
+                "PostUp = iptables -A FORWARD -i %i -j ACCEPT" \
+                "PostDown = iptables -D FORWARD -i %i -j ACCEPT"
+    _wg_migrate_mtu
+    _wg_migrate_mtu
+    local conf="$FT_WG_DIR/ft-wg0.conf"
+    [ "$(grep -c "^MTU = $WG_MTU" "$conf")" -eq 1 ]
+    [ "$(grep -c 'clamp-mss-to-pmtu' "$conf")" -eq 1 ]
+}
+
+@test "_wg_migrate_mtu: чужой conf (без маркера) не трогаем" {
+    _write_conf "[Interface]" "Address = 10.13.13.1/24"
+    _wg_migrate_mtu
+    run _wg_conf_has_mtu "$FT_WG_DIR/ft-wg0.conf"
+    [ "$status" -eq 1 ]
+}
+
+@test "_wg_migrate_mtu: клиентский conf тоже получает MTU" {
+    _write_conf "[Interface]" "$WG_MARKER" "Address = 10.13.13.1/24"
+    printf '%s\n' "[Interface]" "PrivateKey = k" "Address = 10.13.13.2/32" \
+                  "[Peer]" "PublicKey = s" > "$WG_CLIENT_CONF"
+    _wg_migrate_mtu
+    _wg_conf_has_mtu "$WG_CLIENT_CONF"
 }
 
 @test "pkg_mgr: на машине без пакетников -> код 1" {

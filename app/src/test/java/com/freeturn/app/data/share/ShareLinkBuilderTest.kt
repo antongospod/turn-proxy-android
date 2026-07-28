@@ -15,7 +15,6 @@ class ShareLinkBuilderTest {
         tcpForward: Boolean = false,
         bond: Boolean = false,
         useUdp: Boolean = false,
-        mtu: Int = ClientConfig.DEFAULT_WG_MTU,
         opts: ServerOpts = ServerOpts()
     ) = Server(
         name = "Мой сервер",
@@ -23,8 +22,7 @@ class ShareLinkBuilderTest {
             serverAddress = "1.2.3.4:56000",
             tcpForward = tcpForward,
             bond = bond,
-            useUdp = useUdp,
-            wireGuardMtu = mtu
+            useUdp = useUdp
         ),
         opts = opts
     )
@@ -69,21 +67,12 @@ class ShareLinkBuilderTest {
     }
 
     @Test
-    fun `mtu carried from client config`() {
-        val link = FreeturnLink.parse(
-            ShareLinkBuilder.build(server(mtu = 1380), ShareInfo(wgBackend = true), "u", null)
-        ).getOrThrow()
-        assertEquals(1380, link.mtu)
-    }
-
-    @Test
-    fun `mtu line stripped from conf, field is source`() {
+    fun `mtu line stripped from conf`() {
         val conf = "[Interface]\nPrivateKey = abc=\nMTU = 1500\n[Peer]\nPublicKey = def="
         val link = FreeturnLink.parse(
-            ShareLinkBuilder.build(server(mtu = 1320), ShareInfo(wgBackend = true), "u", conf)
+            ShareLinkBuilder.build(server(), ShareInfo(wgBackend = true), "u", conf)
         ).getOrThrow()
         assertEquals("[Interface]\nPrivateKey = abc=\n[Peer]\nPublicKey = def=", link.wgConf)
-        assertEquals(1320, link.mtu)
     }
 
     @Test

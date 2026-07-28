@@ -46,8 +46,25 @@ object ProxyServiceState {
     private val _connectedSince = MutableStateFlow<Long?>(null)
     val connectedSince: StateFlow<Long?> = _connectedSince.asStateFlow()
 
+    /**
+     * Сервис доломан до конца, включая остановку WG в фоновом потоке. `isRunning` гаснет
+     * раньше - в начале `onDestroy`, - поэтому ждать надо именно этот флаг: иначе поздние
+     * строки WG попадут в уже очищенный лог, а отложенный рестарт поднимет ядро с конфигом,
+     * который к тому моменту успели подменить (restore бэкапа).
+     */
+    private val _teardownComplete = MutableStateFlow(true)
+    val teardownComplete: StateFlow<Boolean> = _teardownComplete.asStateFlow()
+
     fun setRunning(value: Boolean) {
         _isRunning.value = value
+    }
+
+    fun markTeardownStarted() {
+        _teardownComplete.value = false
+    }
+
+    fun markTeardownComplete() {
+        _teardownComplete.value = true
     }
 
     fun setStartupResult(result: StartupResult?) {

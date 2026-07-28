@@ -81,7 +81,13 @@ class CoreProcessController(
     fun destroyProcessAndTunnel() {
         process.get()?.destroyCompat()
         val wg = wireGuard
-        Thread { runBlocking { wg.stop() } }.start()
+        Thread {
+            try {
+                runBlocking { wg.stop() }
+            } finally {
+                ProxyServiceState.markTeardownComplete()
+            }
+        }.start()
     }
 
     private suspend fun startBinaryProcess() {

@@ -23,7 +23,6 @@ data class ClientConfig(
     val tunnelTransport: String = TunnelTransport.NONE,
     val wireGuardConfig: String = "",
     val wireGuardTunnelName: String = TunnelTransport.DEFAULT_TUNNEL_NAME,
-    val wireGuardMtu: Int = DEFAULT_WG_MTU,
     val splitTunnelMode: String = SplitTunnelMode.EXCLUDE,
     /**
      * Package-имена для include/exclude (разделители: запятая/пробел/перенос строки).
@@ -40,9 +39,9 @@ data class ClientConfig(
         const val DEFAULT_LOCAL_PORT = "127.0.0.1:9000"
         const val DEFAULT_THREADS = 12
         const val DEFAULT_STREAMS_PER_CRED = 12
-        // Минимум IPv6 снижает риск фрагментации поверх TURN.
-        const val DEFAULT_WG_MTU = 1280
-        const val MIN_WG_MTU = 1280
-        const val MAX_WG_MTU = 1500
+        // Не настройка, а константа транспорта: WG идёт поверх TURN (STUN-обёртка +
+        // UDP + IP), дефолтные 1420 фрагментируются. 1280 - минимум IPv6, живёт везде.
+        // Серверная сторона держит то же значение (control.sh, WG_MTU).
+        const val WG_MTU = 1280
     }
 }

@@ -129,7 +129,6 @@ class ImportViewModel(
                 tunnelTransport = if (wgConf.isNotEmpty()) TunnelTransport.WIREGUARD
                 else TunnelTransport.NONE,
                 wireGuardConfig = wgConf,
-                wireGuardMtu = link.mtu,
                 clientId = link.clientId.trim()
             ),
             opts = ServerOpts(

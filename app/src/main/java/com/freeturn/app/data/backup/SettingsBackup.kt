@@ -1,5 +1,6 @@
 package com.freeturn.app.data.backup
 
+import com.freeturn.app.data.config.ClientId
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerJson
 import org.json.JSONArray
@@ -10,8 +11,8 @@ data class BackupData(
     val servers: List<Server>,
     val activeId: String?,
     // Постоянный client-id устройства (allowlist на сервере). Без него restore на новом
-    // девайсе даёт свежий cid -> сервер отклоняет подключение.
-    val ownClientId: String?,
+    // девайсе даёт свежий cid -> сервер отклоняет подключение, поэтому поле обязательное.
+    val ownClientId: String,
     val dynamicTheme: Boolean,
     val nerdMode: Boolean,
     val privacyMode: Boolean,
@@ -29,7 +30,7 @@ object SettingsBackup {
         put("v", FORMAT_VERSION)
         put("servers", JSONArray(ServerJson.encodeList(data.servers)))
         data.activeId?.let { put("activeId", it) }
-        data.ownClientId?.let { put("ownClientId", it) }
+        put("ownClientId", data.ownClientId)
         put("dynamicTheme", data.dynamicTheme)
         put("nerdMode", data.nerdMode)
         put("privacyMode", data.privacyMode)
@@ -46,10 +47,14 @@ object SettingsBackup {
             throw BackupCrypto.FormatException("bad payload")
         }
         val serversJson = o.optJSONArray("servers")?.toString() ?: "[]"
+        // Битый/отсутствующий cid валим здесь, до затирания профиля: применить такой бэкап -
+        // значит подменить личность на чужую и получить обрыв на allowlist.
+        val cid = o.optString("ownClientId")
+        if (!ClientId.isValid(cid)) throw BackupCrypto.FormatException("bad client id")
         return BackupData(
             servers = ServerJson.decodeList(serversJson),
             activeId = o.optString("activeId").takeIf { it.isNotBlank() },
-            ownClientId = o.optString("ownClientId").takeIf { it.isNotBlank() },
+            ownClientId = cid,
             dynamicTheme = o.optBoolean("dynamicTheme", true),
             nerdMode = o.optBoolean("nerdMode", true),
             privacyMode = o.optBoolean("privacyMode", false),
