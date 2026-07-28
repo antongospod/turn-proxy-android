@@ -32,24 +32,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import android.content.Context
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 import com.freeturn.app.data.config.splitTunnelSelection
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
-import com.freeturn.app.data.toPackageSet
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.theme.Spacing
 
@@ -80,30 +72,6 @@ fun SplitTunnelModal(
             onModeChange = onModeChange,
             onAppsChange = onAppsChange
         )
-    }
-}
-
-private suspend fun loadRussianPreset(context: Context): String? = withContext(Dispatchers.IO) {
-    try {
-        context.assets.open("geoip-ru.srs").use { input ->
-            File(context.filesDir, "geoip-ru.srs").outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-        context.assets.open("geosite-ru.srs").use { input ->
-            File(context.filesDir, "geosite-ru.srs").outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-        context.assets.open("russian_packages.txt").bufferedReader().use { reader ->
-            val packages = reader.readLines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-            packages.sorted().joinToString("\n")
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
     }
 }
 
@@ -181,33 +149,6 @@ fun SplitTunnelSheetContent(
                 onModeChange(value)
             }
         )
-
-        val scope = rememberCoroutineScope()
-        OutlinedButton(
-            onClick = {
-                HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                scope.launch {
-                    val preset = loadRussianPreset(context)
-                    if (preset != null) {
-                        val currentApps = apps.toPackageSet()
-                        val presetApps = preset.toPackageSet()
-                        val merged = (currentApps + presetApps).sorted().joinToString("\n")
-                        onAppsChange(merged)
-                    }
-                }
-            },
-            enabled = controlsEnabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = HorizontalPadding)
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.cloud_download_24px),
-                contentDescription = null,
-                modifier = Modifier.padding(end = Spacing.sm)
-            )
-            Text("Загрузить пресет РФ")
-        }
 
         OutlinedTextField(
             value = query,
