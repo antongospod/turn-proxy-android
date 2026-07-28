@@ -66,7 +66,7 @@ import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.settings.BackupEvent
-import com.freeturn.app.viewmodel.settings.BackupFailReason
+import com.freeturn.app.viewmodel.settings.RestoreFailReason
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -257,16 +257,16 @@ fun AppScreen(
     }
 }
 
-/** Текст снекбара по результату экспорта/импорта (строки выбирает UI, не ViewModel). */
+/** Текст снекбара по результату экспорта/восстановления (строки выбирает UI, не ViewModel). */
 internal fun backupEventMessage(context: android.content.Context, event: BackupEvent): String =
     when (event) {
         BackupEvent.ExportSuccess -> context.getString(R.string.backup_export_ok)
         BackupEvent.ExportFailed -> context.getString(R.string.backup_export_fail)
-        is BackupEvent.ImportSuccess -> context.getString(R.string.backup_import_ok, event.count)
-        is BackupEvent.ImportFailed -> when (event.reason) {
-            BackupFailReason.BAD_PASSWORD -> context.getString(R.string.backup_import_bad_password)
-            BackupFailReason.BAD_FILE -> context.getString(R.string.backup_import_bad_file)
-            BackupFailReason.IO -> context.getString(R.string.backup_import_fail)
+        is BackupEvent.RestoreSuccess -> context.getString(R.string.backup_restore_ok, event.count)
+        is BackupEvent.RestoreFailed -> when (event.reason) {
+            RestoreFailReason.BAD_PASSWORD -> context.getString(R.string.backup_restore_bad_password)
+            RestoreFailReason.BAD_FILE -> context.getString(R.string.backup_restore_bad_file)
+            RestoreFailReason.IO -> context.getString(R.string.backup_restore_fail)
         }
     }
 

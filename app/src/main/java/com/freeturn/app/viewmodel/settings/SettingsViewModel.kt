@@ -395,22 +395,29 @@ class SettingsViewModel(
         }
     }
 
-    fun importBackup(uri: Uri, password: String) {
+    fun restoreBackup(uri: Uri, password: String) {
         viewModelScope.launch {
             val event = try {
                 val bytes = withContext(Dispatchers.IO) {
                     appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: throw IOException("no input stream")
                 }
-                BackupEvent.ImportSuccess(backupManager.import(bytes, password))
+                // Разбор до остановки рантайма: неверный пароль не должен гасить подключение.
+                val data = backupManager.decode(bytes, password)
+                if (ProxyServiceState.isRunning.value) proxyManager.stopProxy()
+                val count = backupManager.restore(data)
+                sshRepository.resetAll()
+                proxyManager.clearState()
+                ProxyServiceState.clearLogs()
+                BackupEvent.RestoreSuccess(count)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: BackupCrypto.BadPasswordException) {
-                BackupEvent.ImportFailed(BackupFailReason.BAD_PASSWORD)
+                BackupEvent.RestoreFailed(RestoreFailReason.BAD_PASSWORD)
             } catch (_: BackupCrypto.FormatException) {
-                BackupEvent.ImportFailed(BackupFailReason.BAD_FILE)
+                BackupEvent.RestoreFailed(RestoreFailReason.BAD_FILE)
             } catch (_: Exception) {
-                BackupEvent.ImportFailed(BackupFailReason.IO)
+                BackupEvent.RestoreFailed(RestoreFailReason.IO)
             }
             _backupEvents.emit(event)
         }
@@ -435,11 +442,11 @@ class SettingsViewModel(
     }
 }
 
-enum class BackupFailReason { BAD_PASSWORD, BAD_FILE, IO }
+enum class RestoreFailReason { BAD_PASSWORD, BAD_FILE, IO }
 
 sealed interface BackupEvent {
     data object ExportSuccess : BackupEvent
     data object ExportFailed : BackupEvent
-    data class ImportSuccess(val count: Int) : BackupEvent
-    data class ImportFailed(val reason: BackupFailReason) : BackupEvent
+    data class RestoreSuccess(val count: Int) : BackupEvent
+    data class RestoreFailed(val reason: RestoreFailReason) : BackupEvent
 }

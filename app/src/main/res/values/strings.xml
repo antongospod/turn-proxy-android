@@ -93,8 +93,8 @@
     <string name="add_manual_title">Ручная настройка</string>
     <string name="add_manual_desc">Ввести параметры вручную</string>
     <string name="add_manual_create">Создать</string>
-    <string name="add_from_file_title">Файл с настройками</string>
-    <string name="add_from_file_desc">Загрузить конфигурацию из файла</string>
+    <string name="add_restore_title">Восстановление</string>
+    <string name="add_restore_desc">Загрузить резервную копию</string>
     <string name="add_from_qr_title">QR-код</string>
     <string name="add_from_qr_desc">Отсканировать код с экрана</string>
     <string name="add_soon_badge">Скоро</string>
@@ -505,24 +505,25 @@
     <string name="app_reset_desc">Удалить все данные приложения</string>
     <string name="update_current_version">Текущая версия %1$s</string>
 
-    <!-- Резервная копия (экспорт/импорт) -->
+    <!-- Резервная копия (экспорт/восстановление) -->
     <string name="app_section_backup">Резервная копия</string>
     <string name="backup_export_title">Экспорт настроек</string>
     <string name="backup_export_desc">Профили и настройки в зашифрованный файл</string>
     <string name="backup_export_action">Экспортировать</string>
-    <string name="backup_import_title">Импорт настроек</string>
-    <string name="backup_import_action">Импортировать</string>
+    <string name="backup_restore_title">Восстановление</string>
+    <string name="backup_restore_action">Восстановить</string>
     <string name="backup_password_label">Пароль</string>
     <string name="backup_password_confirm_label">Повторите пароль</string>
-    <string name="backup_password_hint">Понадобится при импорте на другом устройстве. Восстановить нельзя.</string>
+    <string name="backup_password_hint">Понадобится при восстановлении на другом устройстве. Восстановить нельзя.</string>
     <string name="backup_password_empty">Введите пароль</string>
     <string name="backup_password_mismatch">Пароли не совпадают</string>
     <string name="backup_export_ok">Настройки экспортированы</string>
     <string name="backup_export_fail">Не удалось сохранить файл</string>
-    <string name="backup_import_ok">Импортировано серверов: %1$d</string>
-    <string name="backup_import_fail">Не удалось импортировать файл</string>
-    <string name="backup_import_bad_password">Неверный пароль</string>
-    <string name="backup_import_bad_file">Неверный формат файла резервной копии</string>
+    <string name="backup_restore_warning">Текущие серверы и настройки будут заменены.</string>
+    <string name="backup_restore_ok">Восстановлено серверов: %1$d</string>
+    <string name="backup_restore_fail">Не удалось восстановить</string>
+    <string name="backup_restore_bad_password">Неверный пароль</string>
+    <string name="backup_restore_bad_file">Неверный формат файла</string>
 
     <!-- О проекте -->
     <string name="settings_about">О проекте</string>

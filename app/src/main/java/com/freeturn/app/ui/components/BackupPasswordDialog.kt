@@ -20,7 +20,8 @@ import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Диалог ввода пароля для бэкапа. [requireConfirmation] - режим экспорта (поле повтора +
- * проверка совпадения). [onConfirm] получает валидный непустой пароль.
+ * проверка совпадения). [warning] - предупреждение над полем. [onConfirm] получает валидный
+ * непустой пароль.
  */
 @Composable
 fun BackupPasswordDialog(
@@ -28,7 +29,8 @@ fun BackupPasswordDialog(
     confirmLabel: String,
     requireConfirmation: Boolean,
     onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    warning: String? = null
 ) {
     var password by remember { mutableStateOf("") }
     var repeat by remember { mutableStateOf("") }
@@ -41,6 +43,13 @@ fun BackupPasswordDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                warning?.let {
+                    Text(
+                        it,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; error = null },

@@ -70,21 +70,21 @@ fun AddServerScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showManualDialog by rememberSaveable { mutableStateOf(false) }
-    var showImportDialog by rememberSaveable { mutableStateOf(false) }
-    var importUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var showRestoreDialog by rememberSaveable { mutableStateOf(false) }
+    var restoreUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
     val linkBus = koinInject<LinkImportBus>()
     val snackbarHostState = remember { SnackbarHostState() }
     val notLinkMessage = stringResource(R.string.add_paste_not_link)
     val scope = rememberCoroutineScope()
 
-    // Импорт из файла: выбор файла -> диалог пароля -> расшифровка/слияние в VM.
-    val importLauncher = rememberLauncherForActivityResult(
+    // Восстановление: выбор файла -> диалог пароля -> расшифровка и замена профиля в VM.
+    val restoreLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            importUri = uri
-            showImportDialog = true
+            restoreUri = uri
+            showRestoreDialog = true
         }
     }
 
@@ -164,9 +164,9 @@ fun AddServerScreen(
                     SettingsGroupItem(3, 4) {
                         SettingsEntryRow(
                             iconRes = R.drawable.description_24px,
-                            title = stringResource(R.string.add_from_file_title),
-                            subtitle = stringResource(R.string.add_from_file_desc),
-                            onClick = { importLauncher.launch(arrayOf("*/*")) }
+                            title = stringResource(R.string.add_restore_title),
+                            subtitle = stringResource(R.string.add_restore_desc),
+                            onClick = { restoreLauncher.launch(arrayOf("*/*")) }
                         )
                     }
                 }
@@ -184,16 +184,17 @@ fun AddServerScreen(
         )
     }
 
-    if (showImportDialog) {
+    if (showRestoreDialog) {
         BackupPasswordDialog(
-            title = stringResource(R.string.backup_import_title),
-            confirmLabel = stringResource(R.string.backup_import_action),
+            title = stringResource(R.string.backup_restore_title),
+            confirmLabel = stringResource(R.string.backup_restore_action),
             requireConfirmation = false,
             onConfirm = { password ->
-                showImportDialog = false
-                importUri?.let { settingsViewModel.importBackup(it, password) }
+                showRestoreDialog = false
+                restoreUri?.let { settingsViewModel.restoreBackup(it, password) }
             },
-            onDismiss = { showImportDialog = false }
+            onDismiss = { showRestoreDialog = false },
+            warning = stringResource(R.string.backup_restore_warning)
         )
     }
 }

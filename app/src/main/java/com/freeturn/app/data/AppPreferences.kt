@@ -271,47 +271,36 @@ class AppPreferences(context: Context) {
             privacyMode = privacyModeFlow.first(),
             restartServerOnSwitch = restartServerOnSwitchFlow.first(),
             suppressUpdatePrompt = suppressUpdatePromptFlow.first(),
-            suppressTgPrompt = suppressTgPromptFlow.first()
+            suppressTgPrompt = suppressTgPromptFlow.first(),
+            hotspotProxyEnabled = hotspotProxyEnabledFlow.first()
         )
     }
 
     /**
-     * Применяет бэкап: добавляет серверы к существующим (не заменяет - новые id и
-     * уникализация имён). Тогглы, личность (own client-id) и активный сервер восстанавливает
-     * только на чистый профиль (не было серверов): иначе импорт "подмешать серверы" в живой
-     * профиль молча менял бы тему/приватность/cid. Всё одной транзакцией. Возвращает число
-     * добавленных серверов.
+     * Восстанавливает профиль целиком: чистит DataStore и пишет содержимое бэкапа одной
+     * транзакцией. Частичное слияние недопустимо - личность (own client-id) поверх непустого
+     * профиля не применялась бы, и ядро уходило бы на сервер с чужим cid (allowlist рвёт
+     * сессию сразу после DTLS-хендшейка). Возвращает число восстановленных серверов.
+     *
+     * Одноразовые флаги подсказок (батарея, TG) не в бэкапе - они про установку, не про
+     * профиль, и сбрасываются вместе со всем остальным.
      */
-    suspend fun importBackup(data: BackupData): Int {
-        var added = 0
+    suspend fun restoreBackup(data: BackupData): Int {
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON]).toMutableList()
-            val freshProfile = list.isEmpty()
-            val idMap = HashMap<String, String>()
-            data.servers.forEach { incoming ->
-                val newId = UUID.randomUUID().toString()
-                idMap[incoming.id] = newId
-                val base = incoming.name.trim().ifBlank { Server.FALLBACK_NAME }
-                list += incoming.copy(id = newId, name = uniqueServerName(base, list))
-                added++
-            }
-            prefs[SERVERS_JSON] = ServerJson.encodeList(list)
-            val restoredActive = data.activeId?.let { idMap[it] }
-            when {
-                freshProfile && restoredActive != null -> prefs[ACTIVE_SERVER_ID] = restoredActive
-                prefs[ACTIVE_SERVER_ID].isNullOrBlank() && list.isNotEmpty() ->
-                    prefs[ACTIVE_SERVER_ID] = list.first().id
-            }
-            if (freshProfile) {
-                data.ownClientId?.takeIf { ClientId.isValid(it) }?.let { prefs[OWN_CLIENT_ID] = it }
-                prefs[DYNAMIC_THEME] = data.dynamicTheme
-                prefs[NERD_MODE] = data.nerdMode
-                prefs[PRIVACY_MODE] = data.privacyMode
-                prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
-                prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt
-                prefs[SUPPRESS_TG_PROMPT] = data.suppressTgPrompt
-            }
+            prefs.clear()
+            prefs[SERVERS_JSON] = ServerJson.encodeList(data.servers)
+            val active = data.activeId?.takeIf { id -> data.servers.any { it.id == id } }
+                ?: data.servers.firstOrNull()?.id
+            active?.let { prefs[ACTIVE_SERVER_ID] = it }
+            data.ownClientId?.takeIf { ClientId.isValid(it) }?.let { prefs[OWN_CLIENT_ID] = it }
+            prefs[DYNAMIC_THEME] = data.dynamicTheme
+            prefs[NERD_MODE] = data.nerdMode
+            prefs[PRIVACY_MODE] = data.privacyMode
+            prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+            prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt
+            prefs[SUPPRESS_TG_PROMPT] = data.suppressTgPrompt
+            prefs[HOTSPOT_PROXY_ENABLED] = data.hotspotProxyEnabled
         }
-        return added
+        return data.servers.size
     }
 }

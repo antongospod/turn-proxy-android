@@ -17,12 +17,13 @@ data class BackupData(
     val privacyMode: Boolean,
     val restartServerOnSwitch: Boolean,
     val suppressUpdatePrompt: Boolean,
-    val suppressTgPrompt: Boolean
+    val suppressTgPrompt: Boolean,
+    val hotspotProxyEnabled: Boolean
 )
 
 /** Сериализация [BackupData] в JSON (серверы - через тот же [ServerJson], что и в DataStore). */
 object SettingsBackup {
-    private const val FORMAT_VERSION = 2
+    private const val FORMAT_VERSION = 3
 
     fun encode(data: BackupData): String = JSONObject().apply {
         put("v", FORMAT_VERSION)
@@ -35,6 +36,7 @@ object SettingsBackup {
         put("restartServerOnSwitch", data.restartServerOnSwitch)
         put("suppressUpdatePrompt", data.suppressUpdatePrompt)
         put("suppressTgPrompt", data.suppressTgPrompt)
+        put("hotspotProxyEnabled", data.hotspotProxyEnabled)
     }.toString()
 
     fun decode(json: String): BackupData {
@@ -53,7 +55,8 @@ object SettingsBackup {
             privacyMode = o.optBoolean("privacyMode", false),
             restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false),
             suppressUpdatePrompt = o.optBoolean("suppressUpdatePrompt", false),
-            suppressTgPrompt = o.optBoolean("suppressTgPrompt", false)
+            suppressTgPrompt = o.optBoolean("suppressTgPrompt", false),
+            hotspotProxyEnabled = o.optBoolean("hotspotProxyEnabled", false)
         )
     }
 }

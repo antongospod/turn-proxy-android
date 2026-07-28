@@ -2,6 +2,7 @@ package com.freeturn.app.domain.backup
 
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.backup.BackupCrypto
+import com.freeturn.app.data.backup.BackupData
 import com.freeturn.app.data.backup.SettingsBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,13 +20,16 @@ class BackupManager(private val prefs: AppPreferences) {
     }
 
     /**
-     * Расшифровывает бэкап: добавляет серверы и восстанавливает тоггл-настройки.
-     * Возвращает число добавленных серверов.
-     * Бросает [BackupCrypto.BadPasswordException] / [BackupCrypto.FormatException].
+     * Расшифровка отделена от применения: [restore] затирает профиль, и до неё вызывающий
+     * должен погасить рантайм. Бросает [BackupCrypto.BadPasswordException] /
+     * [BackupCrypto.FormatException].
      */
-    suspend fun import(bytes: ByteArray, password: String): Int = withContext(Dispatchers.Default) {
-        val payload = BackupCrypto.decrypt(bytes, password)
-        val data = SettingsBackup.decode(String(payload, Charsets.UTF_8))
-        prefs.importBackup(data)
-    }
+    suspend fun decode(bytes: ByteArray, password: String): BackupData =
+        withContext(Dispatchers.Default) {
+            val payload = BackupCrypto.decrypt(bytes, password)
+            SettingsBackup.decode(String(payload, Charsets.UTF_8))
+        }
+
+    /** Заменяет профиль содержимым бэкапа. Возвращает число восстановленных серверов. */
+    suspend fun restore(data: BackupData): Int = prefs.restoreBackup(data)
 }
