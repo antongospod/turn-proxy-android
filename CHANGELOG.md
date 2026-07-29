@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.5.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.2...v3.5.0) (2026-07-29)
+
+
+### Features
+
+* **client:** убран выбор браузерного профиля ([85e7b87](https://github.com/samosvalishe/turn-proxy-android/commit/85e7b87b9c5d3c1bc7232b1c013484d719ebd1ca))
+* **logs:** маскировка аргументов ядра под приватным режимом ([8846e57](https://github.com/samosvalishe/turn-proxy-android/commit/8846e573cb05939599606bb7f595b64f7c93b556))
+* **split:** убрана загрузка пресета РФ ([a30625f](https://github.com/samosvalishe/turn-proxy-android/commit/a30625f4a88daef57f2505f9655795613b99eef6))
+
+
+### Fixes
+
+* **backup:** восстановление заменяет профиль целиком ([93e1fc6](https://github.com/samosvalishe/turn-proxy-android/commit/93e1fc68bae14995d9ca84b7519dcb3bbb0f60d1))
+* **captcha:** исправлена работоспособность автосолвера ([f0d0db3](https://github.com/samosvalishe/turn-proxy-android/commit/f0d0db3e5f1b2c0d6a5a0c0fcf07b6b00a8546df))
+* **haptics:** вибра не глушится legacy-ключом системы ([e90c5f6](https://github.com/samosvalishe/turn-proxy-android/commit/e90c5f67709dd7d1576f6ac80dc637ea71def3fe))
+* **proxy:** не ждать 5 минут при падении старта FGS ([bd48667](https://github.com/samosvalishe/turn-proxy-android/commit/bd486671ac1082975c6d52b19243dc565ffd69f1))
+* **ssh:** StrictHostKeyChecking=yes для блокировки MITM ([ece9090](https://github.com/samosvalishe/turn-proxy-android/commit/ece90902f731a2db2efda676d33ee209cd36237e))
+* **ui:** плавный переход состояний главной кнопки ([7708415](https://github.com/samosvalishe/turn-proxy-android/commit/77084151f649db1d02f9beb8a76f450b3a47529a))
+* **wg:** MTU 1280 константой транспорта + MSS clamp на сервере ([f208597](https://github.com/samosvalishe/turn-proxy-android/commit/f208597cdea3c096e94a026ea3524eb5940d0650))
+* временный блок socks 5 hotspot ([1460bfb](https://github.com/samosvalishe/turn-proxy-android/commit/1460bfb59f6f749e2dbb3be08b04f4d7a50e69f5))
+
 ## [3.4.2](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.1...v3.4.2) (2026-07-13)
 
 
