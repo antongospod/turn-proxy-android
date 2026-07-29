@@ -96,8 +96,9 @@ fun ConnectionModeScreen(
     var userPickedVpn by remember(serverId, saved.tunnelTransport) { mutableStateOf<Boolean?>(null) }
     val isVpn = userPickedVpn ?: (saved.tunnelTransport == TunnelTransport.WIREGUARD)
 
-    var wgConfig by remember(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
-    var wgName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
+    val fieldsKey = serverId ?: snapshot.activeId
+    var wgConfig by remember(fieldsKey) { mutableStateOf(saved.wireGuardConfig) }
+    var wgName by remember(fieldsKey) { mutableStateOf(saved.wireGuardTunnelName) }
 
     fun persistWg(vpn: Boolean = isVpn) {
         clientEdit {
@@ -112,10 +113,17 @@ fun ConnectionModeScreen(
     var showSplitSheet by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(isActive) { if (!isActive) showSplitSheet = false }
 
-    var wgDirty by remember(serverId) { mutableStateOf(false) }
-    var pendingSave by remember(serverId) { mutableStateOf(false) }
-    LaunchedEffect(wgConfig, wgName) {
-        if (!wgDirty) { wgDirty = true; return@LaunchedEffect }
+    var wgDirty by remember(fieldsKey) { mutableStateOf(false) }
+    var pendingSave by remember(fieldsKey) { mutableStateOf(false) }
+
+    LaunchedEffect(fieldsKey, saved) {
+        if (wgDirty) return@LaunchedEffect
+        wgConfig = saved.wireGuardConfig
+        wgName = saved.wireGuardTunnelName
+    }
+
+    LaunchedEffect(fieldsKey, wgConfig, wgName) {
+        if (!wgDirty) return@LaunchedEffect
         pendingSave = true
         delay(600)
         persistWg()
@@ -136,6 +144,7 @@ fun ConnectionModeScreen(
                 }
                 if (!text.isNullOrBlank()) {
                     wgConfig = text
+                    wgDirty = true
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                 }
             }
@@ -208,9 +217,9 @@ fun ConnectionModeScreen(
                 if (isVpn) {
                     WireGuardConfigCard(
                         wgConfig = wgConfig,
-                        onWgConfig = { wgConfig = it },
+                        onWgConfig = { wgConfig = it; wgDirty = true },
                         wgName = wgName,
-                        onWgName = { wgName = it },
+                        onWgName = { wgName = it; wgDirty = true },
                         privacyMode = privacyMode,
                         onLoadFile = { filePicker.launch("*/*") }
                     )

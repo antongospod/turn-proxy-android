@@ -91,26 +91,43 @@ fun ClientSetupScreen(
     val context = LocalContext.current
 
     // remember (не rememberSaveable), чтобы не восстанавливать stale-поля из bundle.
-    var serverAddress by remember(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
-    var vkLink       by remember(saved.vkLink)         { mutableStateOf(saved.vkLink) }
-    var threads      by remember(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
-    var streamsPerCred by remember(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
-    var localPort    by remember(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var magicTurn by remember(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
-    var customDns by remember(saved.customDns) { mutableStateOf(saved.customDns) }
+    val fieldsKey = serverId ?: snapshot.activeId
+    var serverAddress by remember(fieldsKey) { mutableStateOf(saved.serverAddress) }
+    var vkLink       by remember(fieldsKey) { mutableStateOf(saved.vkLink) }
+    var threads      by remember(fieldsKey) { mutableFloatStateOf(saved.threads.toFloat()) }
+    var streamsPerCred by remember(fieldsKey) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
+    var localPort    by remember(fieldsKey) { mutableStateOf(saved.localPort) }
+    var magicTurn    by remember(fieldsKey) { mutableStateOf(saved.magicTurn) }
+    var customDns    by remember(fieldsKey) { mutableStateOf(saved.customDns) }
+
+    // Поля живут своей жизнью с момента первой правки. До этого догоняем DataStore:
+    // clientConfig стартует с дефолта и реальный конфиг приезжает уже после композиции.
+    var fieldsDirty by remember(fieldsKey) { mutableStateOf(false) }
+    LaunchedEffect(fieldsKey, saved) {
+        if (fieldsDirty) return@LaunchedEffect
+        serverAddress = saved.serverAddress
+        vkLink = saved.vkLink
+        threads = saved.threads.toFloat()
+        streamsPerCred = saved.streamsPerCred.toFloat()
+        localPort = saved.localPort
+        magicTurn = saved.magicTurn
+        customDns = saved.customDns
+    }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(effSshIp, effProxyListen) {
         if (serverAddress.isBlank() && effSshIp.isNotBlank()) {
             val port = effProxyListen.substringAfterLast(":", "56000")
             serverAddress = "$effSshIp:$port"
+            fieldsDirty = true
         }
     }
 
     // Авто-сохранение с дебаунсом 600 мс.
     LaunchedEffect(
-        serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
+        fieldsKey, serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
     ) {
+        if (!fieldsDirty) return@LaunchedEffect
         delay(600)
         clientEdit { current ->
             current.copy(
@@ -164,12 +181,12 @@ fun ClientSetupScreen(
             ) {
                 ConnectionCard(
                     serverAddress = serverAddress,
-                    onServerAddress = { serverAddress = it },
+                    onServerAddress = { serverAddress = it; fieldsDirty = true },
                     showVkLink = saved.provider == Provider.VK,
                     vkLink = vkLink,
-                    onVkLink = { vkLink = it },
+                    onVkLink = { vkLink = it; fieldsDirty = true },
                     localPort = localPort,
-                    onLocalPort = { localPort = it },
+                    onLocalPort = { localPort = it; fieldsDirty = true },
                     privacyMode = privacyMode
                 )
 
@@ -179,9 +196,10 @@ fun ClientSetupScreen(
                     onThreads = {
                         threads = it
                         if (streamsPerCred > it) streamsPerCred = it
+                        fieldsDirty = true
                     },
                     streamsPerCred = streamsPerCred,
-                    onStreamsPerCred = { streamsPerCred = it.coerceAtMost(threads) },
+                    onStreamsPerCred = { streamsPerCred = it.coerceAtMost(threads); fieldsDirty = true },
                     onTick = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) }
                 )
 
@@ -192,7 +210,7 @@ fun ClientSetupScreen(
                         clientEdit { it.copy(dnsMode = mode) }
                     },
                     customDns = customDns,
-                    onCustomDns = { customDns = it },
+                    onCustomDns = { customDns = it; fieldsDirty = true },
                     useCarrierDns = saved.useCarrierDns,
                     onUseCarrierDns = { v -> clientEdit { it.copy(useCarrierDns = v) } }
                 )
@@ -212,7 +230,7 @@ fun ClientSetupScreen(
                     magicSwitch = saved.magicSwitch,
                     onMagicSwitch = { v -> clientEdit { it.copy(magicSwitch = v) } },
                     magicTurn = magicTurn,
-                    onMagicTurn = { magicTurn = it },
+                    onMagicTurn = { magicTurn = it; fieldsDirty = true },
                     privacyMode = privacyMode
                 )
 
