@@ -175,7 +175,9 @@ private fun CameraPreview(onResult: (String) -> Unit) {
     DisposableEffect(lifecycleOwner) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var boundProvider: ProcessCameraProvider? = null
+        val disposed = AtomicBoolean(false)
         providerFuture.addListener({
+            if (disposed.get()) return@addListener
             val provider = providerFuture.get()
             boundProvider = provider
             val preview = Preview.Builder().build().apply {
@@ -219,6 +221,7 @@ private fun CameraPreview(onResult: (String) -> Unit) {
         }, ContextCompat.getMainExecutor(context))
 
         onDispose {
+            disposed.set(true)
             boundProvider?.unbindAll()
             analysisExecutor.shutdown()
             scanner.close()

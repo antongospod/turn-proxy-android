@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -97,11 +98,11 @@ fun ServerDetailScreen(
     val online = status as? ServerHubState.Online
     val connected = online != null
 
-    // SSH-загрузка после enter-перехода не конкурирует с анимацией экрана.
-    LaunchedEffect(isActive, sshConfig.ip, sshState) {
-        if (isActive && sshConfig.ip.isNotBlank() && sshState is SshConnectionState.Disconnected) {
+    val disconnected by rememberUpdatedState(sshState is SshConnectionState.Disconnected)
+    LaunchedEffect(isActive, sshConfig.ip) {
+        if (isActive && sshConfig.ip.isNotBlank()) {
             kotlinx.coroutines.delay(NAV_SLIDE_MS + 50L)
-            serverViewModel.reconnectSsh()
+            if (disconnected) serverViewModel.reconnectSsh()
         }
     }
 
