@@ -25,7 +25,9 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -33,7 +35,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -269,15 +271,15 @@ private fun UserRowMenu(
 
 @Composable
 private fun OnlineDot(modifier: Modifier = Modifier) {
-    val pulse = if (LocalReducedMotion.current) 1f else {
-        val transition = rememberInfiniteTransition(label = "online")
-        val a by transition.animateFloat(
+    val pulse: State<Float> = if (LocalReducedMotion.current) {
+        remember { mutableFloatStateOf(1f) }
+    } else {
+        rememberInfiniteTransition(label = "online").animateFloat(
             initialValue = 1f,
             targetValue = 0.3f,
             animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
             label = "online_alpha"
         )
-        a
     }
     Box(
         modifier = modifier
@@ -288,7 +290,7 @@ private fun OnlineDot(modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .size(9.dp)
-                .alpha(pulse)
+                .graphicsLayer { alpha = pulse.value }
                 .background(MaterialTheme.extendedColorScheme.success, CircleShape)
         )
     }

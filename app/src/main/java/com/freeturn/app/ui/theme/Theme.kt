@@ -1,8 +1,8 @@
 package com.freeturn.app.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
@@ -22,9 +22,9 @@ import androidx.core.view.WindowCompat
 
 /**
  * Системная настройка "Убрать анимации" (Settings -> Спец. возможности). true = анимации
- * выключены. Читается один раз за жизнь Activity (staticCompositionLocalOf + keyless
- * remember) - живое переключение тумблера для приложения избыточно. Потребители гасят
- * необязательную моушн: nav-переходы, animateContentSize и т.п.
+ * выключены. Читается один раз за жизнь Activity - живое переключение тумблера для
+ * приложения избыточно. Потребители гасят необязательную моушн: nav-переходы,
+ * animateContentSize и т.п.
  */
 val LocalReducedMotion = staticCompositionLocalOf { false }
 
@@ -112,25 +112,26 @@ fun FreeTurnTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val context = LocalContext.current
+    val colorScheme = remember(context, darkTheme, dynamicColor) {
+        when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            darkTheme -> darkScheme
+            else -> lightScheme
         }
-        darkTheme -> darkScheme
-        else -> lightScheme
     }
+    val motionScheme = remember { MotionScheme.expressive() }
 
     val view = LocalView.current
-    if (!view.isInEditMode) {
+    val window = LocalActivity.current?.window
+    if (window != null) {
         SideEffect {
-            val window = (view.context as Activity).window
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
-    val context = LocalContext.current
-    val reduceMotion = remember {
+    val reduceMotion = remember(context) {
         Settings.Global.getFloat(
             context.contentResolver,
             Settings.Global.ANIMATOR_DURATION_SCALE,
@@ -144,7 +145,7 @@ fun FreeTurnTheme(
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
-            motionScheme = MotionScheme.expressive(),
+            motionScheme = motionScheme,
             typography = Typography,
             shapes = AppShapes,
             content = content

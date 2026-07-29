@@ -355,19 +355,22 @@ private fun rememberMorphingShape(target: RoundedPolygon, reducedMotion: Boolean
         progress.snapTo(0f)
         progress.animateTo(1f, spec)
     }
-    // Общий буфер пути: MorphShape пересоздаётся каждый кадр морфа, аллокация Path на кадр не нужна.
+
     val buffer = remember { android.graphics.Path() }
-    return MorphShape(morph, progress.value, buffer)
+    val matrix = remember { Matrix() }
+    return MorphShape(morph, progress.value, buffer, matrix)
 }
 
 private class MorphShape(
     private val morph: Morph,
     private val progress: Float,
-    private val buffer: android.graphics.Path
+    private val buffer: android.graphics.Path,
+    // Общая с буфером пути: createOutline зовут каждый кадр морфа.
+    private val matrix: Matrix
 ) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val path = morph.toPath(progress.coerceIn(0f, 1f), buffer).asComposePath()
-        val matrix = Matrix()
+        matrix.reset()
         matrix.scale(size.width, size.height)
         path.transform(matrix)
         return Outline.Generic(path)

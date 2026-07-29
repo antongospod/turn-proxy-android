@@ -1,6 +1,7 @@
 package com.freeturn.app.ui.components
 
 import android.content.Context
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -16,26 +17,22 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Кэш иконок приложений в памяти (packageName -> ImageBitmap). Иконки растеризуются
- * до фиксированного размера, чтобы ограничить память; loadIcon тяжёлый - только IO.
- */
 private object AppIconCache {
     private const val ICON_PX = 160
-    private val cache = ConcurrentHashMap<String, ImageBitmap>()
+    private const val MAX_ICONS = 64
+    private val cache = object : LruCache<String, ImageBitmap>(MAX_ICONS) {}
 
-    fun cached(packageName: String): ImageBitmap? = cache[packageName]
+    fun cached(packageName: String): ImageBitmap? = cache.get(packageName)
 
     suspend fun load(context: Context, packageName: String): ImageBitmap? =
         withContext(Dispatchers.IO) {
-            cache[packageName]?.let { return@withContext it }
+            cache.get(packageName)?.let { return@withContext it }
             runCatching {
                 context.packageManager.getApplicationIcon(packageName)
                     .toBitmap(ICON_PX, ICON_PX)
                     .asImageBitmap()
-                    .also { cache[packageName] = it }
+                    .also { cache.put(packageName, it) }
             }.getOrNull()
         }
 }

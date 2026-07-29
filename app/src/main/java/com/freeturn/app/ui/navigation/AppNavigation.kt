@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -112,9 +113,10 @@ fun AppNavigation(
     NavigationSuiteScaffold(
         navigationSuiteType = suiteType,
         navigationItems = {
-            val items = if (logsTabVisible) {
-                navItems.toMutableList().apply { add(1, logsNavItem) }
-            } else navItems
+            val items = remember(logsTabVisible) {
+                if (logsTabVisible) navItems.toMutableList().apply { add(1, logsNavItem) }
+                else navItems
+            }
             items.forEach { item ->
                 val selected = destination?.hierarchy?.any { it.hasRoute(item.graphRoute::class) } == true
                 NavigationSuiteItem(
