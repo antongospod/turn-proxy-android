@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Централизованное состояние прокси-сервиса.
@@ -22,8 +23,10 @@ object ProxyServiceState {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
-    private val _logs = MutableStateFlow<List<String>>(emptyList())
-    val logs: StateFlow<List<String>> = _logs.asStateFlow()
+    private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
+    val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
+
+    private val logSeq = AtomicLong(0)
 
     private val _logsEnabled = MutableStateFlow(true)
 
@@ -81,8 +84,9 @@ object ProxyServiceState {
 
     fun addLog(msg: String) {
         if (!_logsEnabled.value) return
+        val entry = LogEntry(logSeq.getAndIncrement(), msg, classifyLogLine(msg))
         _logs.update { current ->
-            val next = current + msg
+            val next = current + entry
             if (next.size > MAX_LOG_LINES) next.drop(next.size - MAX_LOG_LINES) else next
         }
     }

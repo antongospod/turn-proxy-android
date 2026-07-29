@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.domain.proxy.LocalProxyManager
 import com.freeturn.app.domain.ProxyState
+import com.freeturn.app.domain.proxy.LogEntry
 import com.freeturn.app.domain.proxy.ProxyServiceState
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -17,7 +18,7 @@ class ProxyViewModel(
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
     val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
-    val logs: StateFlow<List<String>> = ProxyServiceState.logs
+    val logs: StateFlow<List<LogEntry>> = ProxyServiceState.logs
 
     fun startProxy() {
         viewModelScope.launch {

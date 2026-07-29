@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -34,8 +34,10 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -52,6 +54,8 @@ import com.freeturn.app.R
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.domain.proxy.LogEntry
+import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.copyToClipboard
@@ -64,8 +68,11 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
     val logs by proxyViewModel.logs.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) listState.animateScrollToItem(logs.lastIndex)
+    // Ключ на id последней строки, а не на размер: буфер упирается в потолок и size
+    // перестаёт меняться. Догоняем хвост только если юзер сам стоит внизу.
+    val atBottom by remember { derivedStateOf { !listState.canScrollForward } }
+    LaunchedEffect(logs.lastOrNull()?.id, atBottom) {
+        if (logs.isNotEmpty() && atBottom) listState.animateScrollToItem(logs.lastIndex)
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -82,7 +89,7 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
             LogsActionsFab(
                 hasLogs = logs.isNotEmpty(),
                 onCopy = {
-                    context.copyToClipboard("proxy_logs", logs.joinToString("\n"))
+                    context.copyToClipboard("proxy_logs", logs.joinToString("\n") { it.text })
                     HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
                 },
                 onClear = {
@@ -120,8 +127,8 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = Spacing.md)
                     ) {
-                        itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
-                            LogLine(line = line)
+                        items(logs, key = { it.id }) { entry ->
+                            LogLine(entry = entry)
                         }
                     }
                 }
@@ -174,30 +181,14 @@ private fun LogsActionsFab(
 }
 
 @Composable
-private fun LogLine(line: String) {
-    val lower = line.lowercase()
-    val isError = lower.contains("ошибка") || lower.contains("error") ||
-                  lower.contains("критическая") || lower.contains("failed") ||
-                  lower.contains("fatal") || lower.contains("panic") ||
-                  lower.contains("не удалось")
-    val isWarning = lower.contains("watchdog") || lower.contains("перезапуск") ||
-                    lower.contains("переподключение") || lower.contains("квота") ||
-                    lower.contains("quota") || lower.contains("warn") ||
-                    lower.contains("недоступна")
-    val isSuccess = lower.contains("запущен") || lower.contains("подключен") ||
-                    lower.contains("success") || lower.contains("started") ||
-                    lower.contains("established")
-    // Ключевые события сессии - выделяем акцентом (прежде маркировались "===").
-    val isEvent = lower.contains("запуск прокси") || lower.contains("остановка") ||
-                  lower.contains("процесс остановлен") || lower.contains("сессия завершена") ||
-                  lower.contains("быстрый выход") || lower.startsWith("сеть:")
-
-    val textColor = when {
-        isError   -> MaterialTheme.colorScheme.error
-        isWarning -> MaterialTheme.extendedColorScheme.warning
-        isSuccess -> MaterialTheme.extendedColorScheme.success
-        isEvent   -> MaterialTheme.colorScheme.primary
-        else      -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun LogLine(entry: LogEntry) {
+    val level = entry.level
+    val textColor = when (level) {
+        LogLevel.Error   -> MaterialTheme.colorScheme.error
+        LogLevel.Warning -> MaterialTheme.extendedColorScheme.warning
+        LogLevel.Success -> MaterialTheme.extendedColorScheme.success
+        LogLevel.Event   -> MaterialTheme.colorScheme.primary
+        LogLevel.Plain   -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Row(
         modifier = Modifier
@@ -205,7 +196,7 @@ private fun LogLine(line: String) {
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         verticalAlignment = Alignment.Top
     ) {
-        if (isEvent || isError || isWarning || isSuccess) {
+        if (level != LogLevel.Plain) {
             Box(
                 modifier = Modifier
                     .padding(top = Spacing.xs, end = Spacing.sm)
@@ -216,10 +207,10 @@ private fun LogLine(line: String) {
             Spacer(Modifier.width(11.dp))
         }
         Text(
-            text = line,
+            text = entry.text,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
-                fontWeight = if (isEvent) FontWeight.SemiBold else FontWeight.Normal
+                fontWeight = if (level == LogLevel.Event) FontWeight.SemiBold else FontWeight.Normal
             ),
             color = textColor
         )
