@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.Spacing
@@ -32,7 +33,7 @@ internal fun SplitTunnelChip(
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = 48.dp)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,

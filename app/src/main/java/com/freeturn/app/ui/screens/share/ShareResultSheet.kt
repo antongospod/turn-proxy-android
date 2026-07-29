@@ -127,6 +127,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
                     )
                     QrCode(
                         content = result.link,
+                        contentDescription = stringResource(R.string.share_result_qr),
                         modifier = Modifier
                             .widthIn(max = 320.dp)
                             .fillMaxWidth()

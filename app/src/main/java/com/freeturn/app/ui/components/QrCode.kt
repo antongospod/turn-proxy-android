@@ -28,7 +28,7 @@ import com.freeturn.app.ui.theme.Spacing
  * для сканера независимо от темы). Матрица считается вне main-потока.
  */
 @Composable
-fun QrCode(content: String, modifier: Modifier = Modifier) {
+fun QrCode(content: String, contentDescription: String?, modifier: Modifier = Modifier) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, content) {
         value = withContext(Dispatchers.Default) { encode(content) }
     }
@@ -40,7 +40,7 @@ fun QrCode(content: String, modifier: Modifier = Modifier) {
         bitmap?.let {
             Image(
                 bitmap = it,
-                contentDescription = null,
+                contentDescription = contentDescription,
                 contentScale = ContentScale.Fit,
                 // Без сглаживания: модули QR остаются резкими при масштабировании.
                 filterQuality = FilterQuality.None,

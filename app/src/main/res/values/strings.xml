@@ -49,6 +49,7 @@
     <string name="share_peer_revoke">Отозвать доступ</string>
     <string name="share_result_title">Доступ для \"%1$s\"</string>
     <string name="share_result_desc">Передавайте ссылку или QR-код только доверенным лицам. При изменении ключа обфускации потребуется выпустить новую ссылку.</string>
+    <string name="share_result_qr">QR-код с ссылкой на доступ</string>
     <string name="share_result_copy">Копировать</string>
     <string name="share_result_share">Поделиться</string>
     <string name="share_revoke_title">Отозвать доступ?</string>
