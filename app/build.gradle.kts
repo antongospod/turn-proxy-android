@@ -21,7 +21,7 @@ android {
         // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
         minSdk = 24
         targetSdk = 37
-        versionName = "3.4.2" // x-release-please-version
+        versionName = "3.5.0" // x-release-please-version
         // Производный от versionName (M*10000+m*100+p) - release-please бампит только строку версии
         versionCode = versionName!!.split(".").let { (ma, mi, pa) ->
             ma.toInt() * 10000 + mi.toInt() * 100 + pa.toInt()
