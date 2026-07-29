@@ -117,7 +117,6 @@ fun AdvancedScreen(
 ) {
     val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
     val restartServerOnSwitch by settingsViewModel.restartServerOnSwitch.collectAsStateWithLifecycle()
-    val hotspotProxyEnabled by settingsViewModel.hotspotProxyEnabled.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
@@ -160,8 +159,9 @@ fun AdvancedScreen(
                         title = stringResource(R.string.hotspot_proxy),
                         subtitle = stringResource(R.string.hotspot_proxy_desc),
                         iconRes = R.drawable.wifi_tethering_24px,
-                        checked = hotspotProxyEnabled,
-                        onCheckedChange = { settingsViewModel.setHotspotProxyEnabled(it) }
+                        checked = false,
+                        onCheckedChange = {},
+                        enabled = false
                     )
                 }
 
