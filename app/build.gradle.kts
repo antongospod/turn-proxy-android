@@ -90,6 +90,13 @@ kotlin {
     }
 }
 
+composeCompiler {
+    if (project.findProperty("composeReports") == "true") {
+        reportsDestination = layout.buildDirectory.dir("compose_reports")
+        metricsDestination = layout.buildDirectory.dir("compose_metrics")
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.jsch)
