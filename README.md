@@ -5,7 +5,6 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-Compose-7F52FF?logo=kotlin&logoColor=white)
 ![Material 3](https://img.shields.io/badge/Material-3-757575?logo=materialdesign&logoColor=white)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-[![Telegram](https://img.shields.io/badge/Telegram-канал-26A5E4?logo=telegram&logoColor=white)](https://t.me/+5BdkU4q_CGQyNTdi)
 </div>
 
 ![Banner](assets/banner.jpg)
