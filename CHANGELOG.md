@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.5.1](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.0...v3.5.1) (2026-07-30)
+
+
+### Fixes
+
+* **a11y:** описание QR-кода и роль кнопки у чипа split-tunnel ([2573d47](https://github.com/samosvalishe/turn-proxy-android/commit/2573d47c1c33193dd9fe302763f63e1a779673d9))
+* **setup:** поля не затираются дефолтом до приезда DataStore ([50a03f5](https://github.com/samosvalishe/turn-proxy-android/commit/50a03f5ff49717aeeb8d25482c07717cc6e572a2))
+* update бинарников ([2775435](https://github.com/samosvalishe/turn-proxy-android/commit/2775435472579a395626f55ba7ac9cf63c8d4392))
+* гонки в колбэке камеры и в отложенном reconnect ([2607bd7](https://github.com/samosvalishe/turn-proxy-android/commit/2607bd7dc2e6bb91b5cc5ea67b4f5a912c5ecd83))
+
+
+### Performance
+
+* **ui:** меньше аллокаций и рекомпозиций на кадр ([f99e18c](https://github.com/samosvalishe/turn-proxy-android/commit/f99e18c024c91712a78edcdb8bff3d0d257299d4))
+
+
+### Refactoring
+
+* **logs:** уровень строки считается один раз в domain ([e78c335](https://github.com/samosvalishe/turn-proxy-android/commit/e78c335e2fee783780f046789339e4a688cb5e18))
+
 ## [3.5.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.2...v3.5.0) (2026-07-29)
 
 
