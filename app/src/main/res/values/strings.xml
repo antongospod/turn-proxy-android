@@ -348,7 +348,6 @@
     <string name="notif_proxy_stop_action">Отключить</string>
     <string name="notif_proxy_threads_format">Потоки: %1$d/%2$d</string>
     <string name="tile_service_label">Free Turn</string>
-    <string name="proxy_active_wireguard">Прокси и WireGuard активны</string>
 
     <!-- Виджет домашнего экрана -->
     <string name="widget_label">FreeTurn - прокси</string>

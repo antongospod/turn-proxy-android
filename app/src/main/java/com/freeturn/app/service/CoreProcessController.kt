@@ -241,7 +241,7 @@ class CoreProcessController(
                                     ProxyServiceState.setStartupResult(StartupResult.Success)
                                     ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
                                     notifier.setStatus(
-                                        if (wireGuardStarted) context.getString(R.string.proxy_active_wireguard)
+                                        if (wireGuardStarted) context.getString(R.string.tunnel_active)
                                         else context.getString(R.string.proxy_active),
                                         active = true
                                     )
