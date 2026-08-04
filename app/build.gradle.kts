@@ -1,3 +1,6 @@
+import java.net.HttpURLConnection
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -166,4 +169,180 @@ androidComponents {
             AssembleControlScript::outDir
         )
     }
+}
+
+/**
+ * Тянет нативное ядро из релизов free-turn-proxy в jniLibs (папка вне git).
+ * Ассеты релиза без расширения: arm64 - client-android-arm64, armv7 - client-linux-armv7
+ * (Go-бинарник linux/arm GOARM=7 работает и на Android); оба кладутся как libfreeturn.so.
+ */
+abstract class FetchFreeturnCore : DefaultTask() {
+    @get:Input
+    abstract val repo: Property<String>
+
+    /** "latest" или конкретный тег/версия ("2.1.0", "v2.1.0"). */
+    @get:Input
+    abstract val version: Property<String>
+
+    /** ABI -> имя ассета в релизе. */
+    @get:Input
+    abstract val assetNames: MapProperty<String, String>
+
+    @get:Input
+    @get:Optional
+    abstract val token: Property<String>
+
+    /** Вне build/ - переживает clean, общий на все проекты. */
+    @get:Internal
+    abstract val cacheDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val jniLibsDir: DirectoryProperty
+
+    @TaskAction
+    fun fetch() {
+        val libs = jniLibsDir.get().asFile
+        val stamp = File(libs, ".core-version")
+        val installed = if (stamp.isFile) stamp.readText().trim() else null
+        val allPresent = assetNames.get().keys.all { File(libs, "$it/libfreeturn.so").isFile }
+
+        val tag = try {
+            resolveTag()
+        } catch (e: Exception) {
+            // Оффлайн со скачанным ядром - не повод ронять сборку
+            if (allPresent && installed != null) {
+                logger.warn("FreeTurn core: не удалось узнать версию (${e.message}), оставляю $installed")
+                return
+            }
+            throw GradleException("FreeTurn core: не удалось определить версию из ${repo.get()}: ${e.message}", e)
+        }
+
+        if (tag == installed && allPresent) {
+            didWork = false
+            return
+        }
+
+        val base = "https://github.com/${repo.get()}/releases/download/$tag"
+        val cache = File(cacheDir.get().asFile, tag).apply { mkdirs() }
+        val sums = cachedFile(File(cache, "checksums.txt"), "$base/checksums.txt")
+            .readLines()
+            .mapNotNull { line ->
+                val p = line.trim().split(Regex("\\s+"))
+                if (p.size == 2) p[1].removePrefix("*") to p[0] else null
+            }.toMap()
+
+        assetNames.get().forEach { (abi, asset) ->
+            val src = cachedFile(File(cache, asset), "$base/$asset")
+            val expected = sums[asset]
+                ?: throw GradleException("FreeTurn core: $asset нет в checksums.txt релиза $tag")
+            val actual = sha256(src)
+            if (!actual.equals(expected, ignoreCase = true)) {
+                src.delete()
+                throw GradleException("FreeTurn core: sha256 $asset не сошёлся ($actual != $expected)")
+            }
+            val dst = File(libs, "$abi/libfreeturn.so")
+            dst.parentFile.mkdirs()
+            src.copyTo(dst, overwrite = true)
+        }
+
+        stamp.writeText(tag)
+        logger.lifecycle("FreeTurn core: $tag -> ${libs.path}")
+    }
+
+    private fun resolveTag(): String {
+        val v = version.get().trim()
+        if (!v.equals("latest", ignoreCase = true)) return if (v.startsWith("v")) v else "v$v"
+        val json = String(
+            httpGet("https://api.github.com/repos/${repo.get()}/releases/latest", "application/vnd.github+json"),
+            Charsets.UTF_8
+        )
+        return Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1)
+            ?: throw GradleException("нет tag_name в ответе GitHub API")
+    }
+
+    private fun cachedFile(dest: File, url: String): File {
+        if (dest.isFile && dest.length() > 0) return dest
+        val tmp = File(dest.parentFile, "${dest.name}.part")
+        tmp.writeBytes(httpGet(url, "application/octet-stream"))
+        tmp.renameTo(dest)
+        return dest
+    }
+
+    private fun httpGet(url: String, accept: String): ByteArray {
+        var current = URI(url).toURL()
+        repeat(6) {
+            val conn = (current.openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                connectTimeout = 30_000
+                readTimeout = 300_000
+                setRequestProperty("Accept", accept)
+                setRequestProperty("User-Agent", "freeturn-android-build")
+                // Токен только на github.com - на редиректе в CDN он ломает подписанный URL
+                val t = token.orNull
+                if (!t.isNullOrBlank() && current.host.endsWith("github.com")) {
+                    setRequestProperty("Authorization", "Bearer $t")
+                }
+            }
+            try {
+                when (val code = conn.responseCode) {
+                    in 200..299 -> return conn.inputStream.use { it.readBytes() }
+                    301, 302, 303, 307, 308 -> {
+                        val loc = conn.getHeaderField("Location")
+                            ?: throw GradleException("редирект без Location на $current")
+                        current = URI(current.toURI().resolve(loc).toString()).toURL()
+                    }
+                    else -> throw GradleException("HTTP $code на $current")
+                }
+            } finally {
+                conn.disconnect()
+            }
+        }
+        throw GradleException("слишком много редиректов на $url")
+    }
+
+    private fun sha256(file: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                val n = input.read(buf)
+                if (n <= 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+val fetchFreeturnCore = tasks.register<FetchFreeturnCore>("fetchFreeturnCore") {
+    description = "Качает нативное ядро из релизов free-turn-proxy в jniLibs"
+    group = "build"
+    repo.set(providers.gradleProperty("freeturnCoreRepo").orElse("samosvalishe/free-turn-proxy"))
+    version.set(
+        providers.gradleProperty("freeturnCore")
+            .orElse(providers.environmentVariable("FREETURN_CORE_VERSION"))
+            .orElse("latest")
+    )
+    assetNames.set(
+        mapOf(
+            "arm64-v8a" to "client-android-arm64",
+            "armeabi-v7a" to "client-linux-armv7"
+        )
+    )
+    token.set(providers.environmentVariable("GITHUB_TOKEN"))
+    cacheDir.set(layout.dir(provider { File(gradle.gradleUserHomeDir, "caches/freeturn-core") }))
+    jniLibsDir.set(layout.projectDirectory.dir("src/main/jniLibs"))
+    // Версия резолвится в рантайме - актуальность решает stamp-файл внутри таски
+    outputs.upToDateWhen { false }
+}
+
+// В debug ядро подкладывается руками, поэтому по умолчанию качаем только на release.
+// matching, а не named - таски вариантов AGP создаёт позже конфигурации скрипта.
+val coreFetchHook = when (providers.gradleProperty("coreFetch").orNull ?: "release") {
+    "none" -> null
+    "all" -> "preBuild"
+    else -> "preReleaseBuild"
+}
+if (coreFetchHook != null) {
+    tasks.matching { it.name == coreFetchHook }.configureEach { dependsOn(fetchFreeturnCore) }
 }

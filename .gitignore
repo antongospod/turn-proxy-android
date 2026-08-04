@@ -22,6 +22,9 @@ keystore.properties
 **/build/
 **/release/
 
+# Нативное ядро - качается таской fetchFreeturnCore из релизов free-turn-proxy
+/app/src/main/jniLibs/
+
 # Claude Code
 .claude/
 CLAUDE.md

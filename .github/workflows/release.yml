@@ -10,6 +10,8 @@ permissions:
 
 env:
   JAVA_VERSION: "17"
+  # Ядро качается из релизов free-turn-proxy; токен - против anonymous rate limit API
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   build-and-publish:
