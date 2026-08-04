@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,11 +35,11 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,11 +69,17 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
     val logs by proxyViewModel.logs.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
+    var autoScroll by remember { mutableStateOf(true) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { scrolling -> if (!scrolling) autoScroll = listState.isAtBottom() }
+    }
+
     // Ключ на id последней строки, а не на размер: буфер упирается в потолок и size
-    // перестаёт меняться. Догоняем хвост только если юзер сам стоит внизу.
-    val atBottom by remember { derivedStateOf { !listState.canScrollForward } }
-    LaunchedEffect(logs.lastOrNull()?.id, atBottom) {
-        if (logs.isNotEmpty() && atBottom) listState.animateScrollToItem(logs.lastIndex)
+    // перестаёт меняться.
+    LaunchedEffect(logs.lastOrNull()?.id) {
+        if (autoScroll && logs.isNotEmpty()) listState.scrollToItem(logs.lastIndex)
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -135,6 +142,12 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
             }
         }
     }
+}
+
+private fun LazyListState.isAtBottom(): Boolean {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return true
+    return last.index >= info.totalItemsCount - 2
 }
 
 /**
