@@ -42,6 +42,10 @@ object ProxyServiceState {
     private val _connectionStats = MutableStateFlow(ConnectionStats.IDLE)
     val connectionStats: StateFlow<ConnectionStats> = _connectionStats.asStateFlow()
 
+    /** WG поднят поверх прокси: UI и нотификация говорят про туннель, а не про прокси. */
+    private val _tunnelActive = MutableStateFlow(false)
+    val tunnelActive: StateFlow<Boolean> = _tunnelActive.asStateFlow()
+
     /**
      * Момент первого подключения (SystemClock.elapsedRealtime()).
      * При watchdog-рестарте не сбрасывается.
@@ -97,6 +101,10 @@ object ProxyServiceState {
 
     fun setConnectionStats(stats: ConnectionStats) {
         _connectionStats.value = stats
+    }
+
+    fun setTunnelActive(value: Boolean) {
+        _tunnelActive.value = value
     }
 
     /** Запомнить момент первого подключения сессии. Повторные вызовы игнорируются. */

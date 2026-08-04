@@ -18,6 +18,7 @@ class ProxyViewModel(
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
     val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
+    val tunnelActive: StateFlow<Boolean> = ProxyServiceState.tunnelActive
     val logs: StateFlow<List<LogEntry>> = ProxyServiceState.logs
 
     fun startProxy() {

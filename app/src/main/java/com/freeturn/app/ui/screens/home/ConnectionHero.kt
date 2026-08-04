@@ -70,6 +70,7 @@ import kotlin.math.ceil
 internal fun ConnectionHero(
     state: ProxyState,
     uptimeText: String?,
+    tunnelActive: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -82,13 +83,14 @@ internal fun ConnectionHero(
     ) {
         HeroToggleButton(
             kind = kind,
+            tunnelActive = tunnelActive,
             reducedMotion = reducedMotion,
             onClick = onToggle
         )
 
         Spacer(Modifier.height(20.dp))
 
-        StatusLabel(state = state, reducedMotion = reducedMotion)
+        StatusLabel(state = state, tunnelActive = tunnelActive, reducedMotion = reducedMotion)
 
         Spacer(Modifier.height(10.dp))
 
@@ -110,13 +112,16 @@ private fun ProxyState.heroKind(): HeroKind = when (this) {
 @Composable
 private fun HeroToggleButton(
     kind: HeroKind,
+    tunnelActive: Boolean,
     reducedMotion: Boolean,
     onClick: () -> Unit
 ) {
     val extended = MaterialTheme.extendedColorScheme
     val buttonLabel = when (kind) {
         HeroKind.Busy -> stringResource(R.string.proxy_connecting)
-        HeroKind.Running -> stringResource(R.string.proxy_active_stop)
+        HeroKind.Running -> stringResource(
+            if (tunnelActive) R.string.tunnel_active_stop else R.string.proxy_active_stop
+        )
         HeroKind.Error -> stringResource(R.string.proxy_error_restart)
         HeroKind.Idle -> stringResource(R.string.start_proxy)
     }
@@ -245,9 +250,11 @@ private fun HeroIcon(kind: HeroKind, tint: Color) {
 }
 
 @Composable
-private fun StatusLabel(state: ProxyState, reducedMotion: Boolean) {
+private fun StatusLabel(state: ProxyState, tunnelActive: Boolean, reducedMotion: Boolean) {
     val label = when (state) {
-        is ProxyState.Running -> stringResource(R.string.proxy_active)
+        is ProxyState.Running -> stringResource(
+            if (tunnelActive) R.string.tunnel_active else R.string.proxy_active
+        )
         is ProxyState.Starting, is ProxyState.Connecting -> stringResource(R.string.proxy_connecting)
         is ProxyState.Error -> state.message
         is ProxyState.CaptchaRequired -> stringResource(R.string.proxy_captcha_required)

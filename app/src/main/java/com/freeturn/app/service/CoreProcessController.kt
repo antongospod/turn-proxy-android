@@ -242,7 +242,8 @@ class CoreProcessController(
                                     ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
                                     notifier.setStatus(
                                         if (wireGuardStarted) context.getString(R.string.proxy_active_wireguard)
-                                        else context.getString(R.string.proxy_active)
+                                        else context.getString(R.string.proxy_active),
+                                        active = true
                                     )
                                 } catch (e: Exception) {
                                     val message = e.message ?: e.javaClass.simpleName

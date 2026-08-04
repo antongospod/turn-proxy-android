@@ -63,6 +63,7 @@ class WireGuardTunnelManager(context: Context) {
                 stopLocked()
                 throw e
             }
+            ProxyServiceState.setTunnelActive(true)
             ProxyServiceState.addLog("WireGuard: туннель $name поднят через $endpoint")
         }
     }
@@ -70,6 +71,7 @@ class WireGuardTunnelManager(context: Context) {
     suspend fun stop() = mutex.withLock { stopLocked() }
 
     private fun stopLocked() {
+        ProxyServiceState.setTunnelActive(false)
         val tunnel = tunnelRef.getAndSet(null) ?: return
         try {
             backend.setState(tunnel, Tunnel.State.DOWN, null)

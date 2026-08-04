@@ -16,7 +16,7 @@ import java.util.Locale
 /**
  * Нотификации прокси-сервиса: foreground-статус (+скорость/число потоков) и
  * отдельный алерт ручной капчи. Статус и скорость держит внутри, перерисовывает
- * сам. Скорость/счётчик дописываются только когда статус == "активно" (без WG).
+ * сам. Скорость/счётчик показываются только при "активных" статусах.
  */
 class ProxyNotifier(private val service: Service) {
 
@@ -36,8 +36,7 @@ class ProxyNotifier(private val service: Service) {
     private var baseStatus = ""
     private var speedText = ""
     private var captchaActive = false
-
-    private val isActive get() = baseStatus == service.getString(R.string.proxy_active)
+    private var isActive = false
 
     fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -61,10 +60,13 @@ class ProxyNotifier(private val service: Service) {
     /** Базовый статус "Подключение..." для самого первого startForeground. */
     fun prepareConnecting() {
         baseStatus = service.getString(R.string.notif_proxy_connecting)
+        isActive = false
     }
 
-    fun setStatus(text: String) {
+    /** [active] - соединение установлено (прокси или прокси+WG): показываем потоки и скорость. */
+    fun setStatus(text: String, active: Boolean = false) {
         baseStatus = text
+        isActive = active
         show()
     }
 
@@ -79,20 +81,25 @@ class ProxyNotifier(private val service: Service) {
     }
 
     fun build(): Notification {
-        var text = baseStatus
         val stats = ProxyServiceState.connectionStats.value
+        // Активное соединение: статус уезжает в заголовок, строка текста целиком под
+        // потоки и скорость - вместе они в одну строку не влезают.
+        val title: String
+        val text: String
         if (isActive) {
-            if (stats.total > 0) {
-                text = String.format(
+            title = baseStatus
+            text = listOfNotNull(
+                if (stats.total > 0) String.format(
                     Locale.US,
-                    service.getString(R.string.notif_proxy_status_format),
+                    service.getString(R.string.notif_proxy_threads_format),
                     stats.active,
-                    stats.total,
-                    speedText
-                )
-            } else if (speedText.isNotEmpty()) {
-                text += " • $speedText"
-            }
+                    stats.total
+                ) else null,
+                speedText.takeIf { it.isNotEmpty() }
+            ).joinToString(" • ")
+        } else {
+            title = service.getString(R.string.notif_proxy_title)
+            text = baseStatus
         }
 
         val stopIntent = Intent(service, ProxyReceiver::class.java).apply {
@@ -103,7 +110,7 @@ class ProxyNotifier(private val service: Service) {
         )
 
         return NotificationCompat.Builder(service, CHANNEL_PROXY)
-            .setContentTitle(service.getString(R.string.notif_proxy_title))
+            .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)

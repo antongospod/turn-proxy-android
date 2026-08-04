@@ -58,6 +58,7 @@ fun HomeScreen(
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
     val connectedSince by proxyViewModel.connectedSince.collectAsStateWithLifecycle()
     val uptimeText = rememberProxyUptime(connectedSince)
+    val tunnelActive by proxyViewModel.tunnelActive.collectAsStateWithLifecycle()
     val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
@@ -156,6 +157,7 @@ fun HomeScreen(
                     ConnectionHero(
                         state = proxyState,
                         uptimeText = uptimeText,
+                        tunnelActive = tunnelActive,
                         onToggle = {
                             when (proxyState) {
                                 is ProxyState.Idle, is ProxyState.Error -> {

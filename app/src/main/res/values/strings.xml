@@ -5,6 +5,7 @@
     <string name="nav_home">Главная</string>
     <string name="turn_proxy_title">Free Turn</string>
     <string name="proxy_active">Прокси активен</string>
+    <string name="tunnel_active">Туннель активен</string>
     <string name="proxy_connecting">Подключение…</string>
     <string name="proxy_press_to_start">Нажмите для запуска</string>
     <string name="home_empty_title">Нет серверов</string>
@@ -169,6 +170,7 @@
     <string name="server_connection_lost_title">Нет подключения к серверу</string>
     <string name="server_connection_lost_desc">SSH-сессия не активна. Повторите сопряжение, чтобы управлять сервером.</string>
     <string name="proxy_active_stop">Прокси активен - нажмите для остановки</string>
+    <string name="tunnel_active_stop">Туннель активен - нажмите для остановки</string>
     <string name="proxy_error_restart">Ошибка - нажмите для повторного запуска</string>
     <string name="start_proxy">Запустить прокси</string>
     <string name="android_client">Android-клиент</string>
@@ -344,7 +346,7 @@
 
     <!-- Notification & Tile -->
     <string name="notif_proxy_stop_action">Отключить</string>
-    <string name="notif_proxy_status_format">Потоки: %1$d/%2$d • %3$s</string>
+    <string name="notif_proxy_threads_format">Потоки: %1$d/%2$d</string>
     <string name="tile_service_label">Free Turn</string>
     <string name="proxy_active_wireguard">Прокси и WireGuard активны</string>
 
