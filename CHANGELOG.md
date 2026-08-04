@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.2](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.1...v3.5.2) (2026-08-04)
+
+
+### Fixes
+
+* **logs:** починен автоскролл к хвосту ([d52cceb](https://github.com/samosvalishe/turn-proxy-android/commit/d52cceb90c5a1fdbb1699b9ea9267b6f0a1d1ca5))
+* **ui:** в шторке при WG - "Туннель активен" ([0cfaae2](https://github.com/samosvalishe/turn-proxy-android/commit/0cfaae2ac34d6bd91c1ab44357ddfb73d85b4008))
+* **ui:** статистика и статус туннеля в WG-режиме ([009baae](https://github.com/samosvalishe/turn-proxy-android/commit/009baaeabc77d2e3b0ab275e71a2b661d3c1d492))
+
 ## [3.5.1](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.0...v3.5.1) (2026-07-30)
 
 
