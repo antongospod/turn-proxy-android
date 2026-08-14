@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.2...v3.6.0) (2026-08-14)
+
+
+### Features
+
+* update core ([31b6fc6](https://github.com/samosvalishe/turn-proxy-android/commit/31b6fc6fe17bdd7e3a542c8bf059ce4f6e62f913))
+
 ## [3.5.2](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.1...v3.5.2) (2026-08-04)
 
 
