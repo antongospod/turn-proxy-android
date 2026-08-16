@@ -494,6 +494,10 @@
     <string name="suppress_update_prompt_desc">Не показывать диалог с предложением обновиться</string>
     <string name="suppress_tg_prompt_title">Не предлагать Telegram</string>
     <string name="suppress_tg_prompt_desc">Не показывать диалог с предложением подписаться на канал</string>
+    <string name="app_section_background">Работа в фоне</string>
+    <string name="always_on_vpn_title">Always-on VPN</string>
+    <string name="always_on_vpn_desc">Система сама поднимает туннель при загрузке и после сбоя. Надёжнее исключения из экономии батареи; нужен режим WireGuard</string>
+    <string name="always_on_vpn_unavailable">Настройки VPN недоступны на этом устройстве</string>
     <string name="app_section_updates">Обновления</string>
     <string name="app_section_reset">Сброс</string>
     <string name="app_reset_desc">Удалить все данные приложения</string>
