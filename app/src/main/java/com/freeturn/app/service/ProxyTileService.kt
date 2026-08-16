@@ -1,29 +1,40 @@
 package com.freeturn.app.service
-import com.freeturn.app.domain.proxy.ProxyServiceState
 
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.freeturn.app.R
+import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 class ProxyTileService : TileService() {
 
     private var scope: CoroutineScope? = null
-    private var isProxyRunning = false
+    private var running = false
 
     override fun onStartListening() {
         super.onStartListening()
-        scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-        ProxyServiceState.isRunning.onEach { running ->
-            isProxyRunning = running
-            updateTileState()
-        }.launchIn(scope!!)
+        // Система пару start/stop соблюдает, но лишний listening-цикл оставил бы
+        // второй collector на том же тайле.
+        scope?.cancel()
+        scope = CoroutineScope(Dispatchers.Main + SupervisorJob()).also { s ->
+            ProxyStore.status
+                .map { it.busy }
+                .distinctUntilChanged()
+                .onEach { busy ->
+                    running = busy
+                    render()
+                }
+                .launchIn(s)
+        }
     }
 
     override fun onStopListening() {
@@ -34,25 +45,16 @@ class ProxyTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        if (isProxyRunning) {
-            val intent = Intent(this, ProxyReceiver::class.java).apply {
-                action = ProxyActions.STOP
-            }
-            sendBroadcast(intent)
-        } else {
-            val intent = Intent(this, ProxyReceiver::class.java).apply {
-                action = ProxyActions.START
-            }
-            sendBroadcast(intent)
-        }
+        val action = if (running) ProxyActions.STOP else ProxyActions.START
+        sendBroadcast(Intent(this, ProxyReceiver::class.java).setAction(action))
     }
 
-    private fun updateTileState() {
+    private fun render() {
         val tile = qsTile ?: return
-        tile.state = if (isProxyRunning) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = getString(R.string.tile_service_label)
-        tile.contentDescription = getString(R.string.tile_service_label)
-        tile.icon = android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_qs_tile_nearby)
+        tile.contentDescription = tile.label
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tile_nearby)
         tile.updateTile()
     }
 }

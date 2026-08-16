@@ -1,178 +1,248 @@
 package com.freeturn.app.domain.proxy
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.ConnectException
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.NoRouteToHostException
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.concurrent.atomic.AtomicBoolean
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.nio.charset.StandardCharsets
+import kotlin.coroutines.coroutineContext
 
-class Socks5Server(private val port: Int = 1080) {
+/**
+ * SOCKS5 (RFC 1928) для раздачи туннеля наружу - через точку доступа или по локальной
+ * сети. Только CONNECT: UDP ASSOCIATE не реализован, поэтому у клиентов нет QUIC и
+ * UDP-DNS - им нужен remote DNS через сам прокси.
+ *
+ * Имеет смысл только в туннельном режиме. Сокеты к цели намеренно НЕ выводятся из
+ * VPN - именно они и должны уйти в tun; наружу выводится обратный канал к клиенту
+ * ([protect]), иначе ответы в локальную сеть уехали бы в туннель.
+ *
+ * Слушает 0.0.0.0 без авторизации: открыт всей локальной сети, не только клиентам
+ * точки доступа.
+ */
+class Socks5Server(
+    private val protect: (Socket) -> Boolean,
+    private val port: Int = DEFAULT_PORT,
+) {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Слушающий сокет - под монитором: bind идёт на потоке вызывающего, чтобы
+    // BindException был виден ему, а не утонул в корутине.
     private var serverSocket: ServerSocket? = null
-    private var scope: CoroutineScope? = null
-    private val isRunning = AtomicBoolean(false)
+    private var acceptJob: Job? = null
 
-    companion object {
-        // SOCKS5 reply codes (RFC 1928)
-        private const val REPLY_SUCCESS: Byte = 0x00
-        private const val REPLY_GENERAL_FAILURE: Byte = 0x01
-        private const val REPLY_CONNECTION_REFUSED: Byte = 0x05
-        private const val REPLY_HOST_UNREACHABLE: Byte = 0x04
-        private const val REPLY_NETWORK_UNREACHABLE: Byte = 0x03
+    @Synchronized
+    fun start() {
+        if (serverSocket != null) return
+        val socket = try {
+            ServerSocket(port, BACKLOG, InetAddress.getByName(BIND_ADDRESS))
+        } catch (e: Exception) {
+            ProxyStore.log("SOCKS5: не поднялся на $BIND_ADDRESS:$port - ${e.message}", LogLevel.Error)
+            return
+        }
+        serverSocket = socket
+        acceptJob = scope.launch { acceptLoop(socket) }
+        ProxyStore.log("SOCKS5: раздача туннеля на $BIND_ADDRESS:$port (только TCP)")
     }
 
-    fun start() {
-        if (!isRunning.compareAndSet(false, true)) return
-        val newScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        scope = newScope
-        newScope.launch {
-            try {
-                serverSocket = ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"))
-                ProxyServiceState.addLog("SOCKS5 Hotspot Proxy запущен на 0.0.0.0:$port")
-                while (isActive && isRunning.get()) {
-                    val clientSocket = serverSocket?.accept() ?: break
-                    launch { handleClient(clientSocket) }
-                }
+    @Synchronized
+    fun stop() {
+        val socket = serverSocket ?: return
+        serverSocket = null
+        // Сокет закрываем до отмены: accept() блокирующий и на отмену корутины не смотрит.
+        try { socket.close() } catch (_: Exception) {}
+        acceptJob = null
+        scope.coroutineContext.cancelChildren()
+        ProxyStore.log("SOCKS5: раздача остановлена")
+    }
+
+    private suspend fun acceptLoop(socket: ServerSocket) {
+        while (coroutineContext.isActive) {
+            val client = try {
+                socket.accept()
             } catch (e: Exception) {
-                if (e !is CancellationException && isRunning.get()) {
-                    ProxyServiceState.addLog("SOCKS5 ошибка сервера: ${e.message}")
+                // Закрытый из stop() сокет - штатный выход, о нём молчим.
+                if (serverSocket != null) {
+                    ProxyStore.log("SOCKS5: приём прерван - ${e.message}", LogLevel.Warning)
                 }
-            } finally {
-                stop()
+                return
             }
+            scope.launch { handleClient(client) }
         }
     }
 
-    fun stop() {
-        if (!isRunning.compareAndSet(true, false)) return
+    private suspend fun handleClient(client: Socket) = withContext(Dispatchers.IO) {
+        var target: Socket? = null
         try {
-            serverSocket?.close()
-            serverSocket = null
-        } catch (_: Exception) {}
-        scope?.cancel()
-        scope = null
-        ProxyServiceState.addLog("SOCKS5 Hotspot Proxy остановлен")
-    }
+            // Обратный канал - мимо туннеля: приложение теперь внутри tun, и ответы
+            // клиенту в локальную сеть без этого ушли бы в туннель.
+            protect(client)
 
-    private suspend fun handleClient(clientSocket: Socket) = withContext(Dispatchers.IO) {
-        var targetSocket: Socket? = null
-        try {
-            val input = clientSocket.getInputStream()
-            val output = clientSocket.getOutputStream()
+            val input = client.getInputStream()
+            val output = client.getOutputStream()
 
-            val version = input.readByte()
-            if (version != 5) return@withContext
-            val numMethods = input.readByte()
-            if (numMethods <= 0) return@withContext
-            val methods = ByteArray(numMethods)
-            input.readFully(methods)
+            if (!negotiate(input, output)) return@withContext
 
-            output.write(byteArrayOf(5, 0))
-            output.flush()
+            if (input.readByte() != VERSION) return@withContext
+            val command = input.readByte()
+            input.readByte() // RSV
+            val addressType = input.readByte()
 
-            val reqVersion = input.readByte()
-            val reqCmd = input.readByte()
-            input.readByte() // RSV (reserved, игнорируем)
-            val reqAtyp = input.readByte()
-
-            if (reqVersion != 5 || reqCmd != 1) { // Only CONNECT is supported
-                sendReply(output, REPLY_GENERAL_FAILURE)
+            if (command != CMD_CONNECT) {
+                sendReply(output, REPLY_COMMAND_NOT_SUPPORTED)
                 return@withContext
             }
-
-            val host: String
-            when (reqAtyp) {
-                1 -> { // IPv4
-                    val hostBytes = ByteArray(4)
-                    input.readFully(hostBytes)
-                    host = InetAddress.getByAddress(hostBytes).hostAddress ?: ""
-                }
-                3 -> { // Domain name
-                    val len = input.readByte()
-                    if (len <= 0) return@withContext
-                    val hostBytes = ByteArray(len)
-                    input.readFully(hostBytes)
-                    host = String(hostBytes)
-                }
-                4 -> { // IPv6
-                    val hostBytes = ByteArray(16)
-                    input.readFully(hostBytes)
-                    host = InetAddress.getByAddress(hostBytes).hostAddress ?: ""
-                }
-                else -> {
-                    sendReply(output, REPLY_GENERAL_FAILURE)
-                    return@withContext
-                }
+            // Длину неизвестного типа адреса не угадать - дочитать до порта нечем,
+            // поэтому соединение после ответа закрывается.
+            val host = readHost(input, addressType) ?: run {
+                sendReply(output, REPLY_ADDRESS_TYPE_NOT_SUPPORTED)
+                return@withContext
             }
+            val targetPort = readPort(input)
 
-            val portBytes = ByteArray(2)
-            input.readFully(portBytes)
-            val targetPort = ((portBytes[0].toInt() and 0xFF) shl 8) or (portBytes[1].toInt() and 0xFF)
-
+            val socket = Socket()
+            target = socket
             try {
-                targetSocket = Socket(host, targetPort)
-            } catch (e: java.net.ConnectException) {
-                sendReply(output, REPLY_CONNECTION_REFUSED)
-                return@withContext
-            } catch (e: java.net.NoRouteToHostException) {
-                sendReply(output, REPLY_HOST_UNREACHABLE)
-                return@withContext
-            } catch (e: java.net.UnknownHostException) {
-                sendReply(output, REPLY_HOST_UNREACHABLE)
-                return@withContext
+                socket.connect(InetSocketAddress(host, targetPort), CONNECT_TIMEOUT_MS)
             } catch (e: Exception) {
-                sendReply(output, REPLY_GENERAL_FAILURE)
+                sendReply(output, replyFor(e))
                 return@withContext
             }
-
             sendReply(output, REPLY_SUCCESS)
 
-            val clientToServer = launch { pipe(input, targetSocket.getOutputStream()) }
-            val serverToClient = launch { pipe(targetSocket.getInputStream(), output) }
-
-            clientToServer.join()
-            serverToClient.join()
+            val upstream = launch { pipe(input, socket.getOutputStream(), socket) }
+            val downstream = launch { pipe(socket.getInputStream(), output, client) }
+            upstream.join()
+            downstream.join()
         } catch (_: EOFException) {
         } catch (_: Exception) {
         } finally {
-            try { clientSocket.close() } catch (_: Exception) {}
-            try { targetSocket?.close() } catch (_: Exception) {}
+            try { client.close() } catch (_: Exception) {}
+            try { target?.close() } catch (_: Exception) {}
         }
     }
 
-    private fun sendReply(output: OutputStream, replyCode: Byte) {
-        // VER(1) REP(1) RSV(1) ATYP(1)=IPv4 BND.ADDR(4) BND.PORT(2)
-        output.write(byteArrayOf(5, replyCode, 0, 1, 0, 0, 0, 0, 0, 0))
-        output.flush()
-    }
-
-    private fun InputStream.readByte(): Int {
-        val b = this.read()
-        if (b == -1) throw EOFException()
-        return b
-    }
-
-    private fun InputStream.readFully(b: ByteArray) {
-        var offset = 0
-        while (offset < b.size) {
-            val read = this.read(b, offset, b.size - offset)
-            if (read == -1) throw EOFException()
-            offset += read
+    /** false - клиент не предложил "без авторизации" либо поздоровался не по протоколу. */
+    private fun negotiate(input: InputStream, output: OutputStream): Boolean {
+        if (input.readByte() != VERSION) return false
+        val methodCount = input.readByte()
+        if (methodCount <= 0) return false
+        val methods = input.readExactly(methodCount)
+        if (methods.none { it.toInt() and 0xFF == METHOD_NO_AUTH }) {
+            output.writeBytes(VERSION, METHOD_NONE_ACCEPTABLE)
+            return false
         }
+        output.writeBytes(VERSION, METHOD_NO_AUTH)
+        return true
     }
 
-    private suspend fun pipe(inputStream: InputStream, outputStream: OutputStream) = withContext(Dispatchers.IO) {
+    private fun readHost(input: InputStream, addressType: Int): String? = when (addressType) {
+        ATYP_IPV4 -> InetAddress.getByAddress(input.readExactly(4)).hostAddress
+        ATYP_IPV6 -> InetAddress.getByAddress(input.readExactly(16)).hostAddress
+        ATYP_DOMAIN -> {
+            val length = input.readByte()
+            // Имя хоста в SOCKS5 - ASCII; платформенная кодировка ломала бы IDN-punycode.
+            if (length <= 0) null else String(input.readExactly(length), StandardCharsets.US_ASCII)
+        }
+        else -> null
+    }
+
+    private fun readPort(input: InputStream): Int {
+        val bytes = input.readExactly(2)
+        return ((bytes[0].toInt() and 0xFF) shl 8) or (bytes[1].toInt() and 0xFF)
+    }
+
+    private fun sendReply(output: OutputStream, reply: Int) {
+        // VER REP RSV ATYP=IPv4 BND.ADDR(4) BND.PORT(2). Привязку не сообщаем -
+        // для CONNECT клиенты её не используют.
+        output.writeBytes(VERSION, reply, 0, ATYP_IPV4, 0, 0, 0, 0, 0, 0)
+    }
+
+    private fun replyFor(e: Exception): Int = when (e) {
+        is ConnectException -> REPLY_CONNECTION_REFUSED
+        is NoRouteToHostException -> REPLY_HOST_UNREACHABLE
+        is UnknownHostException -> REPLY_HOST_UNREACHABLE
+        is SocketTimeoutException -> REPLY_HOST_UNREACHABLE
+        else -> REPLY_GENERAL_FAILURE
+    }
+
+    /**
+     * Половина дуплекса. По концу источника закрывает [sink] на запись: без FIN
+     * встречная сторона держала бы соединение открытым, а обе `join` не возвращались бы
+     * до таймаута где-то в сети.
+     */
+    private suspend fun pipe(
+        source: InputStream,
+        destination: OutputStream,
+        sink: Socket,
+    ) = withContext(Dispatchers.IO) {
+        val buffer = ByteArray(BUFFER_SIZE)
         try {
-            val buffer = ByteArray(8192)
-            while (isActive) {
-                val bytesRead = inputStream.read(buffer)
-                if (bytesRead == -1) break
-                outputStream.write(buffer, 0, bytesRead)
-                outputStream.flush()
+            while (true) {
+                val read = source.read(buffer)
+                if (read == -1) break
+                destination.write(buffer, 0, read)
+                destination.flush()
             }
         } catch (_: Exception) {
+        } finally {
+            try { sink.shutdownOutput() } catch (_: Exception) {}
         }
     }
+
+    companion object {
+        const val DEFAULT_PORT = 1080
+
+        private const val BIND_ADDRESS = "0.0.0.0"
+        private const val BACKLOG = 50
+        private const val BUFFER_SIZE = 8192
+        private const val CONNECT_TIMEOUT_MS = 10_000
+
+        private const val VERSION = 5
+        private const val METHOD_NO_AUTH = 0x00
+        private const val METHOD_NONE_ACCEPTABLE = 0xFF
+        private const val CMD_CONNECT = 0x01
+        private const val ATYP_IPV4 = 0x01
+        private const val ATYP_DOMAIN = 0x03
+        private const val ATYP_IPV6 = 0x04
+
+        private const val REPLY_SUCCESS = 0x00
+        private const val REPLY_GENERAL_FAILURE = 0x01
+        private const val REPLY_HOST_UNREACHABLE = 0x04
+        private const val REPLY_CONNECTION_REFUSED = 0x05
+        private const val REPLY_COMMAND_NOT_SUPPORTED = 0x07
+        private const val REPLY_ADDRESS_TYPE_NOT_SUPPORTED = 0x08
+    }
+}
+
+private fun InputStream.readByte(): Int = read().also { if (it == -1) throw EOFException() }
+
+private fun InputStream.readExactly(count: Int): ByteArray {
+    val bytes = ByteArray(count)
+    var offset = 0
+    while (offset < count) {
+        val read = read(bytes, offset, count - offset)
+        if (read == -1) throw EOFException()
+        offset += read
+    }
+    return bytes
+}
+
+private fun OutputStream.writeBytes(vararg values: Int) {
+    write(ByteArray(values.size) { values[it].toByte() })
+    flush()
 }

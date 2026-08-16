@@ -17,9 +17,9 @@ data class BackupData(
     val nerdMode: Boolean,
     val privacyMode: Boolean,
     val restartServerOnSwitch: Boolean,
+    val hotspotProxy: Boolean,
     val suppressUpdatePrompt: Boolean,
-    val suppressTgPrompt: Boolean,
-    val hotspotProxyEnabled: Boolean
+    val suppressTgPrompt: Boolean
 )
 
 /** Сериализация [BackupData] в JSON (серверы - через тот же [ServerJson], что и в DataStore). */
@@ -35,9 +35,9 @@ object SettingsBackup {
         put("nerdMode", data.nerdMode)
         put("privacyMode", data.privacyMode)
         put("restartServerOnSwitch", data.restartServerOnSwitch)
+        put("hotspotProxy", data.hotspotProxy)
         put("suppressUpdatePrompt", data.suppressUpdatePrompt)
         put("suppressTgPrompt", data.suppressTgPrompt)
-        put("hotspotProxyEnabled", data.hotspotProxyEnabled)
     }.toString()
 
     fun decode(json: String): BackupData {
@@ -59,9 +59,9 @@ object SettingsBackup {
             nerdMode = o.optBoolean("nerdMode", true),
             privacyMode = o.optBoolean("privacyMode", false),
             restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false),
+            hotspotProxy = o.optBoolean("hotspotProxy", false),
             suppressUpdatePrompt = o.optBoolean("suppressUpdatePrompt", false),
-            suppressTgPrompt = o.optBoolean("suppressTgPrompt", false),
-            hotspotProxyEnabled = o.optBoolean("hotspotProxyEnabled", false)
+            suppressTgPrompt = o.optBoolean("suppressTgPrompt", false)
         )
     }
 }

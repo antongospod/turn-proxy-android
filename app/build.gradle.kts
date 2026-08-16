@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.freeturn.app"
-        // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
+        // gomobile собирает ядро с -androidapi 24.
         minSdk = 24
         targetSdk = 37
         versionName = "3.6.0" // x-release-please-version
@@ -42,7 +42,6 @@ android {
 
     packaging {
         resources.excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
-        jniLibs.useLegacyPackaging = true
     }
 
     buildFeatures {
@@ -82,7 +81,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // WireGuard tunnel-либа использует java.time, поэтому нужен desugaring.
+        // SshRepository использует java.time, поэтому нужен desugaring.
         isCoreLibraryDesugaringEnabled = true
     }
 }
@@ -101,12 +100,14 @@ composeCompiler {
 }
 
 dependencies {
+    // Ядро + gomobile-биндинг; файл кладёт fetchFreeturnAar
+    implementation(files(layout.projectDirectory.file("libs/freeturn.aar")))
+
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.jsch)
     implementation(libs.bouncycastle)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.wireguard.tunnel)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -172,21 +173,16 @@ androidComponents {
 }
 
 /**
- * Тянет нативное ядро из релизов free-turn-proxy в jniLibs (папка вне git).
- * Ассеты релиза без расширения: arm64 - client-android-arm64, armv7 - client-linux-armv7
- * (Go-бинарник linux/arm GOARM=7 работает и на Android); оба кладутся как libfreeturn.so.
+ * Тянет `freeturn.aar` (ядро + gomobile-биндинг) из релизов free-turn-proxy
+ * в app/libs. Версия `local` - брать уже лежащий файл и в сеть не ходить.
  */
-abstract class FetchFreeturnCore : DefaultTask() {
+abstract class FetchFreeturnAar : DefaultTask() {
     @get:Input
     abstract val repo: Property<String>
 
-    /** "latest" или конкретный тег/версия ("2.1.0", "v2.1.0"). */
+    /** "latest", "local" или конкретный тег/версия ("2.1.0", "v2.1.0"). */
     @get:Input
     abstract val version: Property<String>
-
-    /** ABI -> имя ассета в релизе. */
-    @get:Input
-    abstract val assetNames: MapProperty<String, String>
 
     @get:Input
     @get:Optional
@@ -196,28 +192,33 @@ abstract class FetchFreeturnCore : DefaultTask() {
     @get:Internal
     abstract val cacheDir: DirectoryProperty
 
-    @get:OutputDirectory
-    abstract val jniLibsDir: DirectoryProperty
+    @get:OutputFile
+    abstract val aarFile: RegularFileProperty
 
     @TaskAction
     fun fetch() {
-        val libs = jniLibsDir.get().asFile
-        val stamp = File(libs, ".core-version")
+        val aar = aarFile.get().asFile
+        val stamp = File(aar.parentFile, ".aar-version")
         val installed = if (stamp.isFile) stamp.readText().trim() else null
-        val allPresent = assetNames.get().keys.all { File(libs, "$it/libfreeturn.so").isFile }
+
+        if (version.get().trim().equals("local", ignoreCase = true)) {
+            if (!aar.isFile) throw GradleException("FreeTurn aar: freeturnAar=local, но ${aar.path} нет")
+            didWork = false
+            return
+        }
 
         val tag = try {
             resolveTag()
         } catch (e: Exception) {
             // Оффлайн со скачанным ядром - не повод ронять сборку
-            if (allPresent && installed != null) {
-                logger.warn("FreeTurn core: не удалось узнать версию (${e.message}), оставляю $installed")
+            if (aar.isFile && installed != null) {
+                logger.warn("FreeTurn aar: не удалось узнать версию (${e.message}), оставляю $installed")
                 return
             }
-            throw GradleException("FreeTurn core: не удалось определить версию из ${repo.get()}: ${e.message}", e)
+            throw GradleException("FreeTurn aar: не удалось определить версию из ${repo.get()}: ${e.message}", e)
         }
 
-        if (tag == installed && allPresent) {
+        if (tag == installed && aar.isFile) {
             didWork = false
             return
         }
@@ -231,22 +232,19 @@ abstract class FetchFreeturnCore : DefaultTask() {
                 if (p.size == 2) p[1].removePrefix("*") to p[0] else null
             }.toMap()
 
-        assetNames.get().forEach { (abi, asset) ->
-            val src = cachedFile(File(cache, asset), "$base/$asset")
-            val expected = sums[asset]
-                ?: throw GradleException("FreeTurn core: $asset нет в checksums.txt релиза $tag")
-            val actual = sha256(src)
-            if (!actual.equals(expected, ignoreCase = true)) {
-                src.delete()
-                throw GradleException("FreeTurn core: sha256 $asset не сошёлся ($actual != $expected)")
-            }
-            val dst = File(libs, "$abi/libfreeturn.so")
-            dst.parentFile.mkdirs()
-            src.copyTo(dst, overwrite = true)
+        val src = cachedFile(File(cache, ASSET), "$base/$ASSET")
+        val expected = sums[ASSET]
+            ?: throw GradleException("FreeTurn aar: $ASSET нет в checksums.txt релиза $tag")
+        val actual = sha256(src)
+        if (!actual.equals(expected, ignoreCase = true)) {
+            src.delete()
+            throw GradleException("FreeTurn aar: sha256 не сошёлся ($actual != $expected)")
         }
+        aar.parentFile.mkdirs()
+        src.copyTo(aar, overwrite = true)
 
         stamp.writeText(tag)
-        logger.lifecycle("FreeTurn core: $tag -> ${libs.path}")
+        logger.lifecycle("FreeTurn aar: $tag -> ${aar.path}")
     }
 
     private fun resolveTag(): String {
@@ -312,37 +310,28 @@ abstract class FetchFreeturnCore : DefaultTask() {
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }
+
+    private companion object {
+        const val ASSET = "freeturn.aar"
+    }
 }
 
-val fetchFreeturnCore = tasks.register<FetchFreeturnCore>("fetchFreeturnCore") {
-    description = "Качает нативное ядро из релизов free-turn-proxy в jniLibs"
+val fetchFreeturnAar = tasks.register<FetchFreeturnAar>("fetchFreeturnAar") {
+    description = "Качает freeturn.aar из релизов free-turn-proxy в app/libs"
     group = "build"
-    repo.set(providers.gradleProperty("freeturnCoreRepo").orElse("samosvalishe/free-turn-proxy"))
+    repo.set(providers.gradleProperty("freeturnAarRepo").orElse("samosvalishe/free-turn-proxy"))
     version.set(
-        providers.gradleProperty("freeturnCore")
-            .orElse(providers.environmentVariable("FREETURN_CORE_VERSION"))
+        providers.gradleProperty("freeturnAar")
+            .orElse(providers.environmentVariable("FREETURN_AAR_VERSION"))
             .orElse("latest")
-    )
-    assetNames.set(
-        mapOf(
-            "arm64-v8a" to "client-android-arm64",
-            "armeabi-v7a" to "client-linux-armv7"
-        )
     )
     token.set(providers.environmentVariable("GITHUB_TOKEN"))
     cacheDir.set(layout.dir(provider { File(gradle.gradleUserHomeDir, "caches/freeturn-core") }))
-    jniLibsDir.set(layout.projectDirectory.dir("src/main/jniLibs"))
+    aarFile.set(layout.projectDirectory.file("libs/freeturn.aar"))
     // Версия резолвится в рантайме - актуальность решает stamp-файл внутри таски
     outputs.upToDateWhen { false }
 }
 
-// В debug ядро подкладывается руками, поэтому по умолчанию качаем только на release.
+// AAR нужен на компиляции, а не на упаковке - качаем в любой сборке.
 // matching, а не named - таски вариантов AGP создаёт позже конфигурации скрипта.
-val coreFetchHook = when (providers.gradleProperty("coreFetch").orNull ?: "release") {
-    "none" -> null
-    "all" -> "preBuild"
-    else -> "preReleaseBuild"
-}
-if (coreFetchHook != null) {
-    tasks.matching { it.name == coreFetchHook }.configureEach { dependsOn(fetchFreeturnCore) }
-}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchFreeturnAar) }

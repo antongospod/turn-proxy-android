@@ -13,11 +13,16 @@ import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerJson
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.server.ServersSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.util.UUID
 
@@ -40,11 +45,20 @@ class AppPreferences(context: Context) {
         val SUPPRESS_TG_PROMPT = booleanPreferencesKey("suppress_tg_prompt")
         val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
         val RESTART_SERVER_ON_SWITCH = booleanPreferencesKey("restart_server_on_switch")
+        val HOTSPOT_PROXY = booleanPreferencesKey("hotspot_proxy")
         val SERVERS_JSON = stringPreferencesKey("servers_json")
         val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
         val OWN_CLIENT_ID = stringPreferencesKey("own_client_id")
-        val HOTSPOT_PROXY_ENABLED = booleanPreferencesKey("hotspot_proxy_enabled")
+        val PROXY_DESIRED = booleanPreferencesKey("proxy_desired")
     }
+
+    // Намерение пользователя переживает смерть процесса, поэтому пишется своим scope:
+    // STOP гасит сервис вместе с его корутинами раньше, чем dataStore успевает записать.
+    // Параллелизм 1: пул IO раскидал бы быструю пару START->STOP по разным потокам, и
+    // на диске мог остаться true - прокси поднимался бы сам после выключения.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val desiredScope =
+        CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
 
     private fun <T> prefFlow(transform: (Preferences) -> T): Flow<T> =
         context.dataStore.data
@@ -89,6 +103,10 @@ class AppPreferences(context: Context) {
     val restartServerOnSwitchFlow: Flow<Boolean> =
         prefFlow { prefs -> prefs[RESTART_SERVER_ON_SWITCH] ?: false }
 
+    // Раздача туннеля по SOCKS5 наружу. Работает только в WG-режиме: без tun сокеты
+    // сервера уходят напрямую, и клиенты хотспота получили бы канал мимо туннеля.
+    val hotspotProxyEnabledFlow: Flow<Boolean> = prefFlow { prefs -> prefs[HOTSPOT_PROXY] ?: false }
+
     val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
     val suppressUpdatePromptFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SUPPRESS_UPDATE_PROMPT] ?: false }
@@ -99,7 +117,16 @@ class AppPreferences(context: Context) {
     // даже после "не ограничивать" - без флага диалог всплывал бы каждый запуск.
     val batteryPromptShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[BATTERY_PROMPT_SHOWN] ?: false }
 
-    val hotspotProxyEnabledFlow: Flow<Boolean> = prefFlow { prefs -> prefs[HOTSPOT_PROXY_ENABLED] ?: false }
+    // "Прокси должен работать" по последней команде пользователя. Живое состояние сессии -
+    // в ProxyStore; здесь только намерение, по которому её восстанавливают после убийства.
+    val proxyDesiredFlow: Flow<Boolean> = prefFlow { prefs -> prefs[PROXY_DESIRED] ?: false }
+
+    /** Не suspend: зовётся с путей, где вызывающий вот-вот умрёт (см. [desiredScope]). */
+    fun setProxyDesired(desired: Boolean) {
+        desiredScope.launch {
+            context.dataStore.edit { prefs -> prefs[PROXY_DESIRED] = desired }
+        }
+    }
 
     // Каждая операция - одна транзакция dataStore.edit: атомарный read-modify-write,
     // параллельные записи не теряются и не оставляют активный id без сервера.
@@ -225,7 +252,7 @@ class AppPreferences(context: Context) {
     }
 
     suspend fun setHotspotProxyEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[HOTSPOT_PROXY_ENABLED] = enabled }
+        context.dataStore.edit { it[HOTSPOT_PROXY] = enabled }
     }
 
     suspend fun setTgSubscribeShown() {
@@ -270,9 +297,9 @@ class AppPreferences(context: Context) {
             nerdMode = nerdModeFlow.first(),
             privacyMode = privacyModeFlow.first(),
             restartServerOnSwitch = restartServerOnSwitchFlow.first(),
+            hotspotProxy = hotspotProxyEnabledFlow.first(),
             suppressUpdatePrompt = suppressUpdatePromptFlow.first(),
-            suppressTgPrompt = suppressTgPromptFlow.first(),
-            hotspotProxyEnabled = hotspotProxyEnabledFlow.first()
+            suppressTgPrompt = suppressTgPromptFlow.first()
         )
     }
 
@@ -297,9 +324,9 @@ class AppPreferences(context: Context) {
             prefs[NERD_MODE] = data.nerdMode
             prefs[PRIVACY_MODE] = data.privacyMode
             prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+            prefs[HOTSPOT_PROXY] = data.hotspotProxy
             prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt
             prefs[SUPPRESS_TG_PROMPT] = data.suppressTgPrompt
-            prefs[HOTSPOT_PROXY_ENABLED] = data.hotspotProxyEnabled
         }
         return data.servers.size
     }

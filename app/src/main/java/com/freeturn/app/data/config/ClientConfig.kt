@@ -9,8 +9,6 @@ data class ClientConfig(
     val useUdp: Boolean = false,
     val manualCaptcha: Boolean = false,
     val localPort: String = DEFAULT_LOCAL_PORT,
-    val isRawMode: Boolean = false,
-    val rawCommand: String = "",
     val tcpForward: Boolean = false,
     val bond: Boolean = false,
     val debugMode: Boolean = false,

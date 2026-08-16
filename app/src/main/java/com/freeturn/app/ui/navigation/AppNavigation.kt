@@ -44,7 +44,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.R
-import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.screens.captcha.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.share.ImportSheet
@@ -74,7 +73,7 @@ fun AppNavigation(
     // дефолтный tgSubscribeShown=false и диалог мигнёт у тех, кто его уже закрыл.
     if (!isInitialized) return
 
-    val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
+    val status by proxyViewModel.status.collectAsStateWithLifecycle()
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
     val initialSuppressTgPrompt by settingsViewModel.initialSuppressTgPrompt.collectAsStateWithLifecycle()
     val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
@@ -156,14 +155,13 @@ fun AppNavigation(
         onImported = { navController.navigateToTab(HomeGraph) }
     )
 
-    // Диалог капчи поверх любого экрана. Оборачиваем в key(sessionId), чтобы для
-    // каждой новой капча-сессии Compose пересоздавал диалог и WebView грузил URL заново
-    // (бинарник цикличит креды и для каждой выдаёт новую капчу с тем же localhost-URL).
-    val captchaState = proxyState as? ProxyState.CaptchaRequired
-    if (captchaState != null) {
-        androidx.compose.runtime.key(captchaState.sessionId) {
+    // Диалог капчи поверх любого экрана. key(captchaId) - чтобы Compose пересоздавал
+    // WebView на каждую новую капчу: ядро цикличит креды и выдаёт для них тот же
+    // localhost-URL, иначе страница не перезагрузится.
+    if (status.busy && status.captchaUrl.isNotEmpty()) {
+        androidx.compose.runtime.key(status.captchaId) {
             CaptchaWebViewDialog(
-                captchaUrl = captchaState.url,
+                captchaUrl = status.captchaUrl,
                 onDismiss = { proxyViewModel.dismissCaptcha() }
             )
         }

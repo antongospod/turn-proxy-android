@@ -50,7 +50,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.TunnelTransport
-import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
@@ -75,7 +74,7 @@ fun ConnectionModeScreen(
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
-    val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
+    val status by proxyViewModel.status.collectAsStateWithLifecycle()
 
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
     val saved = server?.client ?: activeClient
@@ -245,7 +244,7 @@ fun ConnectionModeScreen(
         SplitTunnelModal(
             mode = saved.splitTunnelMode,
             apps = saved.splitTunnelApps,
-            locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+            locked = status.busy,
             onModeChange = settingsViewModel::setSplitTunnelMode,
             onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet = false },

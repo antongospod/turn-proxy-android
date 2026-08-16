@@ -1,5 +1,4 @@
 package com.freeturn.app.service
-import com.freeturn.app.domain.proxy.ProxyServiceState
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -11,12 +10,13 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.R
+import com.freeturn.app.domain.proxy.ProxyPhase
+import com.freeturn.app.domain.proxy.ProxyStatus
 import java.util.Locale
 
 /**
- * Нотификации прокси-сервиса: foreground-статус (+скорость/число потоков) и
- * отдельный алерт ручной капчи. Статус и скорость держит внутри, перерисовывает
- * сам. Скорость/счётчик показываются только при "активных" статусах.
+ * Нотификации сервиса: постоянный статус подключения и отдельный алерт ручной
+ * капчи. Рисуется целиком из [ProxyStatus] - своего состояния не держит.
  */
 class ProxyNotifier(private val service: Service) {
 
@@ -27,16 +27,23 @@ class ProxyNotifier(private val service: Service) {
         private const val CHANNEL_CAPTCHA = "CaptchaChannel"
     }
 
-    private val openAppIntent: PendingIntent? by lazy {
+    private var shown: ProxyStatus? = null
+    private var captchaShown = false
+
+    private val openApp: PendingIntent? by lazy {
         service.packageManager.getLaunchIntentForPackage(service.packageName)?.let {
             PendingIntent.getActivity(service, 0, it, PendingIntent.FLAG_IMMUTABLE)
         }
     }
 
-    private var baseStatus = ""
-    private var speedText = ""
-    private var captchaActive = false
-    private var isActive = false
+    private val stopAction: PendingIntent by lazy {
+        PendingIntent.getBroadcast(
+            service,
+            0,
+            Intent(service, ProxyReceiver::class.java).setAction(ProxyActions.STOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+    }
 
     fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -57,97 +64,91 @@ class ProxyNotifier(private val service: Service) {
         )
     }
 
-    /** Базовый статус "Подключение..." для самого первого startForeground. */
-    fun prepareConnecting() {
-        baseStatus = service.getString(R.string.notif_proxy_connecting)
-        isActive = false
+    /** Первая нотификация для `startForeground` - до неё сессии ещё нет. */
+    fun build(): Notification = build(ProxyStatus(phase = ProxyPhase.Connecting), tunnelMode = false)
+
+    fun update(status: ProxyStatus, tunnelMode: Boolean) {
+        if (status.captchaUrl.isNotEmpty()) showCaptcha() else cancelCaptcha()
+        // Метрики тикают каждые 2 с: перерисовываем, только если что-то видимое изменилось.
+        if (status.visible() == shown?.visible()) return
+        shown = status
+        notify(NOTIF_ID_FG, build(status, tunnelMode))
     }
 
-    /** [active] - соединение установлено (прокси или прокси+WG): показываем потоки и скорость. */
-    fun setStatus(text: String, active: Boolean = false) {
-        baseStatus = text
-        isActive = active
-        show()
-    }
-
-    fun setSpeed(text: String) {
-        speedText = text
-        if (isActive) show()
-    }
-
-    /** Перерисовать (обновился счётчик потоков) - только если статус активен. */
-    fun refreshStats() {
-        if (isActive) show()
-    }
-
-    fun build(): Notification {
-        val stats = ProxyServiceState.connectionStats.value
-        // Активное соединение: статус уезжает в заголовок, строка текста целиком под
-        // потоки и скорость - вместе они в одну строку не влезают.
-        val title: String
-        val text: String
-        if (isActive) {
-            title = baseStatus
-            text = listOfNotNull(
-                if (stats.total > 0) String.format(
-                    Locale.US,
-                    service.getString(R.string.notif_proxy_threads_format),
-                    stats.active,
-                    stats.total
-                ) else null,
-                speedText.takeIf { it.isNotEmpty() }
-            ).joinToString(" • ")
-        } else {
-            title = service.getString(R.string.notif_proxy_title)
-            text = baseStatus
+    private fun build(status: ProxyStatus, tunnelMode: Boolean): Notification {
+        val connected = status.phase == ProxyPhase.Connected
+        val title = when {
+            connected && tunnelMode -> service.getString(R.string.tunnel_active)
+            connected -> service.getString(R.string.proxy_active)
+            status.phase == ProxyPhase.Error -> service.getString(R.string.notif_proxy_connect_error)
+            else -> service.getString(R.string.notif_proxy_connecting)
         }
-
-        val stopIntent = Intent(service, ProxyReceiver::class.java).apply {
-            action = ProxyActions.STOP
-        }
-        val stopPending = PendingIntent.getBroadcast(
-            service, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
+        // Сразу после коннекта метрик ещё нет (поллер тикает раз в 2 с) - строка была бы пустой.
+        val details = listOfNotNull(streamsText(status), speedText(status))
+            .takeIf { connected && it.isNotEmpty() }
+            ?.joinToString(" • ")
+            ?: service.getString(R.string.notif_proxy_title)
         return NotificationCompat.Builder(service, CHANNEL_PROXY)
             .setContentTitle(title)
-            .setContentText(text)
+            .setContentText(details)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
-            .setContentIntent(openAppIntent)
-            .addAction(0, service.getString(R.string.notif_proxy_stop_action), stopPending)
+            .setContentIntent(openApp)
+            .addAction(0, service.getString(R.string.notif_proxy_stop_action), stopAction)
             .build()
     }
 
-    private fun show() {
-        try {
-            NotificationManagerCompat.from(service).notify(NOTIF_ID_FG, build())
-        } catch (_: SecurityException) {}
+    private fun streamsText(status: ProxyStatus): String? =
+        if (status.total > 0) String.format(
+            Locale.US,
+            service.getString(R.string.notif_proxy_threads_format),
+            status.active,
+            status.total
+        ) else null
+
+    private fun speedText(status: ProxyStatus): String? =
+        if (status.rxRate == 0L && status.txRate == 0L) null
+        else "↓ ${rate(status.rxRate)} ↑ ${rate(status.txRate)}"
+
+    private fun rate(bytes: Long): String = when {
+        bytes < 1024 -> "$bytes B/s"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB/s"
+        else -> String.format(Locale.US, "%.1f MB/s", bytes / (1024f * 1024f))
     }
 
-    /** Показ алерта капчи. Дедуп: пока предыдущий не закрыт - повторно не шумим. */
-    fun showCaptcha() {
-        if (captchaActive) return
-        captchaActive = true
-        val notification = NotificationCompat.Builder(service, CHANNEL_CAPTCHA)
-            .setContentTitle(service.getString(R.string.notif_captcha_title))
-            .setContentText(service.getString(R.string.notif_captcha_text))
-            .setSmallIcon(R.drawable.ic_notification_captcha)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setAutoCancel(true)
-            .setContentIntent(openAppIntent)
-            .build()
-        try {
-            NotificationManagerCompat.from(service).notify(NOTIF_ID_CAPTCHA, notification)
-        } catch (_: SecurityException) {
-            // POST_NOTIFICATIONS отозван на API 33+ - молча игнорируем, диалог в UI
-            // всё равно откроется через captchaSession StateFlow.
-        }
+    /** Дедуп: пока предыдущий алерт не закрыт - повторно не шумим. */
+    private fun showCaptcha() {
+        if (captchaShown) return
+        captchaShown = true
+        notify(
+            NOTIF_ID_CAPTCHA,
+            NotificationCompat.Builder(service, CHANNEL_CAPTCHA)
+                .setContentTitle(service.getString(R.string.notif_captcha_title))
+                .setContentText(service.getString(R.string.notif_captcha_text))
+                .setSmallIcon(R.drawable.ic_notification_captcha)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(openApp)
+                .build()
+        )
     }
 
     fun cancelCaptcha() {
+        if (!captchaShown) return
+        captchaShown = false
         NotificationManagerCompat.from(service).cancel(NOTIF_ID_CAPTCHA)
-        captchaActive = false
+    }
+
+    // POST_NOTIFICATIONS могли отозвать: диалог капчи UI покажет и без алерта.
+    private fun notify(id: Int, notification: Notification) {
+        try {
+            NotificationManagerCompat.from(service).notify(id, notification)
+        } catch (_: SecurityException) {
+        }
     }
 }
+
+/** Что видно в нотификации: скорость округляем, чтобы не дёргать её каждый тик. */
+private fun ProxyStatus.visible() =
+    listOf(phase, active, total, rxRate / 1024, txRate / 1024)

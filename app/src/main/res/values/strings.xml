@@ -323,8 +323,8 @@
     <string name="notif_captcha_text">Откройте приложение для проверки</string>
     <string name="notif_proxy_connect_error">Ошибка подключения</string>
     <string name="notif_proxy_wireguard_error">Ошибка WireGuard</string>
-    <string name="notif_proxy_network_change">Смена сети, переподключение…</string>
-    <string name="notif_proxy_reconnecting">Переподключение (%1$d/%2$d)…</string>
+    <string name="notif_proxy_vpn_permission">Нужно разрешение VPN - откройте приложение</string>
+    <string name="tcp_blocked_by_tunnel">Туннель работает только поверх UDP-проброса</string>
 
     <!-- CaptchaWebViewDialog -->
     <string name="captcha_title">Проверка VK</string>
@@ -392,7 +392,7 @@
     <string name="nerd_mode">Режим отладки</string>
     <string name="nerd_mode_desc">Открывает отладочную информацию: состояние ядра, журнал сервера и подробные логи</string>
     <string name="hotspot_proxy">SOCKS5 Hotspot</string>
-    <string name="hotspot_proxy_desc">Временно недоступно</string>
+    <string name="hotspot_proxy_desc">Слушать на 0.0.0.0:1080 для раздачи WireGuard-туннеля через точку доступа</string>
     <string name="restart_server_on_switch">Перезапуск сервера при смене профиля</string>
     <string name="restart_server_on_switch_desc">Перезапускать сервер под параметры нового профиля</string>
     <string name="nerd_section_title">Отладочная информация</string>

@@ -3,6 +3,7 @@ package com.freeturn.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -21,6 +22,7 @@ import com.freeturn.app.ui.navigation.AppNavigation
 import com.freeturn.app.ui.theme.FreeTurnTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import com.freeturn.app.viewmodel.proxy.ProxyViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -28,6 +30,7 @@ import androidx.compose.runtime.getValue
 class MainActivity : ComponentActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModel()
+    private val proxyViewModel: ProxyViewModel by viewModel()
     private val linkImportBus: LinkImportBus by inject()
 
     private val requestNotificationPermission =
@@ -63,6 +66,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Открытие приложения - момент, когда убитую сессию можно поднять без фоновых
+    // ограничений: активити на экране, право на FGS есть.
+    override fun onResume() {
+        super.onResume()
+        proxyViewModel.onForeground(vpnConsent = VpnService.prepare(this) == null)
     }
 
     // singleTask: freeturn://-ссылка при живой задаче приходит сюда, не в onCreate.

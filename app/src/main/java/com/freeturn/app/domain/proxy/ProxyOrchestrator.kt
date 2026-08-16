@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.first
 
 class ProxyOrchestrator(
     private val prefs: AppPreferences,
-    private val proxyManager: LocalProxyManager,
+    private val launcher: ProxyServiceLauncher,
     private val sshRepository: SshRepository
 ) {
     suspend fun restartServerIfRunning() {
@@ -50,10 +50,10 @@ class ProxyOrchestrator(
         )
     }
 
-    suspend fun restartProxyIfRunning() {
-        if (!ProxyServiceState.isRunning.value) return
-        proxyManager.stopProxy()
-        proxyManager.startProxy(prefs.clientConfigFlow.first())
+    /** Команда START при живой сессии пересоздаёт её с новым конфигом. */
+    fun restartProxyIfRunning() {
+        if (!ProxyStore.status.value.busy) return
+        launcher.start()
     }
 
 }

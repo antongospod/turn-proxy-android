@@ -284,6 +284,7 @@ fun ServerManagementScreen(
                     ServerSyncCard(
                         tcp = tcpDraft,
                         onTcp = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); tcpDraft = it },
+                        tcpBlocked = effClient.wireGuardActive,
                         obfProfile = obfDraft,
                         onObfProfile = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); obfDraft = it },
                         keyDraft = keyDraft,

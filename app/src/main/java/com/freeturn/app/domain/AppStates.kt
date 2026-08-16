@@ -21,34 +21,6 @@ sealed class ServerState {
     data class Error(val message: String) : ServerState()
 }
 
-sealed class ProxyState {
-    object Idle : ProxyState()
-    object Starting : ProxyState()
-    data class Connecting(val active: Int, val total: Int) : ProxyState()
-    data class Running(val active: Int, val total: Int) : ProxyState()
-    data class Error(val message: String) : ProxyState()
-    data class CaptchaRequired(val url: String, val sessionId: Long = 0L) : ProxyState()
-}
-
-sealed class StartupResult {
-    data object Success : StartupResult()
-    data class Failed(val message: String) : StartupResult()
-}
-
-// sessionId пересоздаёт WebView, когда ядро повторно выдаёт тот же URL.
-data class CaptchaSession(val url: String, val sessionId: Long)
-
-/**
- * Статистика подключений ядра.
- * [active] - живые каналы.
- * [total] - целевое число каналов (0 = неизвестно).
- */
-data class ConnectionStats(val active: Int, val total: Int) {
-    companion object {
-        val IDLE = ConnectionStats(0, 0)
-    }
-}
-
 sealed class UpdateState {
     object Idle : UpdateState()
     object Checking : UpdateState()

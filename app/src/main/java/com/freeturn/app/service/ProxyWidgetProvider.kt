@@ -10,12 +10,15 @@ import android.widget.RemoteViews
 import com.freeturn.app.MainActivity
 import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.domain.proxy.ProxyServiceState
+import com.freeturn.app.domain.proxy.ProxyPhase
+import com.freeturn.app.domain.proxy.ProxyStatus
+import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -33,9 +36,12 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
             try {
-                val serverName = appPreferences.serversSnapshot.first().active?.name
-                val views = buildViews(context, ProxyServiceState.isRunning.value, serverName)
-                manager.updateAppWidget(ids, views)
+                // Таймаут: не эмитни DataStore - finish() не вызвался бы, а у ресивера
+                // на всё про всё 10 секунд до ANR. Виджет переживёт имя-заглушку.
+                val serverName = withTimeoutOrNull(WIDGET_READ_TIMEOUT_MS) {
+                    appPreferences.serversSnapshot.first().active?.name
+                }
+                manager.updateAppWidget(ids, buildViews(context, ProxyStore.status.value, serverName))
             } finally {
                 pending.finish()
             }
@@ -43,6 +49,8 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
     }
 
     companion object {
+        private const val WIDGET_READ_TIMEOUT_MS = 5_000L
+
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
@@ -58,14 +66,13 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
 
         private fun buildViews(
             context: Context,
-            running: Boolean,
+            status: ProxyStatus,
             serverName: String?
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_proxy)
 
-            // Прокси стартует не мгновенно: active>0 = каналы подняты, иначе ещё коннектится.
-            val stats = ProxyServiceState.connectionStats.value
-            val connecting = running && stats.active == 0
+            val running = status.busy
+            val connecting = running && status.phase != ProxyPhase.Connected
 
             val statusRes = when {
                 !running -> R.string.widget_status_off
@@ -77,8 +84,8 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
             // Потоки в подзаголовке рядом с сервером: "Amsterdam · 3/12" (формат главного экрана).
             val counts = when {
                 !running -> null
-                stats.total > 0 -> "${stats.active}/${stats.total}"
-                else -> stats.active.toString()
+                status.total > 0 -> "${status.active}/${status.total}"
+                else -> status.active.toString()
             }
             val subtitle = listOfNotNull(
                 serverName ?: context.getString(R.string.widget_server_none),

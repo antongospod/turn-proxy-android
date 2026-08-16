@@ -52,8 +52,6 @@ internal object ServerJson {
             put("useUdp", p.client.useUdp)
             put("manualCaptcha", p.client.manualCaptcha)
             put("localPort", p.client.localPort)
-            put("isRawMode", p.client.isRawMode)
-            put("rawCommand", p.client.rawCommand)
             put("tcpForward", p.client.tcpForward)
             put("bond", p.client.bond)
 
@@ -110,8 +108,6 @@ internal object ServerJson {
                 useUdp = cliO.optBoolean("useUdp", false),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
                 localPort = cliO.optString("localPort", ClientConfig.DEFAULT_LOCAL_PORT),
-                isRawMode = cliO.optBoolean("isRawMode", false),
-                rawCommand = cliO.optString("rawCommand"),
                 tcpForward = cliO.optBoolean("tcpForward", false),
                 bond = cliO.optBoolean("bond", false),
 

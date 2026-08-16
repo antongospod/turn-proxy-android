@@ -4,6 +4,7 @@ package com.freeturn.app.ui.screens.servermanagement
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -42,6 +43,7 @@ import com.freeturn.app.ui.util.redact
 internal fun ServerSyncCard(
     tcp: Boolean,
     onTcp: (Boolean) -> Unit,
+    tcpBlocked: Boolean,
     obfProfile: String,
     onObfProfile: (String) -> Unit,
     keyDraft: String,
@@ -65,8 +67,13 @@ internal fun ServerSyncCard(
                 SegmentedButton(
                     selected = tcp,
                     onClick = { onTcp(true) },
+                    // Ядро поднимает туннель только поверх udp-проброса.
+                    enabled = !tcpBlocked,
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) { Text(stringResource(R.string.tcp)) }
+            }
+            if (tcpBlocked) {
+                SettingsControlLabel(stringResource(R.string.tcp_blocked_by_tunnel))
             }
         }
         SettingsRowDivider()

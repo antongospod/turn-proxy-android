@@ -14,13 +14,13 @@ import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServersSnapshot
 import com.freeturn.app.domain.backup.BackupManager
 import com.freeturn.app.domain.update.AppUpdater
-import com.freeturn.app.domain.proxy.LocalProxyManager
+import com.freeturn.app.domain.proxy.ProxyServiceLauncher
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.server.ServerSetupRepository
 import com.freeturn.app.domain.ssh.SshRepository
 import com.freeturn.app.viewmodel.uiError
 import com.freeturn.app.domain.UpdateState
-import com.freeturn.app.domain.proxy.ProxyServiceState
+import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,7 +50,7 @@ sealed interface ServerCleanupState {
 
 class SettingsViewModel(
     private val prefs: AppPreferences,
-    private val proxyManager: LocalProxyManager,
+    private val proxyLauncher: ProxyServiceLauncher,
     private val sshRepository: SshRepository,
     private val serverSetup: ServerSetupRepository,
     private val appUpdater: AppUpdater,
@@ -74,9 +74,6 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     val nerdMode: StateFlow<Boolean> = prefs.nerdModeFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    val hotspotProxyEnabled: StateFlow<Boolean> = prefs.hotspotProxyEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val serversSnapshot: StateFlow<ServersSnapshot> = prefs.serversSnapshot
@@ -106,6 +103,9 @@ class SettingsViewModel(
     val restartServerOnSwitch: StateFlow<Boolean> = prefs.restartServerOnSwitchFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val hotspotProxyEnabled: StateFlow<Boolean> = prefs.hotspotProxyEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     // Ожидаем DataStore, чтобы дефолт StateFlow не пропустил диалог первой сессии.
     suspend fun batteryPromptShownOnce(): Boolean = prefs.batteryPromptShownFlow.first()
 
@@ -118,7 +118,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             _initialTgSubscribeShown.value = prefs.tgSubscribeShownFlow.first()
             _initialSuppressTgPrompt.value = prefs.suppressTgPromptFlow.first()
-            ProxyServiceState.setLogsEnabled(prefs.clientConfigFlow.first().logsEnabled)
+            ProxyStore.setLogsEnabled(prefs.clientConfigFlow.first().logsEnabled)
             _isInitialized.value = true
         }
         viewModelScope.launch {
@@ -134,16 +134,17 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.setRestartServerOnSwitch(enabled) }
     }
 
+    // Применяется со следующего запуска: слушающий порт поднимается вместе с сессией.
+    fun setHotspotProxyEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setHotspotProxyEnabled(enabled) }
+    }
+
     fun setDynamicTheme(enabled: Boolean) {
         viewModelScope.launch { prefs.setDynamicTheme(enabled) }
     }
 
     fun setNerdMode(enabled: Boolean) {
         viewModelScope.launch { prefs.setNerdMode(enabled) }
-    }
-
-    fun setHotspotProxyEnabled(enabled: Boolean) {
-        viewModelScope.launch { prefs.setHotspotProxyEnabled(enabled) }
     }
 
     fun setTgSubscribeShown() {
@@ -169,7 +170,7 @@ class SettingsViewModel(
                 ?: prefs.serversSnapshot.first().activeId ?: return@launch
             if (!prefs.updateServer(targetId) { it.copy(client = config) }) return@launch
             if (targetId == prefs.serversSnapshot.first().activeId) {
-                ProxyServiceState.setLogsEnabled(config.logsEnabled)
+                ProxyStore.setLogsEnabled(config.logsEnabled)
             }
         }
     }
@@ -253,7 +254,7 @@ class SettingsViewModel(
             if (!prefs.updateServer(id) { it.copy(client = transform(it.client)) }) return@launch
             val snap = prefs.serversSnapshot.first()
             snap.active?.takeIf { it.id == id }?.let {
-                ProxyServiceState.setLogsEnabled(it.client.logsEnabled)
+                ProxyStore.setLogsEnabled(it.client.logsEnabled)
             }
         }
     }
@@ -404,11 +405,10 @@ class SettingsViewModel(
                 }
                 // Разбор до остановки рантайма: неверный пароль не должен гасить подключение.
                 val data = backupManager.decode(bytes, password)
-                if (ProxyServiceState.isRunning.value) proxyManager.stopProxy()
+                proxyLauncher.stop()
                 val count = backupManager.restore(data)
                 sshRepository.resetAll()
-                proxyManager.clearState()
-                ProxyServiceState.clearLogs()
+                ProxyStore.clearLogs()
                 BackupEvent.RestoreSuccess(count)
             } catch (e: CancellationException) {
                 throw e
@@ -425,13 +425,10 @@ class SettingsViewModel(
 
     fun resetAllSettings() {
         viewModelScope.launch {
-            if (ProxyServiceState.isRunning.value) {
-                proxyManager.stopProxy()
-            }
+            proxyLauncher.stop()
             prefs.resetAll()
             sshRepository.resetAll()
-            proxyManager.clearState()
-            ProxyServiceState.clearLogs()
+            ProxyStore.clearLogs()
 
             val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
             if (intent != null) {

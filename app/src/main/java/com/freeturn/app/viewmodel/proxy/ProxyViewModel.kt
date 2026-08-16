@@ -3,40 +3,52 @@ package com.freeturn.app.viewmodel.proxy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.domain.proxy.LocalProxyManager
-import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.domain.proxy.LogEntry
-import com.freeturn.app.domain.proxy.ProxyServiceState
+import com.freeturn.app.domain.proxy.ProxyEngine
+import com.freeturn.app.domain.proxy.ProxyPhase
+import com.freeturn.app.domain.proxy.ProxyServiceLauncher
+import com.freeturn.app.domain.proxy.ProxyStatus
+import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ProxyViewModel(
-    private val proxyManager: LocalProxyManager,
-    private val prefs: AppPreferences
+    private val launcher: ProxyServiceLauncher,
+    private val prefs: AppPreferences,
+    private val engine: ProxyEngine
 ) : ViewModel() {
 
-    val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
-    val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
-    val tunnelActive: StateFlow<Boolean> = ProxyServiceState.tunnelActive
-    val logs: StateFlow<List<LogEntry>> = ProxyServiceState.logs
+    val status: StateFlow<ProxyStatus> = ProxyStore.status
+    val logs: StateFlow<List<LogEntry>> = ProxyStore.logs
 
-    fun startProxy() {
+    fun start() = launcher.start()
+
+    fun stop() = launcher.stop()
+
+    /**
+     * Возврат приложения на передний план. Живой сессии он говорит, что устройство
+     * проснулось (стримы не досиживают backoff, начатый до сна); мёртвой - что её
+     * пора поднять: намерение живо, значит процесс убивали, и sticky-рестарт до нас
+     * не дошёл (типично для OEM-киллеров, которым FGS не указ).
+     *
+     * [vpnConsent] - согласие на VpnService уже дано. Без него в WG-режиме стартовать
+     * нечем, а спрашивать молча, без действия пользователя, нельзя.
+     */
+    fun onForeground(vpnConsent: Boolean) {
+        if (ProxyStore.status.value.phase != ProxyPhase.Idle) {
+            engine.wake()
+            return
+        }
         viewModelScope.launch {
-            val config = prefs.clientConfigFlow.first()
-            proxyManager.startProxy(config)
+            if (!prefs.proxyDesiredFlow.first()) return@launch
+            if (!vpnConsent && prefs.clientConfigFlow.first().wireGuardActive) return@launch
+            launcher.start()
         }
     }
 
-    fun stopProxy() {
-        viewModelScope.launch { proxyManager.stopProxy() }
-    }
+    /** Окно закрыл пользователь; ядро ждёт решения дальше и выдаст новую капчу. */
+    fun dismissCaptcha() = ProxyStore.setCaptcha("")
 
-    fun dismissCaptcha() {
-        proxyManager.dismissCaptcha()
-    }
-
-    fun clearLogs() {
-        ProxyServiceState.clearLogs()
-    }
+    fun clearLogs() = ProxyStore.clearLogs()
 }

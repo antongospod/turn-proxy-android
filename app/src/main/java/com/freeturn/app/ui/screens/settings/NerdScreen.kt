@@ -37,8 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.CoreArgs
+import com.freeturn.app.data.CoreCommand
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.toCoreJson
+import com.freeturn.app.domain.proxy.ProxyEngine
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerStartOptions
@@ -53,6 +55,7 @@ import com.freeturn.app.viewmodel.server.ServerHubState
 import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import com.freeturn.app.ui.theme.Spacing
+import org.koin.compose.koinInject
 
 /** Тег релиза приходит и как "1.0.3", и как "v1.0.3" - нормализуем без "vv". */
 private fun versionLabel(version: String): String = "v${version.removePrefix("v")}"
@@ -239,8 +242,9 @@ private fun NerdStateRow(label: String, value: String, mono: Boolean = false) {
 
 @Composable
 private fun LaunchParamsCard(server: Server, privacyMode: Boolean) {
+    val engine: ProxyEngine = koinInject()
     val serverCmd = remember(server, privacyMode) { serverCommandLine(server, privacyMode) }
-    val clientCmd = remember(server, privacyMode) { clientCommandLine(server, privacyMode) }
+    val clientCmd = remember(server, privacyMode) { clientCommandLine(engine, server, privacyMode) }
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -269,24 +273,13 @@ private fun LaunchParamBlock(label: String, commandLine: String) {
     }
 }
 
-private val CLIENT_SECRET_FLAGS = setOf("-peer", "-link", "-obf-key", "-turn", "-client-id")
-
-private fun clientCommandLine(server: Server, privacy: Boolean): String {
-    val argv = CoreArgs.client(server.client, server.opts)
-    val sb = StringBuilder("freeturn")
-    var i = 0
-    while (i < argv.size) {
-        val tok = argv[i]
-        sb.append(' ').append(tok)
-        if (tok in CLIENT_SECRET_FLAGS && i + 1 < argv.size) {
-            sb.append(' ').append(argv[i + 1].redact(privacy))
-            i += 2
-        } else {
-            i += 1
-        }
-    }
-    return sb.toString()
-}
+/** Строку argv собирает само ядро - показанная команда совпадает с запускаемой. */
+private fun clientCommandLine(engine: ProxyEngine, server: Server, privacy: Boolean): String =
+    runCatching { engine.configToArgs(server.client.toCoreJson(server.opts)) }
+        .fold(
+            onSuccess = { CoreCommand.redact(it, privacy) },
+            onFailure = { "-" }
+        )
 
 private fun serverCommandLine(server: Server, privacy: Boolean): String {
     val opts = ServerStartOptions(

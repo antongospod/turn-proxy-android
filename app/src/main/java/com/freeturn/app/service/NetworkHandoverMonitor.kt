@@ -1,5 +1,5 @@
 package com.freeturn.app.service
-import com.freeturn.app.domain.proxy.ProxyServiceState
+import com.freeturn.app.domain.proxy.ProxyStore
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -34,6 +34,10 @@ class NetworkHandoverMonitor(
     @Volatile private var lastKey: String? = null
 
     fun register() {
+        // START прилетает в живой сервис на каждом рестарте сессии: без снятия
+        // прошлого колбэка они копятся (дубли переподключений, а после ~100
+        // регистраций в процессе - TooManyRequestsException).
+        unregister()
         val cm = cm
         val registeredAt = SystemClock.elapsedRealtime()
         lastKey = physicalNetworkKey(cm)
@@ -50,7 +54,7 @@ class NetworkHandoverMonitor(
                 if (oldKey == newKey) return@launch
                 lastKey = newKey
                 if (newKey == null) {
-                    ProxyServiceState.addLog("Сеть: физическая сеть недоступна ($reason)")
+                    ProxyStore.log("Сеть: физическая сеть недоступна ($reason)")
                     return@launch
                 }
                 onHandover()
@@ -62,7 +66,7 @@ class NetworkHandoverMonitor(
                 val caps = cm.getNetworkCapabilities(network)
                 if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
                     !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
-                    ProxyServiceState.addLog("Сеть: VPN-событие проигнорировано")
+                    ProxyStore.log("Сеть: VPN-событие проигнорировано")
                     return
                 }
                 schedule("available")
@@ -92,6 +96,11 @@ class NetworkHandoverMonitor(
     }
 
     fun unregister() {
+        // Debounce живёт своими 2 секундами и после снятия колбэка: без отмены он
+        // дёргает onHandover уже на сворачиваемой сессии, а при перерегистрации -
+        // мимо прогрева, рестартя только что поднятую.
+        debounceJob?.cancel()
+        debounceJob = null
         callback?.let { cb ->
             try {
                 cm.unregisterNetworkCallback(cb)
@@ -101,16 +110,18 @@ class NetworkHandoverMonitor(
     }
 
     /**
-     * DNS активной сети (оператор/Wi-Fi) для флага `-dns-servers` ядра.
-     * Пусто, если сеть недоступна или у linkProperties нет DNS (норма на эмуляторе).
+     * DNS ФИЗИЧЕСКОЙ сети (оператор/Wi-Fi) для `dns.servers` ядра. Именно физической:
+     * при поднятом туннеле activeNetwork - наш же VPN, и в конфиг уехали бы адреса
+     * из WG-конфига. Пусто, если сети нет или у linkProperties нет DNS (норма на эмуляторе).
      */
-    fun activeDnsServers(): String = try {
-        val net = cm.activeNetwork ?: return ""
-        val lp = cm.getLinkProperties(net) ?: return ""
-        lp.dnsServers
-            .mapNotNull { it.hostAddress }
-            .filter { it.isNotBlank() }
-            .joinToString(",")
+    fun physicalDnsServers(): String = try {
+        val cm = cm
+        physicalNetwork(cm)?.let { net ->
+            cm.getLinkProperties(net)?.dnsServers
+                ?.mapNotNull { it.hostAddress }
+                ?.filter { it.isNotBlank() }
+                ?.joinToString(",")
+        }.orEmpty()
     } catch (_: Exception) {
         ""
     }
@@ -121,7 +132,24 @@ class NetworkHandoverMonitor(
      * ложная "смена сети". link-адреса не в ключе - ротация IPv6/DHCP идёт на той же
      * сети; реальный хендовер меняет транспорт/iface.
      */
-    private fun physicalNetworkKey(cm: ConnectivityManager): String? {
+    private fun physicalNetworkKey(cm: ConnectivityManager): String? =
+        rankedPhysicalNetworks(cm).minWithOrNull(comparator)?.let { "${it.transport}|${it.iface}" }
+
+    /** Та же приоритетная физсеть, что даёт ключ - её DNS уходят в конфиг ядра. */
+    private fun physicalNetwork(cm: ConnectivityManager): Network? =
+        rankedPhysicalNetworks(cm).minWithOrNull(comparator)?.network
+
+    private class Ranked(
+        val priority: Int,
+        val transport: String,
+        val iface: String,
+        val network: Network,
+    )
+
+    // tie-break по iface - детерминированный выбор при равном приоритете.
+    private val comparator = compareBy<Ranked>({ it.priority }, { it.iface })
+
+    private fun rankedPhysicalNetworks(cm: ConnectivityManager): List<Ranked> {
         // allNetworks deprecated с API 31, но это единственный синхронный способ снять
         // полный снимок текущих сетей внутри колбэка. Подавляем осознанно.
         @Suppress("DEPRECATION")
@@ -139,9 +167,7 @@ class NetworkHandoverMonitor(
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> 3 to "bluetooth"
                 else -> return@mapNotNull null
             }
-            val iface = cm.getLinkProperties(network)?.interfaceName.orEmpty()
-            // tie-break по iface - детерминированный выбор при равном приоритете.
-            Triple(priority, iface, "$transport|$iface")
-        }.minWithOrNull(compareBy({ it.first }, { it.second }))?.third
+            Ranked(priority, transport, cm.getLinkProperties(network)?.interfaceName.orEmpty(), network)
+        }
     }
 }

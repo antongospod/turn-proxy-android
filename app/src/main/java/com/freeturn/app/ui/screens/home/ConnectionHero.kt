@@ -61,20 +61,20 @@ import androidx.graphics.shapes.toPath
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.domain.ProxyState
+import com.freeturn.app.domain.proxy.ProxyPhase
+import com.freeturn.app.domain.proxy.ProxyStatus
 import com.freeturn.app.ui.theme.Spacing
 import kotlin.math.ceil
 
 /** Герой главного экрана: кнопка-тоггл, строка статуса и пилюля счётчика/uptime. */
 @Composable
 internal fun ConnectionHero(
-    state: ProxyState,
+    status: ProxyStatus,
     uptimeText: String?,
-    tunnelActive: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val kind = state.heroKind()
+    val kind = status.phase.heroKind()
     val reducedMotion = LocalReducedMotion.current
 
     Column(
@@ -83,30 +83,29 @@ internal fun ConnectionHero(
     ) {
         HeroToggleButton(
             kind = kind,
-            tunnelActive = tunnelActive,
+            tunnelActive = status.tunnelUp,
             reducedMotion = reducedMotion,
             onClick = onToggle
         )
 
         Spacer(Modifier.height(20.dp))
 
-        StatusLabel(state = state, tunnelActive = tunnelActive, reducedMotion = reducedMotion)
+        StatusLabel(status = status, reducedMotion = reducedMotion)
 
         Spacer(Modifier.height(10.dp))
 
-        StatsPill(state = state, kind = kind, uptimeText = uptimeText)
+        StatsPill(status = status, kind = kind, uptimeText = uptimeText)
     }
 }
 
-// CaptchaRequired относится к Busy (прокси под капчей работает, текст в строке статуса).
+// Captcha - тоже Busy: прокси под капчей работает, объяснение в строке статуса.
 private enum class HeroKind { Idle, Busy, Running, Error }
 
-private fun ProxyState.heroKind(): HeroKind = when (this) {
-    is ProxyState.Running -> HeroKind.Running
-    is ProxyState.Starting, is ProxyState.Connecting,
-    is ProxyState.CaptchaRequired -> HeroKind.Busy
-    is ProxyState.Error -> HeroKind.Error
-    is ProxyState.Idle -> HeroKind.Idle
+private fun ProxyPhase.heroKind(): HeroKind = when (this) {
+    ProxyPhase.Connected -> HeroKind.Running
+    ProxyPhase.Starting, ProxyPhase.Connecting, ProxyPhase.Captcha -> HeroKind.Busy
+    ProxyPhase.Error -> HeroKind.Error
+    ProxyPhase.Idle -> HeroKind.Idle
 }
 
 @Composable
@@ -250,20 +249,20 @@ private fun HeroIcon(kind: HeroKind, tint: Color) {
 }
 
 @Composable
-private fun StatusLabel(state: ProxyState, tunnelActive: Boolean, reducedMotion: Boolean) {
-    val label = when (state) {
-        is ProxyState.Running -> stringResource(
-            if (tunnelActive) R.string.tunnel_active else R.string.proxy_active
+private fun StatusLabel(status: ProxyStatus, reducedMotion: Boolean) {
+    val label = when (status.phase) {
+        ProxyPhase.Connected -> stringResource(
+            if (status.tunnelUp) R.string.tunnel_active else R.string.proxy_active
         )
-        is ProxyState.Starting, is ProxyState.Connecting -> stringResource(R.string.proxy_connecting)
-        is ProxyState.Error -> state.message
-        is ProxyState.CaptchaRequired -> stringResource(R.string.proxy_captcha_required)
-        else -> stringResource(R.string.proxy_press_to_start)
+        ProxyPhase.Starting, ProxyPhase.Connecting -> stringResource(R.string.proxy_connecting)
+        ProxyPhase.Error -> status.error.ifBlank { stringResource(R.string.notif_proxy_connect_error) }
+        ProxyPhase.Captcha -> stringResource(R.string.proxy_captcha_required)
+        ProxyPhase.Idle -> stringResource(R.string.proxy_press_to_start)
     }
     val color by animateColorAsState(
-        targetValue = when (state) {
-            is ProxyState.Running -> MaterialTheme.extendedColorScheme.success
-            is ProxyState.Error, is ProxyState.CaptchaRequired -> MaterialTheme.colorScheme.error
+        targetValue = when (status.phase) {
+            ProxyPhase.Connected -> MaterialTheme.extendedColorScheme.success
+            ProxyPhase.Error, ProxyPhase.Captcha -> MaterialTheme.colorScheme.error
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
         animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
@@ -296,12 +295,11 @@ private fun StatusLabel(state: ProxyState, tunnelActive: Boolean, reducedMotion:
 }
 
 @Composable
-private fun StatsPill(state: ProxyState, kind: HeroKind, uptimeText: String?) {
-    val counts = when (state) {
-        is ProxyState.Running ->
-            if (state.total > 0) "${state.active}/${state.total}" else "${state.active}"
-        is ProxyState.Connecting ->
-            if (state.total > 0) "${state.active}/${state.total}" else null
+private fun StatsPill(status: ProxyStatus, kind: HeroKind, uptimeText: String?) {
+    val counts = when {
+        !status.busy -> null
+        status.total > 0 -> "${status.active}/${status.total}"
+        status.phase == ProxyPhase.Connected -> "${status.active}"
         else -> null
     }
     val pillText = listOfNotNull(counts, uptimeText)

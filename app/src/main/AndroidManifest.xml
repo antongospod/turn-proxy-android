@@ -86,19 +86,14 @@
             android:name=".service.ProxyService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE"
             tools:targetApi="29">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Maintains an active local network proxy connection over TURN servers so the user can keep using a working tunnel while the app is in the background." />
-        </service>
-
-        <service
-            android:name="com.wireguard.android.backend.GoBackend$VpnService"
-            android:exported="false"
-            android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains an active local network proxy connection over TURN servers so the user can keep using a working tunnel while the app is in the background." />
         </service>
 
         <provider

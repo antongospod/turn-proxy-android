@@ -40,7 +40,6 @@ import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
-import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -55,10 +54,8 @@ fun HomeScreen(
     onAddServer: () -> Unit
 ) {
     val context = LocalContext.current
-    val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
-    val connectedSince by proxyViewModel.connectedSince.collectAsStateWithLifecycle()
-    val uptimeText = rememberProxyUptime(connectedSince)
-    val tunnelActive by proxyViewModel.tunnelActive.collectAsStateWithLifecycle()
+    val status by proxyViewModel.status.collectAsStateWithLifecycle()
+    val uptimeText = rememberProxyUptime(status.connectedSince)
     val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
@@ -82,7 +79,7 @@ fun HomeScreen(
         ActivityResultContracts.StartActivityForResult()
     ) {
         if (VpnService.prepare(context) == null) {
-            proxyViewModel.startProxy()
+            proxyViewModel.start()
         }
     }
 
@@ -94,7 +91,7 @@ fun HomeScreen(
                 return
             }
         }
-        proxyViewModel.startProxy()
+        proxyViewModel.start()
     }
 
     val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -129,7 +126,7 @@ fun HomeScreen(
                     privacyMode = privacyMode,
                     callLink = clientConfig.vkLink,
                     // Правка ссылки только пока прокси стоит (новая комната = реконнект).
-                    callLinkLocked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+                    callLinkLocked = status.busy,
                     onApplyServer = { id ->
                         settingsViewModel.applyServer(id)
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
@@ -155,21 +152,16 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     ConnectionHero(
-                        state = proxyState,
+                        status = status,
                         uptimeText = uptimeText,
-                        tunnelActive = tunnelActive,
                         onToggle = {
-                            when (proxyState) {
-                                is ProxyState.Idle, is ProxyState.Error -> {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    startProxyWithTunnel()
-                                }
-                                // CaptchaRequired: прокси под капчей работает - тоггл его останавливает.
-                                is ProxyState.Running, is ProxyState.Connecting,
-                                is ProxyState.Starting, is ProxyState.CaptchaRequired -> {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
-                                    proxyViewModel.stopProxy()
-                                }
+                            // Любая непокоящаяся фаза (включая капчу и старт) - остановка.
+                            if (status.busy) {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
+                                proxyViewModel.stop()
+                            } else {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                startProxyWithTunnel()
                             }
                         }
                     )
@@ -196,7 +188,7 @@ fun HomeScreen(
         SplitTunnelModal(
             mode = clientConfig.splitTunnelMode,
             apps = clientConfig.splitTunnelApps,
-            locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+            locked = status.busy,
             onModeChange = settingsViewModel::setSplitTunnelMode,
             onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet.value = false },
