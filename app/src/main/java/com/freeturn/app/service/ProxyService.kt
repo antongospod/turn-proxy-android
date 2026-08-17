@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -51,6 +52,7 @@ class ProxyService : VpnService() {
 
     private var tun: ParcelFileDescriptor? = null
     private var socks5: Socks5Server? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // Сколько устройство успело проспать к прошлой проверке: разница elapsedRealtime
     // (идёт во сне) и uptimeMillis (стоит) - и есть накопленный сон.
@@ -172,6 +174,7 @@ class ProxyService : VpnService() {
 
         if (!isCurrent(session)) return
 
+        acquireWakeLock()
         network.register()
 
         tunnelMode = cfg.wireGuardActive
@@ -295,6 +298,18 @@ class ProxyService : VpnService() {
         tun = null
     }
 
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        // Без таймаута: сессия живёт дольше суток, release гарантирован в shutdown.
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FreeTurn::Session").apply { acquire() }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.takeIf { it.isHeld }?.release()
+        wakeLock = null
+    }
+
     /** Всегда false - удобно возвращать из веток, где сессия не состоялась. */
     private fun fail(message: String): Boolean {
         // Уже гасимся - об отменённой сессии сообщать нечего.
@@ -327,6 +342,7 @@ class ProxyService : VpnService() {
         ProxyStore.log("Остановка")
         ProxyStore.finish()
         releaseAll()
+        releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         // Процессный scope движка: onDestroy и onStartCommand блокировать нельзя, а
         // свой scope сервис вот-вот отменит. Гасим именно свою сессию - ядро уже могло

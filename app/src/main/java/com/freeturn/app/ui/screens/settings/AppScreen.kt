@@ -5,11 +5,8 @@
 
 package com.freeturn.app.ui.screens.settings
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -44,7 +41,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,7 +69,6 @@ import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.settings.BackupEvent
 import com.freeturn.app.viewmodel.settings.RestoreFailReason
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -96,7 +91,6 @@ fun AppScreen(
     var showExportDialog by rememberSaveable { mutableStateOf(false) }
     var exportPassword by rememberSaveable { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     // SAF: имя выбирает пользователь, пароль уже введён в диалоге выше.
@@ -183,27 +177,6 @@ fun AppScreen(
                     }
                 }
 
-                SectionLabel(stringResource(R.string.app_section_background))
-                SettingsGroup {
-                    SettingsGroupItem(0, 1) {
-                        SettingsEntryRow(
-                            iconRes = R.drawable.vpn_key_24px,
-                            title = stringResource(R.string.always_on_vpn_title),
-                            subtitle = stringResource(R.string.always_on_vpn_desc),
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                if (!openVpnSettings(context)) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            context.getString(R.string.always_on_vpn_unavailable)
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-
                 SectionLabel(stringResource(R.string.app_section_updates))
                 UpdateCard(
                     state = updateState,
@@ -283,14 +256,6 @@ fun AppScreen(
             onDismiss = { showExportDialog = false }
         )
     }
-}
-
-/** false - экрана VPN в системных настройках нет (урезанные прошивки). */
-private fun openVpnSettings(context: Context): Boolean = try {
-    context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
-    true
-} catch (_: ActivityNotFoundException) {
-    false
 }
 
 /** Текст снекбара по результату экспорта/восстановления (строки выбирает UI, не ViewModel). */
