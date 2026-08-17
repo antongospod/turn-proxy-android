@@ -32,12 +32,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # -PfreeturnAar=latest - в CI ядро подложить руками некому, а без aar не собирается
-      # даже compile: биндинг gomobile лежит в нём.
+      # Версия ядра - пин в gradle.properties, качается на preBuild (без aar не собирается
+      # даже compile: биндинг gomobile лежит в нём).
       - name: Run unit tests
         run: |
           chmod +x gradlew
-          ./gradlew :app:test -PfreeturnAar=latest
+          ./gradlew :app:test
 
       - name: Upload test reports
         if: failure()
@@ -63,7 +63,7 @@ jobs:
       - name: Assemble debug APKs
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug -PfreeturnAar=latest
+          ./gradlew :app:assembleDebug
 
       - uses: actions/upload-artifact@v7
         with:
