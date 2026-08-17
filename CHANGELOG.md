@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.0.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.6.0...v4.0.0) (2026-08-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **proxy:** убрать TCP-режим проброса и bond
+* **proxy:** ядро gomobile в процессе приложения
+
+### Features
+
+* **proxy:** убрать TCP-режим проброса и bond ([215156e](https://github.com/samosvalishe/turn-proxy-android/commit/215156ea44d351f6fcde7d86d4b91259f6e06ed0))
+* **proxy:** ядро gomobile в процессе приложения ([9c05bd9](https://github.com/samosvalishe/turn-proxy-android/commit/9c05bd9e76afa2276e2b5a6c4dad39d0f525616a))
+* **settings:** пункт Always-on VPN в разделе "Работа в фоне" ([429affa](https://github.com/samosvalishe/turn-proxy-android/commit/429affa0a19f1280195857e2e4974b80ce603eed))
+
+
+### Fixes
+
+* bump aar ([be61dbc](https://github.com/samosvalishe/turn-proxy-android/commit/be61dbc69b66fc324aafc09e38135f088818535b))
+* **proxy:** вернуть wake lock сессии, убрать always-on vpn ([0e0d3ee](https://github.com/samosvalishe/turn-proxy-android/commit/0e0d3ee952a0e3428cd928e1b32ed02e585475e3))
+* пересоздание TUN-интерфейса при смене сети для обхода обрывов в Doze mode ([9bfd79a](https://github.com/samosvalishe/turn-proxy-android/commit/9bfd79a854de614af5dd73e9a860a8b59742a7a2))
+
+
+### Performance
+
+* **proxy:** экономия батареи - без wake lock, опрос метрик только при видимом окне ([82c1adf](https://github.com/samosvalishe/turn-proxy-android/commit/82c1adffb6239ca0f189f6904b5222e60b1c0195))
+
 ## [3.6.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.5.2...v3.6.0) (2026-08-14)
 
 
