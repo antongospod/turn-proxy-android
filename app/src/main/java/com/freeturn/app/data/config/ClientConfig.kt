@@ -9,8 +9,6 @@ data class ClientConfig(
     val useUdp: Boolean = false,
     val manualCaptcha: Boolean = false,
     val localPort: String = DEFAULT_LOCAL_PORT,
-    val tcpForward: Boolean = false,
-    val bond: Boolean = false,
     val debugMode: Boolean = false,
     val useCarrierDns: Boolean = true,
     val dnsMode: String = DnsMode.AUTO,

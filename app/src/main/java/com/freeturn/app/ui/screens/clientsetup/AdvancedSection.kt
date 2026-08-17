@@ -14,15 +14,13 @@ import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
-import com.freeturn.app.ui.components.SettingsGroup
-import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.util.redact
 
 /**
- * "Дополнительно": транспорт TURN (tcp/udp, ортогонален режиму туннеля), сегментированная
- * группа свитчей (капча + bond - bond только в TCP-режиме), альтернативный TURN-узел.
+ * "Дополнительно": транспорт TURN (tcp/udp, ортогонален режиму туннеля), ручная капча,
+ * альтернативный TURN-узел.
  */
 @Composable
 internal fun AdvancedSection(
@@ -30,9 +28,6 @@ internal fun AdvancedSection(
     onUseUdp: (Boolean) -> Unit,
     manualCaptcha: Boolean,
     onManualCaptcha: (Boolean) -> Unit,
-    showBond: Boolean,
-    bond: Boolean,
-    onBond: (Boolean) -> Unit,
     magicSwitch: Boolean,
     onMagicSwitch: (Boolean) -> Unit,
     magicTurn: String,
@@ -62,28 +57,13 @@ internal fun AdvancedSection(
         }
     }
 
-    // Капча + Bond - сегментированная группа свитчей.
-    // Bond - client-only флаг (сервер детектит сам), только в TCP-режиме.
-    val toggleCount = if (showBond) 2 else 1
-    SettingsGroup {
-        SettingsGroupItem(0, toggleCount) {
-            SettingsSwitchRow(
-                title = stringResource(R.string.manual_captcha),
-                subtitle = stringResource(R.string.manual_captcha_desc),
-                checked = manualCaptcha,
-                onCheckedChange = onManualCaptcha
-            )
-        }
-        if (showBond) {
-            SettingsGroupItem(1, toggleCount) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.client_bond),
-                    subtitle = stringResource(R.string.client_bond_desc),
-                    checked = bond,
-                    onCheckedChange = onBond
-                )
-            }
-        }
+    SettingsCard {
+        SettingsSwitchRow(
+            title = stringResource(R.string.manual_captcha),
+            subtitle = stringResource(R.string.manual_captcha_desc),
+            checked = manualCaptcha,
+            onCheckedChange = onManualCaptcha
+        )
     }
 
     // Альтернативный TURN-узел - свитч + адрес (раскрывается при включении).

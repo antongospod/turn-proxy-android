@@ -49,7 +49,6 @@ sealed class ServerCommand {
             add("start")
             add("--listen=${opts.listen}")
             add("--connect=${opts.connect}")
-            if (opts.tcpMode) add("--mode=tcp")
             if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
                 add("--obf-profile=${opts.obfProfile}")
                 add("--obf-key=${opts.obfKey}")
@@ -86,7 +85,6 @@ sealed class ServerCommand {
 data class ServerStartOptions(
     val listen: String,
     val connect: String,
-    val tcpMode: Boolean = false,
     val obfProfile: String = "none",
     val obfKey: String = "",
     val clientId: String = ""

@@ -52,9 +52,6 @@ internal object ServerJson {
             put("useUdp", p.client.useUdp)
             put("manualCaptcha", p.client.manualCaptcha)
             put("localPort", p.client.localPort)
-            put("tcpForward", p.client.tcpForward)
-            put("bond", p.client.bond)
-
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
             put("dnsMode", p.client.dnsMode)
@@ -108,9 +105,6 @@ internal object ServerJson {
                 useUdp = cliO.optBoolean("useUdp", false),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
                 localPort = cliO.optString("localPort", ClientConfig.DEFAULT_LOCAL_PORT),
-                tcpForward = cliO.optBoolean("tcpForward", false),
-                bond = cliO.optBoolean("bond", false),
-
                 debugMode = cliO.optBoolean("debugMode", false),
                 useCarrierDns = cliO.optBoolean("useCarrierDns", true),
                 dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {

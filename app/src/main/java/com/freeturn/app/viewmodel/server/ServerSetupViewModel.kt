@@ -69,7 +69,6 @@ data class SetupConfigDraft(
     val wgCustomConf: Boolean = false,
     val wgConfText: String = "",
     val backendPort: String = "",
-    val backendTcp: Boolean = false,
     val vkLink: String = ""
 )
 
@@ -100,10 +99,7 @@ data class SetupUiState(
     val config: SetupConfigDraft = SetupConfigDraft(),
     val install: SetupInstallState? = null
 ) {
-    /**
-     * Внешний порт совпал с UDP-портом бэкенда на том же хосте - оба бинда
-     * конфликтуют. TCP-бэкенд (Xray/sing-box) с UDP-listen не пересекается.
-     */
+    /** Внешний порт совпал с портом бэкенда на том же хосте - оба бинда конфликтуют. */
     val portsClash: Boolean
         get() {
             val listen = config.listenPort.toIntOrNull() ?: return false
@@ -111,8 +107,7 @@ data class SetupUiState(
                 config.vpnMode && config.wgCustomConf -> config.backendPort.toIntOrNull()
                 config.vpnMode && wgDetectedPort == null -> config.wgPort.toIntOrNull()
                 config.vpnMode -> wgDetectedPort
-                !config.backendTcp -> config.backendPort.toIntOrNull()
-                else -> null
+                else -> config.backendPort.toIntOrNull()
             }
             return backend != null && backend == listen
         }
@@ -295,7 +290,6 @@ class ServerSetupViewModel(
                 ServerStartOptions(
                     listen = "0.0.0.0:${c.listenPort}",
                     connect = "127.0.0.1:$backendPort",
-                    tcpMode = !c.vpnMode && c.backendTcp,
                     obfProfile = c.obfProfile,
                     obfKey = if (obfOn) obfKey else "",
                     // Авторизация по allowlist с первого запуска: владелец сидится
@@ -344,7 +338,6 @@ class ServerSetupViewModel(
         client = ClientConfig(
             serverAddress = "${cfg.ip}:${c.listenPort}",
             vkLink = c.vkLink.trim(),
-            tcpForward = !c.vpnMode && c.backendTcp,
             tunnelTransport = if (c.vpnMode && !wgClientConf.isNullOrBlank())
                 TunnelTransport.WIREGUARD else TunnelTransport.NONE,
             wireGuardConfig = wgClientConf.orEmpty()

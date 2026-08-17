@@ -116,14 +116,12 @@ UNIT_EOF
     systemctl enable "$UNIT_NAME" >/dev/null 2>&1 || true
 }
 
-# Bond не задаётся - ядро детектит его по magic-префиксу стрима.
 _write_args_file() {
     local tmp="$ARGSFILE.tmp"
     ( umask 077; : > "$tmp" )
     {
         echo "-listen";  echo "$ARG_LISTEN"
         echo "-connect"; echo "$ARG_CONNECT"
-        if [ "$ARG_MODE" = "tcp" ]; then echo "-mode"; echo "tcp"; fi
         if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
             echo "-obf-profile"; echo "$ARG_OBF_PROFILE"
             echo "-obf-key";     echo "$ARG_OBF_KEY"
@@ -184,7 +182,6 @@ _rt_start_nohup() {
     _write_env_file
     if [ -f "$ENVFILE" ]; then set -a; . "$ENVFILE"; set +a; fi
     local args=(-listen "$ARG_LISTEN" -connect "$ARG_CONNECT")
-    [ "$ARG_MODE" = "tcp" ] && args+=(-mode tcp)
     [ -n "$ARG_CLIENT_ID" ] && args+=(-clients-file "$CLIENTSFILE")
     if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
         ( umask 077; printf '%s' "$ARG_OBF_KEY" > "$OBFFILE" ); chmod 600 "$OBFFILE"

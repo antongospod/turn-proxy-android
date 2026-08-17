@@ -259,15 +259,6 @@ class SettingsViewModel(
         }
     }
 
-    fun setBond(enabled: Boolean) {
-        viewModelScope.launch {
-            val changed = prefs.updateActiveServer {
-                it.copy(client = it.client.copy(bond = enabled))
-            }
-            if (changed) orchestrator.restartProxyIfRunning()
-        }
-    }
-
     fun setActiveVkLink(link: String) {
         viewModelScope.launch {
             prefs.updateActiveServer {
@@ -301,7 +292,6 @@ class SettingsViewModel(
     fun applyServerConfig(
         listen: String,
         connect: String,
-        tcpForward: Boolean,
         obfProfile: String,
         obfKey: String
     ) {
@@ -317,7 +307,6 @@ class SettingsViewModel(
                 s.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    client = s.client.copy(tcpForward = tcpForward),
                     opts = s.opts.copy(obfProfile = obfProfile, obfKey = effKey)
                 )
             }
@@ -337,7 +326,6 @@ class SettingsViewModel(
         id: String,
         listen: String,
         connect: String,
-        tcpForward: Boolean,
         obfProfile: String,
         obfKey: String
     ) {
@@ -351,7 +339,6 @@ class SettingsViewModel(
                 target.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    client = target.client.copy(tcpForward = tcpForward),
                     opts = target.opts.copy(obfProfile = obfProfile, obfKey = effKey)
                 )
             }

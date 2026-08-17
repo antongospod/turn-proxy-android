@@ -207,33 +207,6 @@ fun SetupConfigStep(
             }
         } else {
             SettingsFieldSlot {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !draft.backendTcp,
-                        onClick = {
-                            if (draft.backendTcp) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                onDraftChange(draft.copy(backendTcp = false))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.udp)) }
-                    SegmentedButton(
-                        selected = draft.backendTcp,
-                        onClick = {
-                            if (!draft.backendTcp) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                onDraftChange(draft.copy(backendTcp = true))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.tcp)) }
-                }
-                Text(
-                    stringResource(R.string.setup_backend_protocol_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 BackendPortField(draft, showErrors, onDraftChange)
             }
         }

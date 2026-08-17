@@ -2,7 +2,7 @@ package com.freeturn.app.data.share
 
 import com.freeturn.app.data.control.ShareListData
 
-/** Гость из allowlist без WG-пира (`share-list` clients): tcp/Xray-бэкенд. */
+/** Гость из allowlist без WG-пира (`share-list` clients): свой бэкенд на стороне гостя. */
 data class SharedClient(
     val clientId: String,
     /** Имя = comment в clients.json. */

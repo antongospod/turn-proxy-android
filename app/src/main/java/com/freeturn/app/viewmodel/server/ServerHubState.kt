@@ -8,7 +8,6 @@ sealed interface ServerHubState {
     data class Online(
         val running: Boolean,
         val installed: Boolean,
-        val tcpMode: Boolean?,
         val obfProfile: String?,
         val version: String?,
         val sshIp: String

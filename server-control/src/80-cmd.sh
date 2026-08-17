@@ -1,6 +1,5 @@
 ARG_LISTEN=""
 ARG_CONNECT=""
-ARG_MODE=""
 ARG_OBF_PROFILE="none"
 ARG_OBF_KEY=""
 ARG_TAIL=80
@@ -23,9 +22,6 @@ parse_args() {
             --connect=*)
                 ARG_CONNECT="${1#*=}"
                 [[ "$ARG_CONNECT" =~ ^[a-zA-Z0-9.:_-]+$ ]] || fail bad_arg "bad --connect" ;;
-            --mode=*)
-                ARG_MODE="${1#*=}"
-                [[ "$ARG_MODE" =~ ^(udp|tcp)$ ]] || fail bad_arg "bad --mode (need udp|tcp)" ;;
             --obf-profile=*)
                 ARG_OBF_PROFILE="${1#*=}"
                 [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2|rtpopus3)$ ]] || fail bad_arg "bad --obf-profile" ;;
@@ -71,7 +67,7 @@ parse_args() {
 cmd_probe() {
     stage probe
 
-    local arch bin="" installed=false running=false version="" sha="" mode="" obf=""
+    local arch bin="" installed=false running=false version="" sha="" obf=""
     arch=$(detect_arch) || arch=""
     [ -n "$arch" ] && bin="$PREFIX/$arch"
     if [ -n "$bin" ] && [ -x "$bin" ]; then
@@ -86,7 +82,6 @@ cmd_probe() {
         running=true
         local cmdline
         cmdline=$(current_cmdline)
-        if printf '%s' "$cmdline" | grep -q -- '-mode tcp'; then mode=tcp; else mode=udp; fi
         obf=$(printf '%s' "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
         [ -z "$obf" ] && obf=none
     fi
@@ -114,7 +109,6 @@ cmd_probe() {
     [ -n "$sha" ] && d_str bin_sha256 "$sha"
     d_bool running "$running"
     if [ "$running" = true ]; then
-        d_str mode "$mode"
         d_str obf "$obf"
     fi
     d_str runtime "$runtime"
@@ -246,9 +240,8 @@ cmd_start() {
     # Порт занят ЧУЖИМ процессом? Честный отказ - НЕ убиваем (в отличие от fuser).
     # Проверка ДО rt_stop: fail после остановки оставил бы сервер лежать.
     # Свой процесс на порту - не конфликт (ниже он же перезапускается).
-    local port proto owner opid
+    local port proto=udp owner opid
     port=${ARG_LISTEN##*:}
-    if [ "$ARG_MODE" = tcp ]; then proto=tcp; else proto=udp; fi
     if [[ "$port" =~ ^[0-9]+$ ]]; then
         owner=$(port_owner "$proto" "$port")
         case "$owner" in
@@ -401,7 +394,7 @@ cmd_peer_remove() {
     ok
 }
 
-# tcp/Xray-бэкенд: гость только в allowlist, без WG-пира.
+# Прокси-бэкенд: гость только в allowlist, без WG-пира.
 cmd_client_add() {
     stage client_add
     [ -n "$ARG_CLIENT_ID" ] || fail bad_arg "--client-id required"

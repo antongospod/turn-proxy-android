@@ -16,15 +16,12 @@ object ShareLinkBuilder {
         wgConf: String?,
         clientId: String = ""
     ): String {
-        val tcpMode = if (info.hasRunArgs) info.mode == "tcp" else server.client.tcpForward
         val obfProfile = if (info.hasRunArgs) info.obfProfile else server.opts.obfProfile
         val obfKey = if (info.hasRunArgs) info.obfKey else server.opts.obfKey
         return FreeturnLink(
             provider = server.client.provider,
             peer = server.client.serverAddress,
             transport = if (server.client.useUdp) "udp" else "",
-            mode = if (tcpMode) "tcp" else "",
-            bond = tcpMode && server.client.bond,
             obfProfile = if (ObfProfile.isValidKey(obfKey)) obfProfile else "",
             obfKey = if (ObfProfile.isValidKey(obfKey)) obfKey else "",
             n = server.client.threads,

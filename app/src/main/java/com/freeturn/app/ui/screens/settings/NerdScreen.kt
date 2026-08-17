@@ -285,7 +285,6 @@ private fun serverCommandLine(server: Server, privacy: Boolean): String {
     val opts = ServerStartOptions(
         listen = server.proxyListen,
         connect = server.proxyConnect,
-        tcpMode = server.client.tcpForward,
         obfProfile = if (server.opts.obfEnabled) server.opts.obfProfile else ObfProfile.NONE,
         obfKey = if (server.opts.obfEnabled) server.opts.obfKey else ""
     )

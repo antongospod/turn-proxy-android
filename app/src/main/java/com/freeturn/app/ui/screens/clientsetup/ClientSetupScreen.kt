@@ -61,15 +61,12 @@ fun ClientSetupScreen(
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
-    val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
     val activeProxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
 
     // Источник данных: конкретный сервер по id либо активный.
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
     val saved = server?.client ?: activeClient
-    // Активный сервер рулит живым рантаймом, неактивный - только хранилищем.
-    val isActive = serverId == null || serverId == snapshot.activeId
     val effSshIp = server?.ssh?.ip ?: sshConfig.ip
     val effProxyListen = server?.proxyListen ?: activeProxyListen
 
@@ -81,12 +78,6 @@ fun ClientSetupScreen(
             settingsViewModel.saveClientConfig(transform(settingsViewModel.clientConfig.value), snapshot.activeId)
         }
     }
-
-    val serverKnown = serverState as? com.freeturn.app.domain.ServerState.Known
-    // TCP-форвард: реальное состояние из probe (если запущен) или сохранённое.
-    val syncOn = saved.syncServerSwitches
-    val effectiveTcpForward = if (isActive && syncOn && serverKnown?.running == true)
-        serverKnown.tcpMode ?: saved.tcpForward else saved.tcpForward
 
     val context = LocalContext.current
 
@@ -223,10 +214,6 @@ fun ClientSetupScreen(
                     },
                     manualCaptcha = saved.manualCaptcha,
                     onManualCaptcha = { v -> clientEdit { it.copy(manualCaptcha = v) } },
-                    showBond = effectiveTcpForward,
-                    bond = saved.bond,
-                    // bond триггерит рестарт прокси только у активного; иначе пишем данные.
-                    onBond = { v -> if (isActive) settingsViewModel.setBond(v) else clientEdit { it.copy(bond = v) } },
                     magicSwitch = saved.magicSwitch,
                     onMagicSwitch = { v -> clientEdit { it.copy(magicSwitch = v) } },
                     magicTurn = magicTurn,

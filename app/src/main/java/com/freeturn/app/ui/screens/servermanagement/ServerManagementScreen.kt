@@ -98,7 +98,6 @@ fun ServerManagementScreen(
     }
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
-    var tcpDraft by rememberSaveable(effClient.tcpForward) { mutableStateOf(effClient.tcpForward) }
     var obfDraft by rememberSaveable(effServer.obfProfile) { mutableStateOf(effServer.obfProfile) }
     var keyDraft by rememberSaveable(effServer.obfKey) { mutableStateOf(effServer.obfKey) }
 
@@ -114,7 +113,6 @@ fun ServerManagementScreen(
     val listenFull = "${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort"
     val proxyDirty = listenFull != savedListen || proxyConnect != savedConnect
     val configDirty = proxyDirty ||
-        tcpDraft != effClient.tcpForward ||
         obfDraft != effServer.obfProfile ||
         keyDraft != effServer.obfKey
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
@@ -127,10 +125,10 @@ fun ServerManagementScreen(
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
         // Активный - apply в живой рантайм (один рестарт). Неактивный - пишем только снимок сервера.
         if (isActive) {
-            settingsViewModel.applyServerConfig(listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft)
+            settingsViewModel.applyServerConfig(listenFull, proxyConnect, obfDraft, keyDraft)
         } else {
             // !isActive ⇒ serverId != null (см. isActive выше) - smart cast.
-            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft)
+            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, obfDraft, keyDraft)
         }
         onBack()
     }
@@ -282,9 +280,6 @@ fun ServerManagementScreen(
                 // Гейт общий со входом в экран (ServerDetailScreen) - serverSettingsAvailable.
                 if (serverSettingsAvailable(isConnected, syncOn)) {
                     ServerSyncCard(
-                        tcp = tcpDraft,
-                        onTcp = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); tcpDraft = it },
-                        tcpBlocked = effClient.wireGuardActive,
                         obfProfile = obfDraft,
                         onObfProfile = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); obfDraft = it },
                         keyDraft = keyDraft,

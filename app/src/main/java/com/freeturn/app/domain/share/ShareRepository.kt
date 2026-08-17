@@ -31,7 +31,7 @@ class ShareRepository(context: Context, ssh: SSHManager) {
     suspend fun shareInfo(cfg: SshConfig): Result<ShareInfo> =
         control.run(cfg, ServerCommand.ShareInfo)
             .requireData<ShareInfoData>()
-            .map { ShareInfo(it.mode, it.obfProfile, it.obfKey, it.wgBackend) }
+            .map { ShareInfo(it.obfProfile, it.obfKey, it.wgBackend) }
 
     suspend fun addPeer(
         cfg: SshConfig,

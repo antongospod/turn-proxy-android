@@ -29,7 +29,7 @@ data class CoreConfigJson(
     data class Turn(val n: Int, val transport: String, val host: String, val port: String)
 
     @Serializable
-    data class Proxy(val mode: String, val bond: Boolean, val listen: String)
+    data class Proxy(val listen: String)
 
     @Serializable
     data class Vk(
@@ -57,8 +57,6 @@ data class CoreConfigJson(
 
         const val TRANSPORT_TCP = "tcp"
         const val TRANSPORT_UDP = "udp"
-        const val PROXY_MODE_TCP = "tcp"
-        const val PROXY_MODE_UDP = "udp"
         const val TUNNEL_MODE_NONE = "none"
         const val TUNNEL_MODE_WG = "wg"
         const val PLATFORM_MOBILE = "mobile"
@@ -104,11 +102,6 @@ fun ClientConfig.toCoreJson(
                 port = "",
             ),
             proxy = CoreConfigJson.Proxy(
-                // Ядро поднимает туннель только поверх udp; UI тоже гасит выбор tcp.
-                mode = if (tcpForward && !wireGuardActive) CoreConfigJson.PROXY_MODE_TCP
-                else CoreConfigJson.PROXY_MODE_UDP,
-                // bond работает только в tcp-режиме.
-                bond = tcpForward && !wireGuardActive && bond,
                 // В туннельном режиме порт не биндится (ядро берёт in-memory pipe),
                 // но валидацию проходит и нужен прокси-режиму.
                 listen = localPort,

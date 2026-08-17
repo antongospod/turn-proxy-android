@@ -52,7 +52,6 @@ class ServerViewModel(
                     ServerHubState.Online(
                         running = server.running,
                         installed = server.installed,
-                        tcpMode = server.tcpMode,
                         obfProfile = server.obfProfile,
                         version = server.version,
                         sshIp = ssh.ip
@@ -114,11 +113,9 @@ class ServerViewModel(
                 sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
                 return@launch
             }
-            val tcpMode = prefs.clientConfigFlow.first().tcpForward
             val opts = prefs.serverOptsFlow.first()
             sshRepository.startServer(
                 listen = l, connect = c,
-                tcpMode = tcpMode,
                 obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
                 obfKey = if (opts.obfEnabled) opts.obfKey else "",
                 clientId = prefs.ownClientId()

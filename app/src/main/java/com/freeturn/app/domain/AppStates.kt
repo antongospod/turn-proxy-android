@@ -13,7 +13,6 @@ sealed class ServerState {
     data class Known(
         val installed: Boolean,
         val running: Boolean,
-        val tcpMode: Boolean? = null,
         val obfProfile: String? = null,
         val version: String? = null
     ) : ServerState()

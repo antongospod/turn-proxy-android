@@ -102,24 +102,23 @@ _peer_in_conf() {  # CONF PUBKEY
     ' "$1"
 }
 
+# obf_profile отдаётся всегда, когда параметры запуска нашлись (пусть и "none"):
+# по нему клиент отличает "сервер стартовал из приложения" от "данных нет".
 share_info_emit() {
-    local backend=false mode="" obf="" key=""
+    local backend=false obf="" key=""
     if wg_present && wg_is_ours; then backend=true; fi
     if [ -f "$ARGSFILE" ]; then
-        mode=$(awk 'prev=="-mode"{print;exit}{prev=$0}' "$ARGSFILE"); mode=${mode:-udp}
-        obf=$(awk 'prev=="-obf-profile"{print;exit}{prev=$0}' "$ARGSFILE")
+        obf=$(awk 'prev=="-obf-profile"{print;exit}{prev=$0}' "$ARGSFILE"); obf=${obf:-none}
         key=$(awk 'prev=="-obf-key"{print;exit}{prev=$0}' "$ARGSFILE")
     else
         local cmdline
         cmdline=$(current_cmdline)
         if [ -n "$cmdline" ]; then
-            if printf '%s' "$cmdline" | grep -q -- '-mode tcp'; then mode=tcp; else mode=udp; fi
-            obf=$(printf '%s' "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
+            obf=$(printf '%s' "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p'); obf=${obf:-none}
             key=$(printf '%s' "$cmdline" | sed -nE 's/.*-obf-key[= ]+([0-9a-fA-F]{64}).*/\1/p')
         fi
     fi
     d_bool wg_backend "$backend"
-    if [ -n "$mode" ]; then d_str mode "$mode"; fi
     if [ -n "$obf" ]; then d_str obf_profile "$obf"; fi
     if [ -n "$key" ]; then d_str obf_key "$key"; fi
     return 0

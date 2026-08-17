@@ -12,9 +12,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,15 +32,12 @@ import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.util.redact
 
 /**
- * Синхронные серверные настройки (apply-модель): проброс UDP/TCP, профиль обфускации и
- * obf-ключ (черновик). Регенерация/копирование ключа - через колбэки; рестарт случается
+ * Синхронные серверные настройки (apply-модель): профиль обфускации и obf-ключ
+ * (черновик). Регенерация/копирование ключа - через колбэки; рестарт случается
  * по общей кнопке "Применить" на экране.
  */
 @Composable
 internal fun ServerSyncCard(
-    tcp: Boolean,
-    onTcp: (Boolean) -> Unit,
-    tcpBlocked: Boolean,
     obfProfile: String,
     onObfProfile: (String) -> Unit,
     keyDraft: String,
@@ -55,28 +49,6 @@ internal fun ServerSyncCard(
 ) {
     SectionLabel(stringResource(R.string.server_sync_section))
     SettingsCard {
-        // Проброс: UDP / TCP.
-        SettingsFieldSlot {
-            SettingsControlLabel(stringResource(R.string.tcp_forward_mode))
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = !tcp,
-                    onClick = { onTcp(false) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.udp)) }
-                SegmentedButton(
-                    selected = tcp,
-                    onClick = { onTcp(true) },
-                    // Ядро поднимает туннель только поверх udp-проброса.
-                    enabled = !tcpBlocked,
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.tcp)) }
-            }
-            if (tcpBlocked) {
-                SettingsControlLabel(stringResource(R.string.tcp_blocked_by_tunnel))
-            }
-        }
-        SettingsRowDivider()
         // Профиль обфускации.
         SettingsFieldSlot {
             SettingsControlLabel(stringResource(R.string.obf_profile_title))

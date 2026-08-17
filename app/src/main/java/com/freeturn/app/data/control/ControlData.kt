@@ -14,7 +14,6 @@ data class ProbeData(
     val version: String? = null,
     @SerialName("bin_sha256") val binSha256: String? = null,
     val running: Boolean = false,
-    val mode: String? = null,
     val obf: String? = null,
     val runtime: String = "",
     val euid: Int = -1,
@@ -63,7 +62,6 @@ data class WgSetupInfo(
 @Serializable
 data class ShareInfoData(
     @SerialName("wg_backend") val wgBackend: Boolean = false,
-    val mode: String = "",
     @SerialName("obf_profile") val obfProfile: String = "",
     @SerialName("obf_key") val obfKey: String = "",
 )

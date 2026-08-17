@@ -86,15 +86,22 @@ EOF
     [ "$status" -ne 0 ]
 }
 
-@test "share_info_emit: из run.args (mode/obf)" {
-    printf -- '-listen\n:8443\n-mode\ntcp\n-obf-profile\nrtpopus\n-obf-key\ndeadbeef\n' > "$FT_PREFIX/run.args"
+@test "share_info_emit: из run.args (obf)" {
+    printf -- '-listen\n:8443\n-obf-profile\nrtpopus\n-obf-key\ndeadbeef\n' > "$FT_PREFIX/run.args"
     _two_peers
     _DATA=()
     share_info_emit
     out=$(IFS=,; printf '%s' "${_DATA[*]}")
     [[ "$out" == *'"wg_backend":true'* ]]
-    [[ "$out" == *'"mode":"tcp"'* ]]
     [[ "$out" == *'"obf_profile":"rtpopus"'* ]]
+}
+
+@test "share_info_emit: run.args без obf -> obf_profile none" {
+    printf -- '-listen\n:8443\n-connect\n127.0.0.1:51820\n' > "$FT_PREFIX/run.args"
+    _DATA=()
+    share_info_emit
+    out=$(IFS=,; printf '%s' "${_DATA[*]}")
+    [[ "$out" == *'"obf_profile":"none"'* ]]
 }
 
 @test "clients_json: нет бинаря -> []" {

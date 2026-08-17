@@ -149,7 +149,6 @@ class SshRepository(
                 _serverState.value = ServerState.Known(
                     installed = d.installed,
                     running = d.running,
-                    tcpMode = if (d.running) d.mode == "tcp" else null,
                     obfProfile = if (d.running) d.obf else null,
                     version = d.version
                 )
@@ -185,7 +184,6 @@ class SshRepository(
     suspend fun startServer(
         listen: String,
         connect: String,
-        tcpMode: Boolean = false,
         obfProfile: String = "none",
         obfKey: String = "",
         clientId: String = ""
@@ -200,7 +198,6 @@ class SshRepository(
                 ServerStartOptions(
                     listen = listen,
                     connect = connect,
-                    tcpMode = tcpMode,
                     obfProfile = obfProfile,
                     obfKey = obfKey,
                     clientId = clientId

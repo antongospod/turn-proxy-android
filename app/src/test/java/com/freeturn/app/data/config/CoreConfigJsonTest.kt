@@ -43,27 +43,22 @@ class CoreConfigJsonTest {
     }
 
     @Test
-    fun tunnelForcesUdpProxyMode() {
+    fun tunnelCarriesWgConfig() {
         val wg = base.copy(
-            tcpForward = true,
-            bond = true,
             tunnelTransport = TunnelTransport.WIREGUARD,
             wireGuardConfig = "[Interface]\nAddress = 10.8.0.2/32\n",
         )
-        val proxy = parse(wg)["proxy"]!!.jsonObject
-        assertEquals("udp", proxy["mode"]!!.jsonPrimitive.content)
-        assertEquals(false, proxy["bond"]!!.jsonPrimitive.content.toBoolean())
-
         val tunnel = parse(wg)["tunnel"]!!.jsonObject
         assertEquals("wg", tunnel["mode"]!!.jsonPrimitive.content)
         assertEquals(ClientConfig.WG_MTU, tunnel["mtu"]!!.jsonPrimitive.content.toInt())
     }
 
+    // Лишний ключ в proxy валит старт ядра (DisallowUnknownFields), а не тест схемы.
     @Test
-    fun tcpModeKeepsBondWithoutTunnel() {
-        val proxy = parse(base.copy(tcpForward = true, bond = true))["proxy"]!!.jsonObject
-        assertEquals("tcp", proxy["mode"]!!.jsonPrimitive.content)
-        assertEquals(true, proxy["bond"]!!.jsonPrimitive.content.toBoolean())
+    fun proxyHasOnlyListen() {
+        val proxy = parse(base.copy(localPort = "127.0.0.1:9001"))["proxy"]!!.jsonObject
+        assertEquals(setOf("listen"), proxy.keys)
+        assertEquals("127.0.0.1:9001", proxy["listen"]!!.jsonPrimitive.content)
     }
 
     @Test
