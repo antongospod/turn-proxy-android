@@ -260,6 +260,11 @@ class ProxyService : VpnService() {
         val session = this.session
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
+            if (cfg.wireGuardActive) {
+                // Переподнимаем интерфейс, чтобы получить свежий рабочий дескриптор,
+                // так как старый мог инвалидироваться во время глубокого сна.
+                if (!openTun(cfg, session, socks5 != null)) return@launch
+            }
             try {
                 engine.restart(session, buildConfigJson(cfg), tun?.let { tunHandle })
             } catch (e: Exception) {
