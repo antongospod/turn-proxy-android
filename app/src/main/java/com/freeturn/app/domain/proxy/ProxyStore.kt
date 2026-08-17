@@ -84,6 +84,11 @@ object ProxyStore {
         }
     }
 
+    /** Экран ушёл - опрос метрик встал, и замершие скорости показывать нечестно. */
+    fun clearRates() {
+        _status.update { it.copy(rxRate = 0, txRate = 0) }
+    }
+
     fun setMetrics(active: Int, total: Int, rxRate: Long, txRate: Long, tunnelUp: Boolean) {
         _status.update {
             it.copy(active = active, total = total, rxRate = rxRate, txRate = txRate, tunnelUp = tunnelUp)

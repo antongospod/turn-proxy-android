@@ -65,6 +65,10 @@ class ProxyEngine(private val stateDir: String) {
     // (под локом) - при простом чтении-записи ссылка на живой цикл терялась бы.
     private val poller = AtomicReference<Job?>(null)
 
+    // Метрики нужны только открытому экрану: в фоне их никто не читает (нотификация
+    // скорости не показывает), а опрос будил бы процесс каждые 2 c всю сессию.
+    @Volatile private var metricsWanted = false
+
     // Заявки: последняя выданная и последняя отменённая.
     private val issued = AtomicLong(0)
     private val cancelled = AtomicLong(0)
@@ -192,9 +196,21 @@ class ProxyEngine(private val stateDir: String) {
         protector = null
     }
 
+    /** Экран с метриками виден. Выключение обнуляет скорости - иначе они замрут на экране. */
+    fun setMetricsEnabled(enabled: Boolean) {
+        if (metricsWanted == enabled) return
+        metricsWanted = enabled
+        if (!enabled) {
+            stopPolling()
+            ProxyStore.clearRates()
+            return
+        }
+        if (running != 0L) startPolling()
+    }
+
     /**
      * Устройство проснулось: стримы бросают backoff и пересоздают TURN-аллокации,
-     * не дожидаясь двух провалов ChannelBind refresh (до ~10 минут молчания).
+     * не дожидаясь гэп-детектора ядра (тик 30 c) и тем более провалов ChannelBind.
      *
      * Мимо [lock]: ядро само проверяет, есть ли живая сессия, а ждать за локом
      * долгий `start`/`stop` смысла нет - к их концу пинок уже неактуален.
@@ -229,6 +245,7 @@ class ProxyEngine(private val stateDir: String) {
 
     /** Метрики: событий на них нет, ядро отдаёт только снимок. */
     private fun startPolling() {
+        if (!metricsWanted) return
         val next = scope.launch {
             while (isActive && running != 0L) {
                 delay(POLL_INTERVAL_MS)

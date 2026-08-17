@@ -75,6 +75,17 @@ class MainActivity : ComponentActivity() {
         proxyViewModel.onForeground(vpnConsent = VpnService.prepare(this) == null)
     }
 
+    // Опрос метрик живёт ровно столько, сколько видно окно.
+    override fun onStart() {
+        super.onStart()
+        proxyViewModel.setMetricsVisible(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        proxyViewModel.setMetricsVisible(false)
+    }
+
     // singleTask: freeturn://-ссылка при живой задаче приходит сюда, не в onCreate.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

@@ -8,7 +8,7 @@ import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.freeturn.app.R
@@ -49,9 +49,12 @@ class ProxyService : VpnService() {
     private lateinit var notifier: ProxyNotifier
     private lateinit var network: NetworkHandoverMonitor
 
-    private var wakeLock: PowerManager.WakeLock? = null
     private var tun: ParcelFileDescriptor? = null
     private var socks5: Socks5Server? = null
+
+    // Сколько устройство успело проспать к прошлой проверке: разница elapsedRealtime
+    // (идёт во сне) и uptimeMillis (стоит) - и есть накопленный сон.
+    @Volatile private var sleptMillis = 0L
 
     // Нотификация должна сказать про туннель раньше, чем метрики его увидят.
     @Volatile private var tunnelMode = false
@@ -64,10 +67,15 @@ class ProxyService : VpnService() {
     // Сессию сворачивает либо STOP, либо onDestroy - кто успел первым.
     private val shutdownDone = AtomicBoolean(false)
 
-    // Экран зажёгся - устройство точно не спит: пинаем ядро, не дожидаясь его
-    // собственного детектора сна (тик 5 c) и тем более провалов ChannelBind.
+    // Экран зажёгся после глубокого сна - аллокации протухли, пинаем ядро сразу, не
+    // дожидаясь его гэп-детектора (тик 30 c). Короткие блокировки экрана пропускаем:
+    // рецикл на каждой разблокировке рвал бы живые стримы на ровном месте.
     private val screenOn = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) = engine.wake()
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val slept = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
+            if (slept - sleptMillis >= DEEP_SLEEP_KICK_MS) engine.wake()
+            sleptMillis = slept
+        }
     }
 
     /** Ядро закрывает то, что ему отдали, поэтому наружу уходит только копия. */
@@ -80,6 +88,7 @@ class ProxyService : VpnService() {
         notifier = ProxyNotifier(this)
         notifier.createChannels()
         network = NetworkHandoverMonitor(applicationContext, scope) { onNetworkHandover() }
+        sleptMillis = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
         // Только динамически: SCREEN_ON манифестом не ловится.
         ContextCompat.registerReceiver(
             this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON),
@@ -163,7 +172,6 @@ class ProxyService : VpnService() {
 
         if (!isCurrent(session)) return
 
-        acquireWakeLock()
         network.register()
 
         tunnelMode = cfg.wireGuardActive
@@ -302,13 +310,6 @@ class ProxyService : VpnService() {
         return false
     }
 
-    private fun acquireWakeLock() {
-        if (wakeLock?.isHeld == true) return
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        // Без таймаута: сессия живёт дольше суток, release гарантирован в shutdown.
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FreeTurn::Session").apply { acquire() }
-    }
-
     /**
      * Сворачивает сессию. Зовётся из обработки STOP, а не только из [onDestroy]:
      * пока tun поднят, система держит `VpnService` забинденным, и `stopSelf` его
@@ -327,7 +328,6 @@ class ProxyService : VpnService() {
         ProxyStore.finish()
         releaseAll()
         stopForeground(STOP_FOREGROUND_REMOVE)
-        wakeLock?.takeIf { it.isHeld }?.release()
         // Процессный scope движка: onDestroy и onStartCommand блокировать нельзя, а
         // свой scope сервис вот-вот отменит. Гасим именно свою сессию - ядро уже могло
         // перейти к следующей. Этим же снимается заявка, не дошедшая до ядра.
@@ -376,5 +376,10 @@ class ProxyService : VpnService() {
         shutdown()
         unregisterReceiver(screenOn)
         scope.cancel()
+    }
+
+    private companion object {
+        // Тот же порог, что у гэп-детектора ядра: сон короче аллокации переживают.
+        const val DEEP_SLEEP_KICK_MS = 60_000L
     }
 }

@@ -26,20 +26,20 @@ class ProxyViewModel(
 
     fun stop() = launcher.stop()
 
+    /** Окно видно - только на это время ядро опрашивают на метрики. */
+    fun setMetricsVisible(visible: Boolean) = engine.setMetricsEnabled(visible)
+
     /**
-     * Возврат приложения на передний план. Живой сессии он говорит, что устройство
-     * проснулось (стримы не досиживают backoff, начатый до сна); мёртвой - что её
-     * пора поднять: намерение живо, значит процесс убивали, и sticky-рестарт до нас
-     * не дошёл (типично для OEM-киллеров, которым FGS не указ).
+     * Возврат приложения на передний план. Живую сессию не трогаем - открытие окна
+     * не событие сети, а пинок ядру рециклил бы рабочие аллокации. Мёртвую поднимаем:
+     * намерение живо, значит процесс убивали, и sticky-рестарт до нас не дошёл
+     * (типично для OEM-киллеров, которым FGS не указ).
      *
      * [vpnConsent] - согласие на VpnService уже дано. Без него в WG-режиме стартовать
      * нечем, а спрашивать молча, без действия пользователя, нельзя.
      */
     fun onForeground(vpnConsent: Boolean) {
-        if (ProxyStore.status.value.phase != ProxyPhase.Idle) {
-            engine.wake()
-            return
-        }
+        if (ProxyStore.status.value.phase != ProxyPhase.Idle) return
         viewModelScope.launch {
             if (!prefs.proxyDesiredFlow.first()) return@launch
             if (!vpnConsent && prefs.clientConfigFlow.first().wireGuardActive) return@launch
