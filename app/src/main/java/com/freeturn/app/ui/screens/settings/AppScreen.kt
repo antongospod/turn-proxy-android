@@ -5,7 +5,11 @@
 
 package com.freeturn.app.ui.screens.settings
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.os.PowerManager
+import android.provider.Settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +54,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.domain.UpdateState
@@ -85,6 +94,7 @@ fun AppScreen(
     val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
     val suppressTgPrompt by settingsViewModel.suppressTgPrompt.collectAsStateWithLifecycle()
+    val autoConnect by settingsViewModel.autoConnect.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val appVersion = rememberAppVersion()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
@@ -152,6 +162,22 @@ fun AppScreen(
                             checked = dynamicTheme,
                             onCheckedChange = { settingsViewModel.setDynamicTheme(it) }
                         )
+                    }
+                }
+
+                SectionLabel(stringResource(R.string.app_section_connection))
+                SettingsGroup {
+                    SettingsGroupItem(0, 2) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.auto_connect_title),
+                            subtitle = stringResource(R.string.auto_connect_desc),
+                            iconRes = R.drawable.vpn_key_24px,
+                            checked = autoConnect,
+                            onCheckedChange = { settingsViewModel.setAutoConnect(it) }
+                        )
+                    }
+                    SettingsGroupItem(1, 2) {
+                        BatteryOptimizationRow()
                     }
                 }
 
@@ -354,6 +380,66 @@ private fun UpdateCard(
 }
 
 /** Строка сброса: error-тинт иконки и заголовка, без trailing-шеврона. */
+/**
+ * Статус исключения из оптимизации батареи и запрос его заново. Стартовый диалог
+ * показывается один раз за установку, а без исключения система в Doze режет туннель -
+ * значит вернуться к этому решению надо уметь в любой момент.
+ */
+@SuppressLint("BatteryLife")
+@Composable
+private fun BatteryOptimizationRow() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var exempt by remember { mutableStateOf(context.isIgnoringBatteryOptimizations()) }
+
+    // Решение принимается в системном экране: состояние сверяем на каждом возврате.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) exempt = context.isIgnoringBatteryOptimizations()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Кликабельна всегда: на OxygenOS «умный режим» рапортует как «не оптимизируется»,
+    // хотя процесс в Doze всё равно замораживают - решение остаётся за пользователем.
+    SettingsEntryRow(
+        iconRes = R.drawable.vpn_key_24px,
+        title = stringResource(R.string.battery_opt_title),
+        subtitle = stringResource(
+            if (exempt) R.string.battery_opt_on else R.string.battery_opt_off
+        ),
+        onClick = {
+            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+            context.openBatterySettings(exempt)
+        }
+    )
+}
+
+/**
+ * [exempt] - приложение уже в списке исключений. Тогда запрос-диалог система молча
+ * игнорирует, и вести надо сразу в настройки: на OxygenOS собственные режимы
+ * энергосбережения живут отдельно от системного whitelist и душат процесс независимо.
+ */
+private fun Context.openBatterySettings(exempt: Boolean) {
+    val pkg = "package:$packageName".toUri()
+    val candidates = buildList {
+        if (!exempt) {
+            add(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(pkg))
+        }
+        // Карточка приложения первой: режим энергосбережения выбирается именно там, а
+        // системный список исключений в этот момент уже показывает «не оптимизируется».
+        add(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(pkg))
+        add(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    }
+    for (intent in candidates) {
+        if (runCatching { startActivity(intent) }.isSuccess) return
+    }
+}
+
+private fun Context.isIgnoringBatteryOptimizations(): Boolean =
+    getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+
 @Composable
 private fun ResetRow(onClick: () -> Unit) {
     Row(

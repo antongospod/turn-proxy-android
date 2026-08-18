@@ -34,20 +34,21 @@ internal fun RequestStartupPermissions(settingsViewModel: SettingsViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Флаг ставим по возврату из диалога, а не до запуска: иначе не показавшийся диалог
+    // (перекрыт другим системным окном, отсутствует на прошивке) сжигал единственную попытку.
     val batteryOptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { /* пользователь закрыл диалог батареи - результат нас не интересует */ }
+    ) { settingsViewModel.setBatteryPromptShown() }
 
     suspend fun maybeRequestBatteryExemption() {
         if (settingsViewModel.batteryPromptShownOnce()) return
         val pm = context.getSystemService(PowerManager::class.java)
         if (pm.isIgnoringBatteryOptimizations(context.packageName)) return
-        settingsViewModel.setBatteryPromptShown()
-        batteryOptLauncher.launch(
-            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = "package:${context.packageName}".toUri()
-            }
-        )
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = "package:${context.packageName}".toUri()
+        }
+        // Прошивка может не иметь этого экрана - тогда просить нечем, и жечь флаг незачем.
+        runCatching { batteryOptLauncher.launch(intent) }
     }
 
     val notificationLauncher = rememberLauncherForActivityResult(

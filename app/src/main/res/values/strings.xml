@@ -404,6 +404,8 @@
     <string name="open_logs">Открыть логи</string>
     <string name="nav_logs">Логи</string>
     <string name="logs_actions">Действия с логами</string>
+    <string name="logs_share_file">Отправить файл</string>
+    <string name="logs_share_empty">Файл лога пуст</string>
 
     <!-- Настройки (новый раздел) -->
     <string name="nav_settings">Настройки</string>
@@ -484,6 +486,12 @@
     <string name="settings_app">Приложение</string>
     <string name="settings_app_desc">Тема, приватность и обновления</string>
     <string name="app_section_interface">Интерфейс</string>
+    <string name="app_section_connection">Подключение</string>
+    <string name="battery_opt_title">Работа в фоне без ограничений</string>
+    <string name="battery_opt_on">Ограничений нет. Если туннель всё равно рвётся во сне - откройте «Батарея» и выберите «Без ограничений»</string>
+    <string name="battery_opt_off">Не разрешено - в спящем режиме туннель рвётся</string>
+    <string name="auto_connect_title">Подключаться при запуске</string>
+    <string name="auto_connect_desc">Восстанавливать сессию при открытии приложения, если её оборвала система</string>
     <string name="app_section_prompts">Подсказки</string>
     <string name="suppress_update_prompt_title">Не предлагать обновления</string>
     <string name="suppress_update_prompt_desc">Не показывать диалог с предложением обновиться</string>

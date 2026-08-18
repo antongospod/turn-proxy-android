@@ -97,6 +97,9 @@ class SettingsViewModel(
     val suppressTgPrompt: StateFlow<Boolean> = prefs.suppressTgPromptFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val autoConnect: StateFlow<Boolean> = prefs.autoConnectFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val privacyMode: StateFlow<Boolean> = prefs.privacyModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -161,6 +164,10 @@ class SettingsViewModel(
 
     fun setSuppressTgPrompt(enabled: Boolean) {
         viewModelScope.launch { prefs.setSuppressTgPrompt(enabled) }
+    }
+
+    fun setAutoConnect(enabled: Boolean) {
+        viewModelScope.launch { prefs.setAutoConnect(enabled) }
     }
 
     // expectedActiveId не даёт отложенной записи затереть новый активный сервер.
