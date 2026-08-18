@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -75,8 +76,13 @@ class ProxyService : VpnService() {
     private val screenOn = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val slept = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
-            if (slept - sleptMillis >= DEEP_SLEEP_KICK_MS) engine.wake()
+            val gap = slept - sleptMillis
             sleptMillis = slept
+            if (gap < DEEP_SLEEP_KICK_MS) return
+            // Длительность сна - опора при разборе отвалов: по ней видно, пережила ли
+            // аллокация паузу и не мы ли сами её выбросили.
+            ProxyStore.log("Пробуждение после сна ${gap / 1000} c - пинок ядру")
+            engine.wake()
         }
     }
 
@@ -104,7 +110,7 @@ class ProxyService : VpnService() {
         // stopSelf(startId), а не stopSelf(): START, пришедший следом за отменой,
         // делает её неактуальной - иначе он поднял бы сессию в умирающем сервисе.
         if (intent?.action == ProxyActions.STOP) {
-            shutdown()
+            shutdown("команда STOP")
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -137,6 +143,15 @@ class ProxyService : VpnService() {
             stopping = false
             shutdownDone.set(false)
             scope.launch {
+                // Sticky-рестарт после отказа: fail() снял намерение, а система вернула
+                // сервис. Без этой проверки он поднимал сессию заново - и так по кругу,
+                // сжигая персону и кредиты VK на каждом витке.
+                if (!fresh && !prefs.proxyDesiredFlow.first()) {
+                    ProxyStore.log("Сервис возвращён системой, но прокси выключен - не поднимаем")
+                    shutdown("возврат сервиса без намерения")
+                    stopSelf(lastStartId)
+                    return@launch
+                }
                 // Прошлая сессия могла ещё подниматься: сначала ядро отпускает свою
                 // копию fd, только потом закрываем прошлый интерфейс.
                 engine.stop(previous)
@@ -175,6 +190,11 @@ class ProxyService : VpnService() {
         if (!isCurrent(session)) return
 
         acquireWakeLock()
+        logEnvironment()
+        // Флаг снимается только штатной остановкой: следующий запуск процесса по нему
+        // отличит убийство системой от нормального выхода.
+        prefs.setCleanExit(false)
+        scope.launch { heartbeat(session) }
         network.register()
 
         tunnelMode = cfg.wireGuardActive
@@ -256,7 +276,8 @@ class ProxyService : VpnService() {
         // stopping, а не только isRunning: остановка идёт в фоне, и ядро всё ещё живо -
         // без проверки рестарт поднимал бы сессию, которую сворачивают.
         if (stopping || !engine.isRunning) return
-        ProxyStore.log("Смена сети - переподключение")
+        val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
+        ProxyStore.log("Смена сети - переподключение (сон с прошлой проверки $slept c)")
         val session = this.session
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
@@ -282,7 +303,7 @@ class ProxyService : VpnService() {
             // Ошибка ядра - сессии больше нет: держать поднятый tun не за чем,
             // иначе трафик уходит в интерфейс, за которым никого.
             if (status.phase == ProxyPhase.Error) {
-                shutdown()
+                shutdown("ошибка ядра: ${status.error}")
                 stopSelf(lastStartId)
             }
         }
@@ -301,6 +322,37 @@ class ProxyService : VpnService() {
     private fun closeTun() {
         tun?.close()
         tun = null
+    }
+
+    /**
+     * Без исключения из оптимизации батареи система в Doze игнорирует wake lock и режет
+     * приложению сеть, поэтому статус нужен в логе рядом с моментом отвала.
+     */
+    private fun logEnvironment() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        ProxyStore.log(
+            "Окружение: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}, " +
+                "батарея-исключение=${pm.isIgnoringBatteryOptimizations(packageName)}, " +
+                "doze=${pm.isDeviceIdleMode}"
+        )
+    }
+
+    /**
+     * Метка живого процесса. Обрыв этих строк - точный момент, когда процесс заморозили
+     * или убили: остальной лог в этот момент уже молчит, и отличить одно от другого
+     * иначе нечем.
+     */
+    private suspend fun heartbeat(session: Long) {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        while (isCurrent(session)) {
+            delay(HEARTBEAT_MS)
+            if (!isCurrent(session)) return
+            val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()) / 1000
+            ProxyStore.log(
+                "hb up=${SystemClock.elapsedRealtime() / 1000}s сон=${slept}s doze=${pm.isDeviceIdleMode}",
+                LogLevel.Plain
+            )
+        }
     }
 
     private fun acquireWakeLock() {
@@ -325,7 +377,7 @@ class ProxyService : VpnService() {
         prefs.setProxyDesired(false)
         ProxyStore.log(message, LogLevel.Error)
         ProxyStore.fail(message)
-        shutdown()
+        shutdown(message)
         stopSelf(lastStartId)
         return false
     }
@@ -339,12 +391,15 @@ class ProxyService : VpnService() {
      * Идемпотентна: STOP и следующий за ним onDestroy не должны гасить дважды.
      */
     @Synchronized
-    private fun shutdown() {
+    private fun shutdown(reason: String) {
         if (!shutdownDone.compareAndSet(false, true)) return
         stopping = true
         val session = this.session
         notifier.cancelCaptcha()
-        ProxyStore.log("Остановка")
+        // Причина обязательна: по логу после гибернации надо отличать команду пользователя
+        // от ошибки ядра и от отзыва VPN системой.
+        ProxyStore.log("Остановка: $reason")
+        prefs.setCleanExit(true)
         ProxyStore.finish()
         releaseAll()
         releaseWakeLock()
@@ -388,19 +443,21 @@ class ProxyService : VpnService() {
     override fun onRevoke() {
         prefs.setProxyDesired(false)
         ProxyStore.log("VPN отключён системой", LogLevel.Warning)
-        shutdown()
+        shutdown("VPN отозван системой")
         stopSelf(lastStartId)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        shutdown()
-        unregisterReceiver(screenOn)
+        shutdown("сервис уничтожен")
+        // Регистрация могла не состояться, если onCreate упал раньше.
+        runCatching { unregisterReceiver(screenOn) }
         scope.cancel()
     }
 
     private companion object {
         // Тот же порог, что у гэп-детектора ядра: сон короче аллокации переживают.
         const val DEEP_SLEEP_KICK_MS = 60_000L
+        const val HEARTBEAT_MS = 60_000L
     }
 }
