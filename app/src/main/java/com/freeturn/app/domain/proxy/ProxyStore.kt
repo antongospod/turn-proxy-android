@@ -36,6 +36,8 @@ object ProxyStore {
     private val flushScheduled = AtomicBoolean(false)
     // Пишется из UI, читается из горутин Go.
     @Volatile private var logsEnabled = true
+    // Ставится один раз на старте процесса; store живёт вне графа DI.
+    @Volatile private var file: LogFile? = null
     private val captchaSeq = AtomicLong(0)
     // Поколение показанной ошибки: таймер гасит только свою. Ошибки приходят из горутин
     // Go, сервиса и UI - хранить Job и отменять его было гонкой, а ошибку от ядра,
@@ -107,7 +109,17 @@ object ProxyStore {
         logsEnabled = enabled
     }
 
+    fun attachFile(logFile: LogFile) {
+        file = logFile
+    }
+
+    /** Собирает лог в [target] для отправки; false - писать было нечего. */
+    fun exportLogFile(target: java.io.File): Boolean = file?.export(target) ?: false
+
     fun log(message: String, level: LogLevel = LogLevel.Event) {
+        // Файл ведём всегда: он нужен ровно тогда, когда экран логов был выключен, а
+        // разбирать отвал уже поздно. Флаг гасит только вывод в UI.
+        file?.append(message, level)
         if (!logsEnabled) return
         val entry = LogEntry(logSeq.getAndIncrement(), message, level)
         synchronized(logBuffer) {
@@ -117,9 +129,16 @@ object ProxyStore {
         scheduleFlush()
     }
 
+    /** Только экран: файл ведёт историю через рестарты, ради которой он и заведён. */
     fun clearLogs() {
         synchronized(logBuffer) { logBuffer.clear() }
         _logs.value = emptyList()
+    }
+
+    /** Явное действие пользователя - единственное, что стирает файл. */
+    fun clearLogFile() {
+        clearLogs()
+        file?.clear()
     }
 
     /**

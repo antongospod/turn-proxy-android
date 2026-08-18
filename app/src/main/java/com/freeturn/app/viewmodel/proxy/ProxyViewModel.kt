@@ -31,9 +31,10 @@ class ProxyViewModel(
 
     /**
      * Возврат приложения на передний план. Живую сессию не трогаем - открытие окна
-     * не событие сети, а пинок ядру рециклил бы рабочие аллокации. Мёртвую поднимаем:
-     * намерение живо, значит процесс убивали, и sticky-рестарт до нас не дошёл
-     * (типично для OEM-киллеров, которым FGS не указ).
+     * не событие сети, а пинок ядру рециклил бы рабочие аллокации. Мёртвую поднимаем
+     * только с явного согласия ([AppPreferences.autoConnectFlow]): намерение переживает
+     * смерть процесса и перезагрузку, поэтому без настройки открытие приложения
+     * поднимало VPN само и отбирало tun у чужого.
      *
      * [vpnConsent] - согласие на VpnService уже дано. Без него в WG-режиме стартовать
      * нечем, а спрашивать молча, без действия пользователя, нельзя.
@@ -41,6 +42,7 @@ class ProxyViewModel(
     fun onForeground(vpnConsent: Boolean) {
         if (ProxyStore.status.value.phase != ProxyPhase.Idle) return
         viewModelScope.launch {
+            if (!prefs.autoConnectFlow.first()) return@launch
             if (!prefs.proxyDesiredFlow.first()) return@launch
             if (!vpnConsent && prefs.clientConfigFlow.first().wireGuardActive) return@launch
             launcher.start()
@@ -50,5 +52,9 @@ class ProxyViewModel(
     /** Окно закрыл пользователь; ядро ждёт решения дальше и выдаст новую капчу. */
     fun dismissCaptcha() = ProxyStore.setCaptcha("")
 
-    fun clearLogs() = ProxyStore.clearLogs()
+    /** С экрана чистим и файл: сохранять историю против воли пользователя незачем. */
+    fun clearLogs() = ProxyStore.clearLogFile()
+
+    /** false - отправлять нечего. */
+    fun exportLogs(target: java.io.File): Boolean = ProxyStore.exportLogFile(target)
 }

@@ -5,6 +5,8 @@
 
 package com.freeturn.app.ui.screens.logs
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
@@ -38,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.EmptyState
@@ -61,6 +67,10 @@ import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /** Вкладка логов: терминальная панель с подсветкой по уровню. */
 @Composable
@@ -68,6 +78,8 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
     val context = LocalContext.current
     val logs by proxyViewModel.logs.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var autoScroll by remember { mutableStateOf(true) }
 
@@ -99,12 +111,17 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
                     context.copyToClipboard("proxy_logs", logs.joinToString("\n") { it.text })
                     HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
                 },
+                onShare = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    scope.launch { shareLogFile(context, proxyViewModel, snackbarHostState) }
+                },
                 onClear = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     proxyViewModel.clearLogs()
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         // Вкладка живёт в NavigationSuite - нижний бар сам держит инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
@@ -154,10 +171,36 @@ private fun LazyListState.isAtBottom(): Boolean {
  * Expressive FAB-меню действий над логами: по тапу раскрывает "Копировать" и "Очистить".
  * Пункты no-op при пустом логе.
  */
+/**
+ * Экранный буфер обрывается на перезапуске прокси, а файл - нет: для разбора отвалов
+ * отправлять надо именно его.
+ */
+private suspend fun shareLogFile(
+    context: Context,
+    proxyViewModel: ProxyViewModel,
+    snackbarHostState: SnackbarHostState
+) {
+    val dir = File(context.cacheDir, "logs").apply { mkdirs() }
+    val target = File(dir, "freeturn-log.txt")
+    val ok = withContext(Dispatchers.IO) { proxyViewModel.exportLogs(target) }
+    if (!ok) {
+        snackbarHostState.showSnackbar(context.getString(R.string.logs_share_empty))
+        return
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, null))
+}
+
 @Composable
 private fun LogsActionsFab(
     hasLogs: Boolean,
     onCopy: () -> Unit,
+    onShare: () -> Unit,
     onClear: () -> Unit
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -184,6 +227,12 @@ private fun LogsActionsFab(
             onClick = { expanded = false; if (hasLogs) onCopy() },
             icon = { Icon(painterResource(R.drawable.content_copy_24px), contentDescription = null) },
             text = { Text(stringResource(R.string.copy)) }
+        )
+        // Без hasLogs: файл переживает очистку экрана, отправлять его есть смысл всегда.
+        FloatingActionButtonMenuItem(
+            onClick = { expanded = false; onShare() },
+            icon = { Icon(painterResource(R.drawable.share_24px), contentDescription = null) },
+            text = { Text(stringResource(R.string.logs_share_file)) }
         )
         FloatingActionButtonMenuItem(
             onClick = { expanded = false; if (hasLogs) onClear() },

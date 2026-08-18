@@ -50,6 +50,8 @@ class AppPreferences(context: Context) {
         val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
         val OWN_CLIENT_ID = stringPreferencesKey("own_client_id")
         val PROXY_DESIRED = booleanPreferencesKey("proxy_desired")
+        val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
+        val CLEAN_EXIT = booleanPreferencesKey("clean_exit")
     }
 
     // Намерение пользователя переживает смерть процесса, поэтому пишется своим scope:
@@ -121,10 +123,26 @@ class AppPreferences(context: Context) {
     // в ProxyStore; здесь только намерение, по которому её восстанавливают после убийства.
     val proxyDesiredFlow: Flow<Boolean> = prefFlow { prefs -> prefs[PROXY_DESIRED] ?: false }
 
+    // Восстановление убитой сессии при открытии окна. По умолчанию выключено: намерение
+    // переживает и смерть процесса, и перезагрузку, поэтому без явного согласия открытие
+    // приложения поднимало VPN, которого пользователь не просил (и отбирало tun у чужого).
+    val autoConnectFlow: Flow<Boolean> = prefFlow { prefs -> prefs[AUTO_CONNECT] ?: false }
+
     /** Не suspend: зовётся с путей, где вызывающий вот-вот умрёт (см. [desiredScope]). */
     fun setProxyDesired(desired: Boolean) {
         desiredScope.launch {
             context.dataStore.edit { prefs -> prefs[PROXY_DESIRED] = desired }
+        }
+    }
+
+    // false на старте сессии, true при штатной остановке: если процесс убит системой,
+    // до записи true дело не доходит, и следующий запуск это увидит.
+    val cleanExitFlow: Flow<Boolean> = prefFlow { prefs -> prefs[CLEAN_EXIT] ?: true }
+
+    /** Не suspend по той же причине, что и [setProxyDesired]. */
+    fun setCleanExit(clean: Boolean) {
+        desiredScope.launch {
+            context.dataStore.edit { prefs -> prefs[CLEAN_EXIT] = clean }
         }
     }
 
@@ -249,6 +267,10 @@ class AppPreferences(context: Context) {
 
     suspend fun setRestartServerOnSwitch(enabled: Boolean) {
         context.dataStore.edit { it[RESTART_SERVER_ON_SWITCH] = enabled }
+    }
+
+    suspend fun setAutoConnect(enabled: Boolean) {
+        context.dataStore.edit { it[AUTO_CONNECT] = enabled }
     }
 
     suspend fun setHotspotProxyEnabled(enabled: Boolean) {
