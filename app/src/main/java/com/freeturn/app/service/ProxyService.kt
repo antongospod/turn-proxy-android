@@ -200,7 +200,17 @@ class ProxyService : VpnService() {
         tunnelMode = cfg.wireGuardActive
         // Раздача только поверх туннеля: без tun сокеты сервера ушли бы напрямую.
         val hotspot = tunnelMode && prefs.hotspotProxyEnabledFlow.first()
-        if (tunnelMode && !openTun(cfg, session, hotspot)) return
+        if (tunnelMode) {
+            // На старте интерфейс обязателен: без него сессии просто нет.
+            when (val tunResult = openTun(cfg, session, hotspot)) {
+                is TunResult.Failed -> {
+                    fail(tunResult.message)
+                    return
+                }
+                TunResult.Stale -> return
+                TunResult.Ok -> Unit
+            }
+        }
 
         val started = try {
             engine.start(session, json, tun?.let { tunHandle }, protector)
@@ -229,24 +239,31 @@ class ProxyService : VpnService() {
         socks5 = Socks5Server(protect = { socket -> protect(socket) }).also { it.start() }
     }
 
-    /** false - интерфейс не поднялся, сессия дальше не идёт. */
-    private fun openTun(cfg: ClientConfig, session: Long, hotspot: Boolean): Boolean {
+    /** Исход попытки поднять tun. Судьбу сессии решает вызывающий, а не сама попытка. */
+    private sealed interface TunResult {
+        data object Ok : TunResult
+        /** Заявку отменили, пока поднимался интерфейс - жаловаться не на что. */
+        data object Stale : TunResult
+        data class Failed(val message: String) : TunResult
+    }
+
+    private fun openTun(cfg: ClientConfig, session: Long, hotspot: Boolean): TunResult {
         val setup = try {
             engine.parseTunnel(cfg.wireGuardConfig, ClientConfig.WG_MTU)
         } catch (e: Exception) {
-            return fail("WireGuard: конфиг не разобран - ${e.message}")
+            return TunResult.Failed("WireGuard: конфиг не разобран - ${e.message}")
         }
 
         val pfd = try {
             Builder().applyTunnel(applicationContext, cfg, setup, hotspot).establish()
         } catch (e: Exception) {
-            return fail("VPN-интерфейс не поднят: ${e.message}")
+            return TunResult.Failed("VPN-интерфейс не поднят: ${e.message}")
         }
         // null - пользователь не дал согласия: старт из тайла, виджета или
         // broadcast'а идёт мимо экрана, где его спрашивают.
-        if (pfd == null) return fail(getString(R.string.notif_proxy_vpn_permission))
+        if (pfd == null) return TunResult.Failed(getString(R.string.notif_proxy_vpn_permission))
 
-        return adoptTun(pfd, session)
+        return if (adoptTun(pfd, session)) TunResult.Ok else TunResult.Stale
     }
 
     /**
@@ -282,9 +299,15 @@ class ProxyService : VpnService() {
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
             if (cfg.wireGuardActive) {
-                // Переподнимаем интерфейс, чтобы получить свежий рабочий дескриптор,
-                // так как старый мог инвалидироваться во время глубокого сна.
-                if (!openTun(cfg, session, socks5 != null)) return@launch
+                // Переподнимаем интерфейс: старый мог инвалидироваться во время сна.
+                // Не вышло - сессию не рвём: ядро продолжит на текущем дескрипторе, а
+                // попытку повторит следующее событие сети (раньше это была смерть сессии).
+                when (val tunResult = openTun(cfg, session, socks5 != null)) {
+                    is TunResult.Failed ->
+                        ProxyStore.log("Интерфейс не переподнят: ${tunResult.message}", LogLevel.Warning)
+                    TunResult.Stale -> return@launch
+                    TunResult.Ok -> Unit
+                }
             }
             try {
                 engine.restart(session, buildConfigJson(cfg), tun?.let { tunHandle })
