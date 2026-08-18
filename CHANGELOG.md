@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.0.0...v4.1.0) (2026-08-18)
+
+
+### Features
+
+* **logs:** файловый лог сессии с ротацией и отправкой ([0f9f9be](https://github.com/samosvalishe/turn-proxy-android/commit/0f9f9be46c58f87eb25f16e6954ee03c6180f0c7))
+* **settings:** подключение при запуске и работа в фоне ([c85e3e0](https://github.com/samosvalishe/turn-proxy-android/commit/c85e3e08e82e88d0105eb44004286743c9a9cfb6))
+
+
+### Fixes
+
+* **proxy:** sticky-рестарт не поднимает сессию без намерения ([cccc711](https://github.com/samosvalishe/turn-proxy-android/commit/cccc711b11e4003da8145e80a395530ad6870e01))
+* **proxy:** неудачный tun при смене сети не рвёт сессию ([36b123b](https://github.com/samosvalishe/turn-proxy-android/commit/36b123be46a762eceee2b11ec5aa147e134ab9c6))
+
 ## [4.0.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.6.0...v4.0.0) (2026-08-17)
 
 
