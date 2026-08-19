@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.2.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.1.0...v4.2.0) (2026-08-19)
+
+
+### Features
+
+* bump aar ([f0aa0bb](https://github.com/samosvalishe/turn-proxy-android/commit/f0aa0bbf27764da94695840b0658c1beb56487be))
+
 ## [4.1.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.0.0...v4.1.0) (2026-08-18)
 
 
