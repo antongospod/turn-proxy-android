@@ -282,7 +282,6 @@ class ProxyService : VpnService() {
         return true
     }
 
-    /** Пересборка конфига: DNS оператора мог смениться вместе с сетью. */
     private suspend fun buildConfigJson(cfg: ClientConfig): String = cfg.toCoreJson(
         srv = prefs.serverOptsFlow.first(),
         carrierDns = if (cfg.useCarrierDns) network.physicalDnsServers() else null,
@@ -295,25 +294,9 @@ class ProxyService : VpnService() {
         if (stopping || !engine.isRunning) return
         val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
         ProxyStore.log("Смена сети - переподключение (сон с прошлой проверки $slept c)")
-        val session = this.session
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
-            if (cfg.wireGuardActive) {
-                // Переподнимаем интерфейс: старый мог инвалидироваться во время сна.
-                // Не вышло - сессию не рвём: ядро продолжит на текущем дескрипторе, а
-                // попытку повторит следующее событие сети (раньше это была смерть сессии).
-                when (val tunResult = openTun(cfg, session, socks5 != null)) {
-                    is TunResult.Failed ->
-                        ProxyStore.log("Интерфейс не переподнят: ${tunResult.message}", LogLevel.Warning)
-                    TunResult.Stale -> return@launch
-                    TunResult.Ok -> Unit
-                }
-            }
-            try {
-                engine.restart(session, buildConfigJson(cfg), tun?.let { tunHandle })
-            } catch (e: Exception) {
-                ProxyStore.log("Перезапуск не удался: ${e.message}", LogLevel.Error)
-            }
+            engine.reconnect(if (cfg.useCarrierDns) network.physicalDnsServers() else "")
         }
     }
 

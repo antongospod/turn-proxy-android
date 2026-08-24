@@ -132,21 +132,6 @@ class ProxyEngine(private val stateDir: String) {
     }
 
     /**
-     * Пересоздание сессии под одним локом ядра (смена сети). Неотменяем: брошенный
-     * на полпути рестарт оставил бы ядро на сети, которой уже нет.
-     */
-    suspend fun restart(session: Long, configJson: String, tun: TunHandle?) =
-        withContext(NonCancellable) {
-            lock.withLock {
-                if (running != session) return@withLock
-                withContext(Dispatchers.IO) {
-                    Mobile.restart(configJson, tun?.dupFd()?.toLong() ?: 0L)
-                }
-                startPolling()
-            }
-        }
-
-    /**
      * Гасит сессию [session] и отменяет её же, если она ещё не дошла до ядра.
      * Чужую сессию не трогает - её ведёт тот, кто её заказал.
      *
@@ -220,6 +205,20 @@ class ProxyEngine(private val stateDir: String) {
         scope.launch {
             runCatching { Mobile.wake() }
                 .onFailure { ProxyStore.log("Пробуждение ядра не удалось: ${it.message}", LogLevel.Warning) }
+        }
+    }
+
+    /**
+     * Смена сети: аллокации пересоздаются, туннель и tun-дескриптор остаются.
+     * Пустой [dnsServers] оставляет текущие резолверы.
+     */
+    fun reconnect(dnsServers: String) {
+        if (running == 0L) return
+        scope.launch {
+            runCatching {
+                Mobile.setDNSServers(dnsServers)
+                Mobile.reconnect()
+            }.onFailure { ProxyStore.log("Переподключение не удалось: ${it.message}", LogLevel.Warning) }
         }
     }
 
