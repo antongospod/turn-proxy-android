@@ -36,15 +36,16 @@ class ProxyViewModel(
      * смерть процесса и перезагрузку, поэтому без настройки открытие приложения
      * поднимало VPN само и отбирало tun у чужого.
      *
-     * [vpnConsent] - согласие на VpnService уже дано. Без него в WG-режиме стартовать
-     * нечем, а спрашивать молча, без действия пользователя, нельзя.
+     * [vpnConsent] - проверка согласия на VpnService, зовётся последней: сам
+     * `VpnService.prepare()` отзывает разрешение у активного чужого VPN. Без согласия
+     * в WG-режиме стартовать нечем, а спрашивать молча, без действия пользователя, нельзя.
      */
-    fun onForeground(vpnConsent: Boolean) {
+    fun onForeground(vpnConsent: () -> Boolean) {
         if (ProxyStore.status.value.phase != ProxyPhase.Idle) return
         viewModelScope.launch {
             if (!prefs.autoConnectFlow.first()) return@launch
             if (!prefs.proxyDesiredFlow.first()) return@launch
-            if (!vpnConsent && prefs.clientConfigFlow.first().wireGuardActive) return@launch
+            if (prefs.clientConfigFlow.first().wireGuardActive && !vpnConsent()) return@launch
             launcher.start()
         }
     }

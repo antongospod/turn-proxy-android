@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
     // ограничений: активити на экране, право на FGS есть.
     override fun onResume() {
         super.onResume()
-        proxyViewModel.onForeground(vpnConsent = VpnService.prepare(this) == null)
+        proxyViewModel.onForeground(vpnConsent = { VpnService.prepare(this) == null })
     }
 
     // Опрос метрик живёт ровно столько, сколько видно окно.
