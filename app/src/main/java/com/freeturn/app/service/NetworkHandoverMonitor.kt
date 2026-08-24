@@ -32,6 +32,9 @@ class NetworkHandoverMonitor(
     private var callback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var debounceJob: Job? = null
     @Volatile private var lastKey: String? = null
+    // Сеть в linger: система уже увела на неё default, но сокеты ещё живут. Из выбора
+    // приоритетной физсети исключена - иначе DNS и ключ остались бы от уходящей.
+    @Volatile private var lingering: Network? = null
 
     fun register() {
         // START прилетает в живой сервис на каждом рестарте сессии: без снятия
@@ -63,6 +66,7 @@ class NetworkHandoverMonitor(
 
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                if (network == lingering) lingering = null
                 val caps = cm.getNetworkCapabilities(network)
                 if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
                     !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
@@ -72,7 +76,21 @@ class NetworkHandoverMonitor(
                 schedule("available")
             }
 
+            // Единственное окно, когда аллокации TURN можно освободить по живому сокету:
+            // сеть ещё принимает трафик. Без debounce - оно короткое.
+            override fun onLosing(network: Network, maxMsToLive: Int) {
+                if (SystemClock.elapsedRealtime() - registeredAt < WARMUP_MS) return
+                lingering = network
+                val newKey = physicalNetworkKey(cm)
+                if (newKey == null || newKey == lastKey) return
+                debounceJob?.cancel()
+                lastKey = newKey
+                ProxyStore.log("Сеть: уходит через $maxMsToLive мс - переподключение заранее")
+                onHandover()
+            }
+
             override fun onLost(network: Network) {
+                if (network == lingering) lingering = null
                 schedule("lost")
             }
 
@@ -101,6 +119,7 @@ class NetworkHandoverMonitor(
         // мимо прогрева, рестартя только что поднятую.
         debounceJob?.cancel()
         debounceJob = null
+        lingering = null
         callback?.let { cb ->
             try {
                 cm.unregisterNetworkCallback(cb)
@@ -154,6 +173,7 @@ class NetworkHandoverMonitor(
         // полный снимок текущих сетей внутри колбэка. Подавляем осознанно.
         @Suppress("DEPRECATION")
         return cm.allNetworks.mapNotNull { network ->
+            if (network == lingering) return@mapNotNull null
             val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
                 !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
