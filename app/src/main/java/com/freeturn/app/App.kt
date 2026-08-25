@@ -7,6 +7,7 @@ import com.freeturn.app.domain.proxy.LogFile
 import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.domain.proxy.ProxyEngine
 import com.freeturn.app.domain.proxy.ProxyStore
+import com.freeturn.app.service.ProxyNotifier
 import com.freeturn.app.service.ProxyWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,9 @@ class App : Application() {
         // Строка в середине лога сессии = процесс убивали и подняли заново; без неё
         // sticky-рестарт неотличим от обычной работы.
         ProxyStore.log("Процесс запущен")
+        // Раз за процесс: в onCreate сервиса эти транзакции доставались главному потоку
+        // ровно на нажатии кнопки.
+        ProxyNotifier.createChannels(this)
         reportPreviousExit()
         warmUpCore()
         observeWidgetState()

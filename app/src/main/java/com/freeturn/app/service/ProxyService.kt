@@ -94,7 +94,6 @@ class ProxyService : VpnService() {
         super.onCreate()
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         notifier = ProxyNotifier(this)
-        notifier.createChannels()
         network = NetworkHandoverMonitor(applicationContext, scope) { onNetworkHandover() }
         sleptMillis = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
         // Только динамически: SCREEN_ON манифестом не ловится.

@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -25,6 +26,30 @@ class ProxyNotifier(private val service: Service) {
         private const val NOTIF_ID_CAPTCHA = 2
         private const val CHANNEL_PROXY = "ProxyChannel"
         private const val CHANNEL_CAPTCHA = "CaptchaChannel"
+
+        /**
+         * Каналы заводятся один раз за процесс, из [android.app.Application]. В onCreate
+         * сервиса эти две транзакции к NotificationManager ложились на главный поток
+         * ровно в момент нажатия - вместе с ними в кадр не влезала анимация кнопки.
+         */
+        fun createChannels(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val nm = context.getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_PROXY,
+                    context.getString(R.string.notif_channel_proxy),
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_CAPTCHA,
+                    context.getString(R.string.notif_channel_captcha),
+                    NotificationManager.IMPORTANCE_HIGH
+                )
+            )
+        }
     }
 
     private var shown: ProxyStatus? = null
@@ -42,25 +67,6 @@ class ProxyNotifier(private val service: Service) {
             0,
             Intent(service, ProxyReceiver::class.java).setAction(ProxyActions.STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-    }
-
-    fun createChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = service.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_PROXY,
-                service.getString(R.string.notif_channel_proxy),
-                NotificationManager.IMPORTANCE_LOW
-            )
-        )
-        nm.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_CAPTCHA,
-                service.getString(R.string.notif_channel_captcha),
-                NotificationManager.IMPORTANCE_HIGH
-            )
         )
     }
 
