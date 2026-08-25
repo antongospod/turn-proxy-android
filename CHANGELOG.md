@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.3.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.2.0...v4.3.0) (2026-08-25)
+
+
+### Features
+
+* bump aar ([082251b](https://github.com/samosvalishe/turn-proxy-android/commit/082251bd63154d2d213b40358457096ff3773e84))
+* **proxy:** освобождать аллокации до потери сети ([d9af18a](https://github.com/samosvalishe/turn-proxy-android/commit/d9af18ab7a282915ae1e1d3c31b14cd4c71bbb75))
+* **proxy:** переподключение вместо перезапуска ядра при смене сети ([e070d12](https://github.com/samosvalishe/turn-proxy-android/commit/e070d121e3351b82d3ceed6893f7bac2f733e856))
+* **proxy:** режим проброса tcp с настраиваемым ARQ ([e7425a5](https://github.com/samosvalishe/turn-proxy-android/commit/e7425a5ab8df6731c2761684647ce1e26736f235))
+* **server:** настройка пейсинга обфускации ([d16772d](https://github.com/samosvalishe/turn-proxy-android/commit/d16772da88e19df670974c3ee889c20871eccf9f))
+* **settings:** тумблер сезонного декора ([bb0a40b](https://github.com/samosvalishe/turn-proxy-android/commit/bb0a40ba9b678fe5679a7bb0f4f3311cae28a4a3))
+* **share:** опциональная ссылка на звонок в freeturn:// ([0f8dc7c](https://github.com/samosvalishe/turn-proxy-android/commit/0f8dc7cf1e521debd63aed54617693c386822654))
+* **ui:** осенний декор кнопки-героя ([f430dea](https://github.com/samosvalishe/turn-proxy-android/commit/f430dea774889fc4a4e0c6a92c79c623760c3c07))
+
+
+### Fixes
+
+* **service:** запрос VPN-разрешения при старте из виджета и тайла ([29dc9a1](https://github.com/samosvalishe/turn-proxy-android/commit/29dc9a199979f8cb5a3206288dd24fe744574daa))
+* **settings:** убрать моргание статуса обновления ([92c1afc](https://github.com/samosvalishe/turn-proxy-android/commit/92c1afcfb0489851ef925ae99e679de90b0bca19))
+* **vpn:** не отзывать чужой VPN при открытии приложения ([a380d2c](https://github.com/samosvalishe/turn-proxy-android/commit/a380d2cfa4c1a170a232b24695925364683cac39))
+
+
+### Performance
+
+* **proxy:** снять старт сервиса с главного потока ([392e8be](https://github.com/samosvalishe/turn-proxy-android/commit/392e8bed69a8d3dae4791c69d5cb77a2e026c485))
+
 ## [4.2.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.1.0...v4.2.0) (2026-08-19)
 
 
