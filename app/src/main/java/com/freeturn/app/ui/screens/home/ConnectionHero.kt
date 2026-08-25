@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
@@ -76,6 +77,8 @@ internal fun ConnectionHero(
 ) {
     val kind = status.phase.heroKind()
     val reducedMotion = LocalReducedMotion.current
+    // Ключ разлёта листвы: каждое нажатие - новая пачка, ноль означает "ещё не жали".
+    var burstKey by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = modifier,
@@ -85,7 +88,11 @@ internal fun ConnectionHero(
             kind = kind,
             tunnelActive = status.tunnelUp,
             reducedMotion = reducedMotion,
-            onClick = onToggle
+            burstKey = burstKey,
+            onClick = {
+                if (AUTUMN_VIBE && !reducedMotion) burstKey++
+                onToggle()
+            }
         )
 
         Spacer(Modifier.height(20.dp))
@@ -97,6 +104,8 @@ internal fun ConnectionHero(
         StatsPill(status = status, kind = kind, uptimeText = uptimeText)
     }
 }
+
+private val HeroButtonSize = 148.dp
 
 // Captcha - тоже Busy: прокси под капчей работает, объяснение в строке статуса.
 private enum class HeroKind { Idle, Busy, Running, Error }
@@ -113,6 +122,7 @@ private fun HeroToggleButton(
     kind: HeroKind,
     tunnelActive: Boolean,
     reducedMotion: Boolean,
+    burstKey: Int,
     onClick: () -> Unit
 ) {
     val extended = MaterialTheme.extendedColorScheme
@@ -168,42 +178,69 @@ private fun HeroToggleButton(
     )
     val rotation = rememberHeroSpin(spinning = kind == HeroKind.Busy && !reducedMotion)
 
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .size(148.dp)
-            // Один слой на scale+rotation: два graphicsLayer поверх generic-outline дают лишний рендер-нод.
-            .graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-                rotationZ = rotation.value
-            }
-            .semantics { contentDescription = buttonLabel },
-        shape = heroShape,
-        color = containerColor,
-        tonalElevation = if (kind == HeroKind.Running) 3.dp else 1.dp
-    ) {
-        Box(
-            // Контр-вращение: крутится только фигура.
+    // Угол от пальца живёт отдельно от служебного спина и складывается с ним.
+    val handSpin = remember { Animatable(0f) }
+    val spinnable = AUTUMN_VIBE && kind == HeroKind.Idle
+    val settleSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    LaunchedEffect(spinnable) {
+        if (spinnable || handSpin.value == 0f) return@LaunchedEffect
+        // Уходим на ближний край круга, иначе возврат из 350 градусов едет через весь оборот.
+        handSpin.animateTo(if (handSpin.value > 180f) 360f else 0f, settleSpec)
+        handSpin.snapTo(0f)
+    }
+
+    Box(contentAlignment = Alignment.Center) {
+        if (AUTUMN_VIBE) {
+            AutumnHeroGlow(
+                color = containerColor,
+                strong = kind == HeroKind.Running,
+                buttonSize = HeroButtonSize
+            )
+        }
+
+        Surface(
+            onClick = onClick,
             modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = -rotation.value },
-            contentAlignment = Alignment.Center
+                .size(HeroButtonSize)
+                .leafSpin(handSpin, spinnable)
+                // Один слой на scale+rotation: два graphicsLayer поверх generic-outline дают лишний рендер-нод.
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    rotationZ = rotation.value + handSpin.value
+                }
+                .semantics { contentDescription = buttonLabel },
+            shape = heroShape,
+            color = containerColor,
+            tonalElevation = if (kind == HeroKind.Running) 3.dp else 1.dp
         ) {
-            if (reducedMotion) {
-                HeroIcon(kind = kind, tint = contentColor)
-            } else {
-                AnimatedContent(
-                    targetState = kind,
-                    transitionSpec = {
-                        (fadeIn(effectsSpec) + scaleIn(spatialSpec, initialScale = 0.85f))
-                            .togetherWith(fadeOut(fastEffectsSpec) + scaleOut(fastEffectsSpec, targetScale = 0.85f))
-                    },
-                    label = "hero_icon"
-                ) { k ->
-                    HeroIcon(kind = k, tint = contentColor)
+            Box(
+                // Контр-вращение: крутится только фигура.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationZ = -(rotation.value + handSpin.value) },
+                contentAlignment = Alignment.Center
+            ) {
+                if (reducedMotion) {
+                    HeroIcon(kind = kind, tint = contentColor)
+                } else {
+                    AnimatedContent(
+                        targetState = kind,
+                        transitionSpec = {
+                            (fadeIn(effectsSpec) + scaleIn(spatialSpec, initialScale = 0.85f))
+                                .togetherWith(fadeOut(fastEffectsSpec) + scaleOut(fastEffectsSpec, targetScale = 0.85f))
+                        },
+                        label = "hero_icon"
+                    ) { k ->
+                        HeroIcon(kind = k, tint = contentColor)
+                    }
                 }
             }
+        }
+
+        // Поверх кнопки: слой без pointerInput, тап проходит насквозь в Surface.
+        if (AUTUMN_VIBE) {
+            AutumnLeafBurst(burstKey = burstKey, buttonSize = HeroButtonSize)
         }
     }
 }
