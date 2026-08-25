@@ -42,6 +42,8 @@ class ProxyOrchestrator(
         sshRepository.stopServer()
         sshRepository.startServer(
             listen = l, connect = c,
+            proxyMode = opts.proxyMode,
+            kcp = opts.kcp,
             obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
             obfKey = if (opts.obfEnabled) opts.obfKey else "",
             clientId = prefs.ownClientId()

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.config.SshConfig
@@ -69,6 +70,7 @@ data class SetupConfigDraft(
     val wgCustomConf: Boolean = false,
     val wgConfText: String = "",
     val backendPort: String = "",
+    val backendTcp: Boolean = false,
     val vkLink: String = ""
 )
 
@@ -99,7 +101,10 @@ data class SetupUiState(
     val config: SetupConfigDraft = SetupConfigDraft(),
     val install: SetupInstallState? = null
 ) {
-    /** Внешний порт совпал с портом бэкенда на том же хосте - оба бинда конфликтуют. */
+    /**
+     * Внешний порт совпал с UDP-портом бэкенда на том же хосте - оба бинда
+     * конфликтуют. TCP-бэкенд (Xray/sing-box) с UDP-listen не пересекается.
+     */
     val portsClash: Boolean
         get() {
             val listen = config.listenPort.toIntOrNull() ?: return false
@@ -107,7 +112,8 @@ data class SetupUiState(
                 config.vpnMode && config.wgCustomConf -> config.backendPort.toIntOrNull()
                 config.vpnMode && wgDetectedPort == null -> config.wgPort.toIntOrNull()
                 config.vpnMode -> wgDetectedPort
-                else -> config.backendPort.toIntOrNull()
+                !config.backendTcp -> config.backendPort.toIntOrNull()
+                else -> null
             }
             return backend != null && backend == listen
         }
@@ -290,6 +296,7 @@ class ServerSetupViewModel(
                 ServerStartOptions(
                     listen = "0.0.0.0:${c.listenPort}",
                     connect = "127.0.0.1:$backendPort",
+                    proxyMode = if (!c.vpnMode && c.backendTcp) ProxyMode.TCP else ProxyMode.UDP,
                     obfProfile = c.obfProfile,
                     obfKey = if (obfOn) obfKey else "",
                     // Авторизация по allowlist с первого запуска: владелец сидится
@@ -346,7 +353,8 @@ class ServerSetupViewModel(
         proxyConnect = "127.0.0.1:$backendPort",
         opts = ServerOpts(
             obfProfile = c.obfProfile,
-            obfKey = if (c.obfProfile != ObfProfile.NONE) obfKey else ""
+            obfKey = if (c.obfProfile != ObfProfile.NONE) obfKey else "",
+            proxyMode = if (!c.vpnMode && c.backendTcp) ProxyMode.TCP else ProxyMode.UDP
         )
     )
 

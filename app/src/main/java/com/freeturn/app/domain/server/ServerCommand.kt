@@ -1,5 +1,8 @@
 package com.freeturn.app.domain.server
 
+import com.freeturn.app.data.config.KcpProfile
+import com.freeturn.app.data.config.ProxyMode
+
 sealed class ServerCommand {
     data object Probe : ServerCommand()
     data object Install : ServerCommand()
@@ -49,6 +52,10 @@ sealed class ServerCommand {
             add("start")
             add("--listen=${opts.listen}")
             add("--connect=${opts.connect}")
+            if (opts.proxyMode == ProxyMode.TCP) {
+                add("--mode=${ProxyMode.TCP}")
+                addAll(kcpArgs(opts.kcp))
+            }
             if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
                 add("--obf-profile=${opts.obfProfile}")
                 add("--obf-key=${opts.obfKey}")
@@ -85,7 +92,22 @@ sealed class ServerCommand {
 data class ServerStartOptions(
     val listen: String,
     val connect: String,
+    val proxyMode: String = ProxyMode.UDP,
+    val kcp: KcpProfile = KcpProfile.DEFAULT,
     val obfProfile: String = "none",
     val obfKey: String = "",
     val clientId: String = ""
 )
+
+/** Только отличия от дефолта: остальное сервер возьмёт своё, как и клиент. */
+private fun kcpArgs(p: KcpProfile): List<String> = buildList {
+    val d = KcpProfile.DEFAULT
+    if (p.noDelay != d.noDelay) add("--kcp-nodelay=${p.noDelay}")
+    if (p.interval != d.interval) add("--kcp-interval=${p.interval}")
+    if (p.resend != d.resend) add("--kcp-resend=${p.resend}")
+    if (p.nc != d.nc) add("--kcp-nc=${p.nc}")
+    if (p.sndWnd != d.sndWnd) add("--kcp-sndwnd=${p.sndWnd}")
+    if (p.rcvWnd != d.rcvWnd) add("--kcp-rcvwnd=${p.rcvWnd}")
+    if (p.mtu != d.mtu) add("--kcp-mtu=${p.mtu}")
+    if (p.ackNoDelay != d.ackNoDelay) add("--kcp-acknodelay=${p.ackNoDelay}")
+}

@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.config.SshConfig
@@ -131,7 +133,9 @@ class ImportViewModel(
             ),
             opts = ServerOpts(
                 obfProfile = link.obfProfile.ifBlank { ObfProfile.NONE },
-                obfKey = link.obfKey
+                obfKey = link.obfKey,
+                proxyMode = if (link.mode == ProxyMode.TCP) ProxyMode.TCP else ProxyMode.UDP,
+                kcp = link.kcp ?: KcpProfile.DEFAULT
             )
         )
     }

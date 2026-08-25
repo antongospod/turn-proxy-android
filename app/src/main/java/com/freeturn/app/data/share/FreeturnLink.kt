@@ -1,5 +1,6 @@
 package com.freeturn.app.data.share
 
+import com.freeturn.app.data.config.KcpProfile
 import org.json.JSONObject
 import java.util.Base64
 
@@ -11,6 +12,7 @@ data class FreeturnLink(
     val provider: String,
     val peer: String,
     val transport: String = "",
+    val mode: String = "",
     val obfProfile: String = "",
     val obfKey: String = "",
     val n: Int = 0,
@@ -20,6 +22,8 @@ data class FreeturnLink(
     val dnsMode: String = "",
     val dnsServers: String = "",
     val manualCaptcha: Boolean = false,
+    /** ARQ tcp-режима; null - у получателя останется дефолт ядра. */
+    val kcp: KcpProfile? = null,
     val name: String = "",
     val wgConf: String = ""
 ) {
@@ -29,6 +33,7 @@ data class FreeturnLink(
         sb.field("provider", jsonString(provider))
         sb.field("peer", jsonString(peer))
         if (transport.isNotEmpty()) sb.field("transport", jsonString(transport))
+        if (mode.isNotEmpty()) sb.field("mode", jsonString(mode))
         if (obfProfile.isNotEmpty() && obfProfile != "none") {
             sb.field("obf", jsonString(obfProfile))
             sb.field("key", jsonString(obfKey))
@@ -40,6 +45,7 @@ data class FreeturnLink(
         if (dnsMode.isNotEmpty()) sb.field("dns", jsonString(dnsMode))
         if (dnsServers.isNotEmpty()) sb.field("dnss", jsonString(dnsServers))
         if (manualCaptcha) sb.field("mcap", "true")
+        if (kcp != null) sb.field("kcp", kcpJson(kcp))
         if (name.isNotEmpty()) sb.field("name", jsonString(name))
         if (wgConf.isNotEmpty()) sb.field("wg", jsonString(wgConf))
         sb.append('}')
@@ -70,6 +76,7 @@ data class FreeturnLink(
                 provider = provider,
                 peer = peer,
                 transport = o.optString("transport"),
+                mode = o.optString("mode"),
                 obfProfile = o.optString("obf"),
                 obfKey = o.optString("key"),
                 n = o.optInt("n", 0),
@@ -79,10 +86,31 @@ data class FreeturnLink(
                 dnsMode = o.optString("dns"),
                 dnsServers = o.optString("dnss"),
                 manualCaptcha = o.optBoolean("mcap", false),
+                kcp = o.optJSONObject("kcp")?.let(::parseKcp),
                 name = o.optString("name"),
                 wgConf = o.optString("wg")
             )
         }
+
+        // Ключи ARQ в ссылке - строчные (json-теги uri.KCP в ядре), а не camelCase конфига.
+        private fun parseKcp(o: JSONObject): KcpProfile {
+            val d = KcpProfile.DEFAULT
+            return KcpProfile(
+                noDelay = o.optInt("nodelay", d.noDelay),
+                interval = o.optInt("interval", d.interval),
+                resend = o.optInt("resend", d.resend),
+                nc = o.optInt("nc", d.nc),
+                sndWnd = o.optInt("sndwnd", d.sndWnd),
+                rcvWnd = o.optInt("rcvwnd", d.rcvWnd),
+                mtu = o.optInt("mtu", d.mtu),
+                ackNoDelay = o.optBoolean("acknodelay", d.ackNoDelay)
+            )
+        }
+
+        private fun kcpJson(p: KcpProfile): String =
+            """{"nodelay":${p.noDelay},"interval":${p.interval},"resend":${p.resend},""" +
+                """"nc":${p.nc},"sndwnd":${p.sndWnd},"rcvwnd":${p.rcvWnd},""" +
+                """"mtu":${p.mtu},"acknodelay":${p.ackNoDelay}}"""
 
         private fun StringBuilder.field(key: String, rawValue: String) {
             if (length > 1) append(',')

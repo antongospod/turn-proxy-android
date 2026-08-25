@@ -55,10 +55,39 @@ class CoreConfigJsonTest {
 
     // Лишний ключ в proxy валит старт ядра (DisallowUnknownFields), а не тест схемы.
     @Test
-    fun proxyHasOnlyListen() {
+    fun proxyHasModeAndListen() {
         val proxy = parse(base.copy(localPort = "127.0.0.1:9001"))["proxy"]!!.jsonObject
-        assertEquals(setOf("listen"), proxy.keys)
+        assertEquals(setOf("mode", "listen"), proxy.keys)
+        assertEquals(ProxyMode.UDP, proxy["mode"]!!.jsonPrimitive.content)
         assertEquals("127.0.0.1:9001", proxy["listen"]!!.jsonPrimitive.content)
+    }
+
+    // В udp ядро отвергает любое отличие ARQ от своего дефолта - секции быть не должно.
+    @Test
+    fun kcpOnlyInTcpMode() {
+        assertTrue(parse(base, ServerOpts(kcp = KcpProfile.MOBILE))["kcp"] == null)
+
+        val tcp = parse(base, ServerOpts(proxyMode = ProxyMode.TCP, kcp = KcpProfile.MOBILE))
+        assertEquals(ProxyMode.TCP, tcp["proxy"]!!.jsonObject["mode"]!!.jsonPrimitive.content)
+        val kcp = tcp["kcp"]!!.jsonObject
+        assertEquals(
+            setOf("noDelay", "interval", "resend", "nc", "sndWnd", "rcvWnd", "mtu", "ackNoDelay"),
+            kcp.keys
+        )
+        assertEquals(KcpProfile.MOBILE.interval, kcp["interval"]!!.jsonPrimitive.content.toInt())
+        assertEquals(KcpProfile.MOBILE.ackNoDelay, kcp["ackNoDelay"]!!.jsonPrimitive.content.toBoolean())
+    }
+
+    // Встроенный туннель гонит датаграммы: tcp-режим при нём ядро бы отвергло.
+    @Test
+    fun tunnelForcesUdpMode() {
+        val wg = base.copy(
+            tunnelTransport = TunnelTransport.WIREGUARD,
+            wireGuardConfig = "[Interface]\nAddress = 10.8.0.2/32\n",
+        )
+        val o = parse(wg, ServerOpts(proxyMode = ProxyMode.TCP))
+        assertEquals(ProxyMode.UDP, o["proxy"]!!.jsonObject["mode"]!!.jsonPrimitive.content)
+        assertTrue(o["kcp"] == null)
     }
 
     @Test

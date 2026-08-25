@@ -104,6 +104,22 @@ EOF
     [[ "$out" == *'"obf_profile":"none"'* ]]
 }
 
+@test "share_info_emit: режим из run.args" {
+    printf -- '-listen\n:8443\n-mode\ntcp\n-connect\n127.0.0.1:443\n' > "$FT_PREFIX/run.args"
+    _DATA=()
+    share_info_emit
+    out=$(IFS=,; printf '%s' "${_DATA[*]}")
+    [[ "$out" == *'"mode":"tcp"'* ]]
+}
+
+@test "share_info_emit: run.args без -mode -> udp" {
+    printf -- '-listen\n:8443\n-connect\n127.0.0.1:51820\n' > "$FT_PREFIX/run.args"
+    _DATA=()
+    share_info_emit
+    out=$(IFS=,; printf '%s' "${_DATA[*]}")
+    [[ "$out" == *'"mode":"udp"'* ]]
+}
+
 @test "clients_json: нет бинаря -> []" {
     [ "$(clients_json)" = "[]" ]
 }

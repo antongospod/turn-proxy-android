@@ -9,8 +9,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -51,14 +48,16 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.components.ApplyFab
+import com.freeturn.app.ui.components.FabClearance
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.copyToClipboard
@@ -98,6 +97,7 @@ fun ServerManagementScreen(
     }
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
+    var tcpDraft by rememberSaveable(effServer.tcpMode) { mutableStateOf(effServer.tcpMode) }
     var obfDraft by rememberSaveable(effServer.obfProfile) { mutableStateOf(effServer.obfProfile) }
     var keyDraft by rememberSaveable(effServer.obfKey) { mutableStateOf(effServer.obfKey) }
 
@@ -113,22 +113,29 @@ fun ServerManagementScreen(
     val listenFull = "${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort"
     val proxyDirty = listenFull != savedListen || proxyConnect != savedConnect
     val configDirty = proxyDirty ||
+        tcpDraft != effServer.tcpMode ||
         obfDraft != effServer.obfProfile ||
         keyDraft != effServer.obfKey
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
     val addressesOk = HostPort.isValid(listenFull) && HostPort.isValid(proxyConnect)
 
-    val canApply = serverSettingsAvailable(isConnected, syncOn) &&
-        configDirty && keyOkForApply && addressesOk && !isWorking
+    val applyVisible = serverSettingsAvailable(isConnected, syncOn) && configDirty
+    val applyBlocked = when {
+        isWorking -> stringResource(R.string.apply_blocked_busy)
+        !addressesOk -> stringResource(R.string.apply_blocked_address)
+        !keyOkForApply -> stringResource(R.string.apply_blocked_key)
+        else -> null
+    }
     fun applyConfig() {
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
         // Активный - apply в живой рантайм (один рестарт). Неактивный - пишем только снимок сервера.
+        val mode = if (tcpDraft) ProxyMode.TCP else ProxyMode.UDP
         if (isActive) {
-            settingsViewModel.applyServerConfig(listenFull, proxyConnect, obfDraft, keyDraft)
+            settingsViewModel.applyServerConfig(listenFull, proxyConnect, mode, obfDraft, keyDraft)
         } else {
             // !isActive ⇒ serverId != null (см. isActive выше) - smart cast.
-            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, obfDraft, keyDraft)
+            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, mode, obfDraft, keyDraft)
         }
         onBack()
     }
@@ -179,17 +186,7 @@ fun ServerManagementScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            AnimatedVisibility(
-                visible = canApply,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut()
-            ) {
-                ExtendedFloatingActionButton(
-                    onClick = { applyConfig() },
-                    icon = { Icon(painterResource(R.drawable.check_circle_24px), contentDescription = null) },
-                    text = { Text(stringResource(R.string.server_apply)) }
-                )
-            }
+            ApplyFab(visible = applyVisible, blockedReason = applyBlocked, onApply = { applyConfig() })
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
@@ -219,7 +216,7 @@ fun ServerManagementScreen(
                             settingsViewModel.applyServer(serverId)
                         }
                     )
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(Spacing.xxl))
                     return@Column
                 }
 
@@ -243,7 +240,7 @@ fun ServerManagementScreen(
                             }
                         )
                     }
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(Spacing.xxl))
                     return@Column
                 }
 
@@ -280,6 +277,9 @@ fun ServerManagementScreen(
                 // Гейт общий со входом в экран (ServerDetailScreen) - serverSettingsAvailable.
                 if (serverSettingsAvailable(isConnected, syncOn)) {
                     ServerSyncCard(
+                        tcp = tcpDraft,
+                        onTcp = { tcpDraft = it },
+                        tcpBlocked = effClient.wireGuardActive,
                         obfProfile = obfDraft,
                         onObfProfile = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); obfDraft = it },
                         keyDraft = keyDraft,
@@ -297,7 +297,7 @@ fun ServerManagementScreen(
                     )
                 }
 
-                Spacer(Modifier.height(if (canApply) 88.dp else 24.dp))
+                Spacer(Modifier.height(if (applyVisible) FabClearance else Spacing.xxl))
             }
         }
     }

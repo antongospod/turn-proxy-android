@@ -1,6 +1,8 @@
 package com.freeturn.app.data.share
 
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.KcpProfile
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerOpts
 import org.junit.Assert.assertEquals
@@ -102,6 +104,32 @@ class ShareLinkBuilderTest {
         val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, ShareInfo(), "u", null)).getOrThrow()
         assertEquals(6, link.n)
         assertEquals(4, link.streamsPerCred)
+    }
+
+    @Test
+    fun `tcp mode from live server wins over local opts`() {
+        val srv = server(opts = ServerOpts(proxyMode = ProxyMode.TCP, kcp = KcpProfile.MOBILE))
+        val info = ShareInfo(mode = ProxyMode.UDP, obfProfile = "none")
+        val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, info, "u", null)).getOrThrow()
+        assertEquals("", link.mode)
+        assertEquals(null, link.kcp)
+    }
+
+    @Test
+    fun `tcp mode and non-default arq carried over`() {
+        val srv = server(opts = ServerOpts(proxyMode = ProxyMode.TCP, kcp = KcpProfile.MOBILE))
+        val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, ShareInfo(), "u", null)).getOrThrow()
+        assertEquals(ProxyMode.TCP, link.mode)
+        assertEquals(KcpProfile.MOBILE, link.kcp)
+    }
+
+    // Дефолтный ARQ у получателя и так дефолтный - в ссылке ему делать нечего.
+    @Test
+    fun `default arq is omitted`() {
+        val srv = server(opts = ServerOpts(proxyMode = ProxyMode.TCP))
+        val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, ShareInfo(), "u", null)).getOrThrow()
+        assertEquals(ProxyMode.TCP, link.mode)
+        assertEquals(null, link.kcp)
     }
 
     @Test

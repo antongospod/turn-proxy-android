@@ -46,6 +46,13 @@ object ClientId {
         ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 }
 
+/** Режим проброса (-mode): udp - датаграммы WireGuard, tcp - поток Xray/sing-box. */
+object ProxyMode {
+    const val UDP = "udp"
+    const val TCP = "tcp"
+    val VALUES = listOf(UDP, TCP)
+}
+
 object TunnelTransport {
     const val NONE = "none"
     const val WIREGUARD = "wireguard"

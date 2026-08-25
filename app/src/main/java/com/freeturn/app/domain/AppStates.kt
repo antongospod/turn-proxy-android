@@ -13,6 +13,8 @@ sealed class ServerState {
     data class Known(
         val installed: Boolean,
         val running: Boolean,
+        /** Режим живого сервера ("udp" | "tcp"); null - сервер не запущен. */
+        val mode: String? = null,
         val obfProfile: String? = null,
         val version: String? = null
     ) : ServerState()

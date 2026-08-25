@@ -114,7 +114,7 @@
     <string name="setup_checking_ssh_desc">Проверка окружения сервера</string>
     <string name="setup_mode_section">Режим работы</string>
     <string name="setup_mode_vpn_desc">Поднимем WireGuard на сервере - весь трафик устройства пойдёт через туннель.</string>
-    <string name="setup_mode_proxy_desc">Прокси перенаправляет трафик на ваш UDP-бэкенд на сервере: WireGuard или AmneziaWG.</string>
+    <string name="setup_mode_proxy_desc">Прокси перенаправляет трафик на ваш бэкенд на сервере: WireGuard или Xray.</string>
     <string name="setup_wg_found">WireGuard найден</string>
     <string name="setup_wg_found_desc">Порт %1$d станет бэкендом. Для этого устройства добавится отдельный пир - конфиг подставится сам.</string>
     <string name="setup_wg_missing">WireGuard не найден</string>
@@ -128,6 +128,8 @@
     <string name="setup_port_roll">Сгенерировать порт</string>
     <string name="setup_backend_port_label">Порт бэкенда</string>
     <string name="setup_backend_port_desc">Локальный порт вашего VPN/бэкенда на сервере (127.0.0.1)</string>
+    <string name="setup_backend_protocol_label">Протокол бэкенда</string>
+    <string name="setup_backend_protocol_desc">UDP - WireGuard/AmneziaWG, TCP - Xray</string>
     <string name="setup_turn_section">TURN-прокси</string>
     <string name="setup_listen_port_desc">Внешний UDP-порт сервера, случайный из диапазона 56000–56999</string>
     <string name="setup_obf_hint_rtpopus">Трафик маскируется под голосовой звонок. Ключ сгенерируется и подставится автоматически.</string>
@@ -202,6 +204,8 @@
     <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт</string>
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
 
+    <string name="tcp_forward_mode">Режим</string>
+    <string name="tcp_blocked_by_tunnel">Туннель работает только поверх UDP-проброса</string>
     <string name="obf_profile_title">Обфускация</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
@@ -247,7 +251,7 @@
     <string name="listen_ip_desc">IP-адрес, который прослушивает сервер. 0.0.0.0 - все интерфейсы. Укажите конкретный WAN IP, если на хосте несколько адресов.</string>
     <string name="turn_client_address">Адрес TURN-клиента</string>
     <string name="turn_client_placeholder">127.0.0.1:40537</string>
-    <string name="turn_client_desc">Локальный WireGuard-бэкенд на стороне сервера</string>
+    <string name="turn_client_desc">Локальный WireGuard/Xray-бэкенд на стороне сервера</string>
     <string name="server_install">Установить</string>
     <string name="server_update">Обновить</string>
     <string name="server_obf_key_label">Obf-ключ (64 hex)</string>
@@ -463,6 +467,10 @@
     <string name="pill_offline">Сервер неактивен</string>
     <string name="not_paired_hint">У сервера нет SSH-сопряжения: управление им из приложения недоступно, клиентские настройки работают.</string>
     <string name="server_apply">Применить</string>
+    <string name="apply_blocked_arq">Исправьте значения ARQ</string>
+    <string name="apply_blocked_address">Проверьте адреса прослушивания и бэкенда</string>
+    <string name="apply_blocked_key">Проверьте obf-ключ</string>
+    <string name="apply_blocked_busy">Дождитесь операции на сервере</string>
     <string name="server_inactive_title">Сервер не активен</string>
     <string name="server_inactive_desc">Чтобы управлять ядром и SSH-подключением, сделайте этот сервер активным.</string>
     <string name="make_active">Сделать активным</string>
@@ -481,6 +489,35 @@
     <string name="mode_vpn">VPN</string>
     <string name="mode_proxy_desc">Трафик идёт через локальный прокси, без туннеля.</string>
     <string name="mode_vpn_desc">Весь трафик устройства туннелируется через WireGuard.</string>
+    <string name="forward_section">Проброс</string>
+    <string name="forward_udp_desc">UDP-релей: локальный порт принимает трафик WireGuard/AmneziaWG.</string>
+    <string name="forward_tcp_desc">TCP-форвардер: локальный порт слушает Xray или sing-box, свой туннель не поднимается.</string>
+    <string name="forward_tcp_foreign_vpn">Если VPN на устройстве держит другое приложение, исключите FreeTurn из его туннеля - иначе трафик зациклится.</string>
+    <string name="forward_server_match">Сервер должен быть запущен в том же режиме, иначе он отклонит сессию.</string>
+
+    <string name="kcp_section">Профиль ARQ</string>
+    <string name="kcp_preset_label">Профиль</string>
+    <string name="kcp_preset_standard">Стандарт</string>
+    <string name="kcp_preset_mobile">Мобильный</string>
+    <string name="kcp_preset_custom">Свои</string>
+    <string name="kcp_preset_standard_desc">Дефолт ядра: минимальная задержка, больше служебного трафика.</string>
+    <string name="kcp_preset_mobile_desc">Щадящий для сотовой сети: реже опрос, окна меньше, ACK пачками.</string>
+    <string name="kcp_preset_custom_desc">Значения задаются вручную; применяются к клиенту и к серверу.</string>
+    <string name="kcp_interval_label">Интервал цикла, мс</string>
+    <string name="kcp_resend_label">Быстрый ресенд, дублей ACK</string>
+    <string name="kcp_sndwnd_label">Окно отправки, пакетов</string>
+    <string name="kcp_rcvwnd_label">Окно приёма, пакетов</string>
+    <string name="kcp_mtu_label">MTU сегмента, байт</string>
+    <string name="kcp_mtu_support">Допустимо 300–1350</string>
+    <string name="kcp_nodelay_title">Быстрый режим</string>
+    <string name="kcp_nodelay_desc">Отправка без задержки накопления</string>
+    <string name="kcp_nc_title">Без контроля перегрузки</string>
+    <string name="kcp_nc_desc">Не сбрасывать окно при потерях</string>
+    <string name="kcp_acknodelay_title">ACK сразу</string>
+    <string name="kcp_acknodelay_desc">Ниже задержка, выше служебный трафик</string>
+    <string name="kcp_value_positive">Нужно число больше нуля</string>
+    <string name="kcp_value_nonneg">Нужно 0 или больше</string>
+    <string name="kcp_mtu_invalid">Нужно значение от 300 до 1350</string>
     <string name="load_wg_conf">Загрузить из файла</string>
     <string name="connection_config_section">Конфигурация туннеля</string>
     <string name="change_server">Сменить сервер</string>
@@ -528,6 +565,6 @@
     <!-- О проекте -->
     <string name="settings_about">О проекте</string>
     <string name="settings_about_desc">Версия, описание и ссылки</string>
-    <string name="about_description">Free Turn проксирует WireGuard-трафик через публичные TURN-сервера. Открытый исходный код и никакой телеметрии: все настройки хранятся только на вашем устройстве.</string>
+    <string name="about_description">Free Turn проксирует WireGuard и Xray-трафик через публичные TURN-сервера. Открытый исходный код и никакой телеметрии: все настройки хранятся только на вашем устройстве.</string>
     <string name="about_links">Ссылки</string>
 </resources>

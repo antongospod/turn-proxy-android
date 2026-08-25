@@ -1,6 +1,8 @@
 package com.freeturn.app.domain.ssh
 
 import android.content.Context
+import com.freeturn.app.data.config.KcpProfile
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.control.ControlResponse
 import com.freeturn.app.data.control.InstallData
@@ -149,6 +151,7 @@ class SshRepository(
                 _serverState.value = ServerState.Known(
                     installed = d.installed,
                     running = d.running,
+                    mode = if (d.running) d.mode ?: ProxyMode.UDP else null,
                     obfProfile = if (d.running) d.obf else null,
                     version = d.version
                 )
@@ -184,6 +187,8 @@ class SshRepository(
     suspend fun startServer(
         listen: String,
         connect: String,
+        proxyMode: String = ProxyMode.UDP,
+        kcp: KcpProfile = KcpProfile.DEFAULT,
         obfProfile: String = "none",
         obfKey: String = "",
         clientId: String = ""
@@ -198,6 +203,8 @@ class SshRepository(
                 ServerStartOptions(
                     listen = listen,
                     connect = connect,
+                    proxyMode = proxyMode,
+                    kcp = kcp,
                     obfProfile = obfProfile,
                     obfKey = obfKey,
                     clientId = clientId

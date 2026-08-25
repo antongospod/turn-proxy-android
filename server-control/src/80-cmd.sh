@@ -1,5 +1,8 @@
 ARG_LISTEN=""
 ARG_CONNECT=""
+ARG_MODE="udp"
+# Готовые argv-токены -kcp-*; пусто = сервер берёт свои дефолты, как и клиент.
+ARG_KCP=()
 ARG_OBF_PROFILE="none"
 ARG_OBF_KEY=""
 ARG_TAIL=80
@@ -13,6 +16,13 @@ ARG_DNS="1.1.1.1"
 ARG_WITH_WG_PKG=0
 ARG_DRY_RUN=0
 
+# --kcp-foo=N -> argv-пара "-kcp-foo" "N"; диапазоны проверяет само ядро.
+_kcp_num_arg() {
+    local flag=${1%%=*} value=${1#*=}
+    [[ "$value" =~ ^[0-9]+$ ]] || fail bad_arg "bad $flag (need number)"
+    ARG_KCP+=("-${flag#--}" "$value")
+}
+
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -22,6 +32,14 @@ parse_args() {
             --connect=*)
                 ARG_CONNECT="${1#*=}"
                 [[ "$ARG_CONNECT" =~ ^[a-zA-Z0-9.:_-]+$ ]] || fail bad_arg "bad --connect" ;;
+            --mode=*)
+                ARG_MODE="${1#*=}"
+                [[ "$ARG_MODE" =~ ^(udp|tcp)$ ]] || fail bad_arg "bad --mode (udp|tcp)" ;;
+            --kcp-nodelay=*|--kcp-interval=*|--kcp-resend=*|--kcp-nc=*|--kcp-sndwnd=*|--kcp-rcvwnd=*|--kcp-mtu=*)
+                _kcp_num_arg "$1" ;;
+            --kcp-acknodelay=*)
+                [[ "${1#*=}" =~ ^(true|false)$ ]] || fail bad_arg "bad $1 (true|false)"
+                ARG_KCP+=("-kcp-acknodelay=${1#*=}") ;;
             --obf-profile=*)
                 ARG_OBF_PROFILE="${1#*=}"
                 [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2|rtpopus3)$ ]] || fail bad_arg "bad --obf-profile" ;;
@@ -67,7 +85,7 @@ parse_args() {
 cmd_probe() {
     stage probe
 
-    local arch bin="" installed=false running=false version="" sha="" obf=""
+    local arch bin="" installed=false running=false version="" sha="" obf="" mode=""
     arch=$(detect_arch) || arch=""
     [ -n "$arch" ] && bin="$PREFIX/$arch"
     if [ -n "$bin" ] && [ -x "$bin" ]; then
@@ -84,6 +102,9 @@ cmd_probe() {
         cmdline=$(current_cmdline)
         obf=$(printf '%s' "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
         [ -z "$obf" ] && obf=none
+        # -mode пишется только для tcp: без флага сервер работает в udp.
+        mode=$(printf '%s' "$cmdline" | sed -nE 's/.*-mode[= ]+(udp|tcp).*/\1/p')
+        [ -z "$mode" ] && mode=udp
     fi
 
     local euid
@@ -109,6 +130,7 @@ cmd_probe() {
     [ -n "$sha" ] && d_str bin_sha256 "$sha"
     d_bool running "$running"
     if [ "$running" = true ]; then
+        d_str mode "$mode"
         d_str obf "$obf"
     fi
     d_str runtime "$runtime"

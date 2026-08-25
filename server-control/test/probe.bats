@@ -71,6 +71,18 @@ run_script() { run bash "$SCRIPT" "$@"; }
     [[ "$output" == *'"code":"bad_arg"'* ]]
 }
 
+@test "невалидный --mode -> err bad_arg" {
+    run_script start --listen=0.0.0.0:56000 --connect=127.0.0.1:443 --mode=quic
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"code":"bad_arg"'* ]]
+}
+
+@test "нечисловой --kcp-interval -> err bad_arg" {
+    run_script start --listen=0.0.0.0:56000 --connect=127.0.0.1:443 --kcp-interval=fast
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"code":"bad_arg"'* ]]
+}
+
 @test "IPv6-endpoint принимается парсером (не bad_arg)" {
     # Под обычным юзером упрётся в needs_root - но parse_args уже принял [v6]:port.
     run_script wg-setup --port=51820 "--endpoint=[2001:db8::1]:51820"

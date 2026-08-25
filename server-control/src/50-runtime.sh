@@ -122,6 +122,11 @@ _write_args_file() {
     {
         echo "-listen";  echo "$ARG_LISTEN"
         echo "-connect"; echo "$ARG_CONNECT"
+        if [ "$ARG_MODE" = "tcp" ]; then
+            echo "-mode"; echo "tcp"
+            # Токены уже готовы (пары флаг/значение и -kcp-acknodelay=BOOL) - по строке на токен.
+            for tok in ${ARG_KCP[@]+"${ARG_KCP[@]}"}; do echo "$tok"; done
+        fi
         if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
             echo "-obf-profile"; echo "$ARG_OBF_PROFILE"
             echo "-obf-key";     echo "$ARG_OBF_KEY"
@@ -182,6 +187,10 @@ _rt_start_nohup() {
     _write_env_file
     if [ -f "$ENVFILE" ]; then set -a; . "$ENVFILE"; set +a; fi
     local args=(-listen "$ARG_LISTEN" -connect "$ARG_CONNECT")
+    if [ "$ARG_MODE" = "tcp" ]; then
+        args+=(-mode tcp)
+        args+=(${ARG_KCP[@]+"${ARG_KCP[@]}"})
+    fi
     [ -n "$ARG_CLIENT_ID" ] && args+=(-clients-file "$CLIENTSFILE")
     if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
         ( umask 077; printf '%s' "$ARG_OBF_KEY" > "$OBFFILE" ); chmod 600 "$OBFFILE"

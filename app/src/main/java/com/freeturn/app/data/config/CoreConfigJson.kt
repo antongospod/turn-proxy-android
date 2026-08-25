@@ -23,13 +23,27 @@ data class CoreConfigJson(
     val obf: Obf,
     val dns: Dns,
     val log: Log,
+    /** Только для `proxy.mode = tcp`: в udp ядро отвергает любое отличие от своего дефолта. */
+    val kcp: Kcp? = null,
     val tunnel: Tunnel,
 ) {
     @Serializable
     data class Turn(val n: Int, val transport: String, val host: String, val port: String)
 
     @Serializable
-    data class Proxy(val listen: String)
+    data class Proxy(val mode: String, val listen: String)
+
+    @Serializable
+    data class Kcp(
+        val noDelay: Int,
+        val interval: Int,
+        val resend: Int,
+        val nc: Int,
+        val sndWnd: Int,
+        val rcvWnd: Int,
+        val mtu: Int,
+        val ackNoDelay: Boolean,
+    )
 
     @Serializable
     data class Vk(
@@ -52,11 +66,14 @@ data class CoreConfigJson(
     data class Tunnel(val mode: String, val config: String, val mtu: Int)
 
     companion object {
-        // Все поля явно: пропущенное ядро молча заменит своим дефолтом.
-        private val json = Json { encodeDefaults = true }
+        // Все поля явно: пропущенное ядро молча заменит своим дефолтом. Исключение -
+        // kcp: null не сериализуется, и дефолты ARQ остаются за ядром.
+        private val json = Json { encodeDefaults = true; explicitNulls = false }
 
         const val TRANSPORT_TCP = "tcp"
         const val TRANSPORT_UDP = "udp"
+        const val PROXY_MODE_TCP = "tcp"
+        const val PROXY_MODE_UDP = "udp"
         const val TUNNEL_MODE_NONE = "none"
         const val TUNNEL_MODE_WG = "wg"
         const val PLATFORM_MOBILE = "mobile"
@@ -84,6 +101,8 @@ fun ClientConfig.toCoreJson(
     }.map { it.trim() }.filter { it.isNotEmpty() }
 
     val obfOn = srv.obfEnabled && ObfProfile.isValidKey(srv.obfKey)
+    // Ядро поднимает встроенный туннель только поверх udp; UI тоже гасит выбор tcp.
+    val tcpMode = srv.tcpMode && !wireGuardActive
 
     return CoreConfigJson.encode(
         CoreConfigJson(
@@ -102,6 +121,7 @@ fun ClientConfig.toCoreJson(
                 port = "",
             ),
             proxy = CoreConfigJson.Proxy(
+                mode = if (tcpMode) CoreConfigJson.PROXY_MODE_TCP else CoreConfigJson.PROXY_MODE_UDP,
                 // В туннельном режиме порт не биндится (ядро берёт in-memory pipe),
                 // но валидацию проходит и нужен прокси-режиму.
                 listen = localPort,
@@ -120,6 +140,7 @@ fun ClientConfig.toCoreJson(
             ),
             dns = CoreConfigJson.Dns(mode = dnsMode, servers = dnsServers),
             log = CoreConfigJson.Log(debug = debugMode),
+            kcp = if (tcpMode) srv.kcp.toCoreJson() else null,
             tunnel = CoreConfigJson.Tunnel(
                 mode = if (wireGuardActive) CoreConfigJson.TUNNEL_MODE_WG
                 else CoreConfigJson.TUNNEL_MODE_NONE,
@@ -129,3 +150,14 @@ fun ClientConfig.toCoreJson(
         )
     )
 }
+
+private fun KcpProfile.toCoreJson() = CoreConfigJson.Kcp(
+    noDelay = noDelay,
+    interval = interval,
+    resend = resend,
+    nc = nc,
+    sndWnd = sndWnd,
+    rcvWnd = rcvWnd,
+    mtu = mtu,
+    ackNoDelay = ackNoDelay,
+)

@@ -1,5 +1,6 @@
 package com.freeturn.app.data.share
 
+import com.freeturn.app.data.config.KcpProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -58,6 +59,8 @@ class FreeturnLinkTest {
             provider = "vk",
             peer = "example.com:56000",
             transport = "udp",
+            mode = "tcp",
+            kcp = KcpProfile.MOBILE,
             obfProfile = "rtpopus",
             obfKey = "00".repeat(32),
             n = 10,
@@ -79,6 +82,33 @@ class FreeturnLinkTest {
         val parsed = FreeturnLink.parse(link.encode()).getOrThrow()
         assertEquals("", parsed.obfProfile)
         assertEquals("", parsed.obfKey)
+    }
+
+    // Ключи ARQ в ссылке строчные (json-теги uri.KCP), а не camelCase конфига ядра.
+    @Test
+    fun `kcp uses go wire keys and sits before name`() {
+        val goldenJson = """{"v":1,"provider":"vk","peer":"1.2.3.4:56000","mode":"tcp",""" +
+            """"kcp":{"nodelay":1,"interval":40,"resend":2,"nc":1,"sndwnd":256,""" +
+            """"rcvwnd":256,"mtu":1200,"acknodelay":false},"name":"Papa"}"""
+        val golden = "freeturn://" + Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(goldenJson.toByteArray(Charsets.UTF_8))
+
+        val link = FreeturnLink(
+            provider = "vk",
+            peer = "1.2.3.4:56000",
+            mode = "tcp",
+            kcp = KcpProfile.MOBILE,
+            name = "Papa"
+        )
+        assertEquals(golden, link.encode())
+        assertEquals(KcpProfile.MOBILE, FreeturnLink.parse(golden).getOrThrow().kcp)
+    }
+
+    @Test
+    fun `link without mode and kcp`() {
+        val parsed = FreeturnLink.parse(goldenMinimal).getOrThrow()
+        assertEquals("", parsed.mode)
+        assertEquals(null, parsed.kcp)
     }
 
     @Test

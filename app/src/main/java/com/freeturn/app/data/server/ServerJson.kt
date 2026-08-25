@@ -2,8 +2,10 @@ package com.freeturn.app.data.server
 
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.DnsMode
+import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.Provider
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.config.TunnelTransport
@@ -72,6 +74,8 @@ internal object ServerJson {
         put("opts", JSONObject().apply {
             put("obfProfile", p.opts.obfProfile)
             put("obfKey", p.opts.obfKey)
+            put("proxyMode", p.opts.proxyMode)
+            put("kcp", encodeKcp(p.opts.kcp))
         })
     }
 
@@ -132,8 +136,38 @@ internal object ServerJson {
                 obfProfile = optsO.optString("obfProfile", ObfProfile.NONE).let {
                     if (it in ObfProfile.VALUES) it else ObfProfile.NONE
                 },
-                obfKey = optsO.optString("obfKey", "")
+                obfKey = optsO.optString("obfKey", ""),
+                proxyMode = optsO.optString("proxyMode", ProxyMode.UDP).let {
+                    if (it in ProxyMode.VALUES) it else ProxyMode.UDP
+                },
+                kcp = decodeKcp(optsO.optJSONObject("kcp"))
             )
+        )
+    }
+
+    private fun encodeKcp(p: KcpProfile): JSONObject = JSONObject().apply {
+        put("noDelay", p.noDelay)
+        put("interval", p.interval)
+        put("resend", p.resend)
+        put("nc", p.nc)
+        put("sndWnd", p.sndWnd)
+        put("rcvWnd", p.rcvWnd)
+        put("mtu", p.mtu)
+        put("ackNoDelay", p.ackNoDelay)
+    }
+
+    private fun decodeKcp(o: JSONObject?): KcpProfile {
+        if (o == null) return KcpProfile.DEFAULT
+        val d = KcpProfile.DEFAULT
+        return KcpProfile(
+            noDelay = o.optInt("noDelay", d.noDelay),
+            interval = o.optInt("interval", d.interval),
+            resend = o.optInt("resend", d.resend),
+            nc = o.optInt("nc", d.nc),
+            sndWnd = o.optInt("sndWnd", d.sndWnd),
+            rcvWnd = o.optInt("rcvWnd", d.rcvWnd),
+            mtu = o.optInt("mtu", d.mtu),
+            ackNoDelay = o.optBoolean("ackNoDelay", d.ackNoDelay)
         )
     }
 }

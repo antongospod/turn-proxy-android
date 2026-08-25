@@ -209,6 +209,10 @@ private fun CoreStateCard(online: ServerHubState.Online, privacyMode: Boolean) {
                 else -> R.string.nerd_state_running
             }
             NerdStateRow(stringResource(R.string.nerd_state_label), stringResource(stateRes))
+            // Режим живого сервера: рассинхрон с клиентом сервер молча отклоняет.
+            online.mode?.takeIf { it.isNotBlank() }?.let {
+                NerdStateRow(stringResource(R.string.tcp_forward_mode), it.uppercase())
+            }
             online.version?.takeIf { it.isNotBlank() }?.let {
                 NerdStateRow(stringResource(R.string.nerd_version_label), versionLabel(it), mono = true)
             }
@@ -285,6 +289,8 @@ private fun serverCommandLine(server: Server, privacy: Boolean): String {
     val opts = ServerStartOptions(
         listen = server.proxyListen,
         connect = server.proxyConnect,
+        proxyMode = server.opts.proxyMode,
+        kcp = server.opts.kcp,
         obfProfile = if (server.opts.obfEnabled) server.opts.obfProfile else ObfProfile.NONE,
         obfKey = if (server.opts.obfEnabled) server.opts.obfKey else ""
     )

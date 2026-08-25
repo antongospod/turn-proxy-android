@@ -49,6 +49,7 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.server.SetupConfigDraft
@@ -207,6 +208,16 @@ fun SetupConfigStep(
             }
         } else {
             SettingsFieldSlot {
+                UdpTcpSegmented(
+                    tcp = draft.backendTcp,
+                    onTcp = { onDraftChange(draft.copy(backendTcp = it)) },
+                    label = stringResource(R.string.setup_backend_protocol_label)
+                )
+                Text(
+                    stringResource(R.string.setup_backend_protocol_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 BackendPortField(draft, showErrors, onDraftChange)
             }
         }

@@ -8,9 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.backup.BackupCrypto
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.control.UninstallData
 import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.server.ServersSnapshot
 import com.freeturn.app.domain.backup.BackupManager
 import com.freeturn.app.domain.update.AppUpdater
@@ -287,18 +289,46 @@ class SettingsViewModel(
                 it.copy(client = it.client.copy(syncServerSwitches = enabled))
             }
             if (!changed) return@launch
-            // NonCancellable не даёт новому переключению оборвать SSH-команду на полпути.
-            syncSideEffectJob?.cancel()
-            syncSideEffectJob = viewModelScope.launch {
-                delay(syncSideEffectDebounceMs)
-                syncSideEffectMutex.withLock {
-                    if (!prefs.clientConfigFlow.first().syncServerSwitches) return@withLock
-                    withContext(NonCancellable) {
-                        orchestrator.restartServerIfRunning()
-                        orchestrator.restartProxyIfRunning()
-                    }
+            scheduleServerSync()
+        }
+    }
+
+    /** Отложенный рестарт пары сервер+клиент: правки летят пачками, SSH-команда - одна. */
+    private fun scheduleServerSync() {
+        // NonCancellable не даёт новому переключению оборвать SSH-команду на полпути.
+        syncSideEffectJob?.cancel()
+        syncSideEffectJob = viewModelScope.launch {
+            delay(syncSideEffectDebounceMs)
+            syncSideEffectMutex.withLock {
+                if (!prefs.clientConfigFlow.first().syncServerSwitches) return@withLock
+                withContext(NonCancellable) {
+                    orchestrator.restartServerIfRunning()
+                    orchestrator.restartProxyIfRunning()
                 }
             }
+        }
+    }
+
+    fun setProxyMode(id: String?, mode: String) = updateOpts(id) { it.copy(proxyMode = mode) }
+
+    /** Режим и ARQ одной транзакцией: рестарт пары идёт один раз на "Применить". */
+    fun applyForwardConfig(id: String?, mode: String, kcp: KcpProfile) =
+        updateOpts(id) { it.copy(proxyMode = mode, kcp = kcp) }
+
+    /**
+     * Режим и ARQ обязаны совпадать с сервером, поэтому правка активного сервера
+     * тянет за собой рестарт обеих сторон - как в apply-модели экрана сервера.
+     */
+    private fun updateOpts(id: String?, transform: (ServerOpts) -> ServerOpts) {
+        viewModelScope.launch {
+            val changed = if (id == null) {
+                prefs.updateActiveServer { it.copy(opts = transform(it.opts)) }
+            } else {
+                prefs.updateServer(id) { it.copy(opts = transform(it.opts)) }
+            }
+            if (!changed) return@launch
+            if (id != null && id != prefs.serversSnapshot.first().activeId) return@launch
+            scheduleServerSync()
         }
     }
 
@@ -306,6 +336,7 @@ class SettingsViewModel(
     fun applyServerConfig(
         listen: String,
         connect: String,
+        proxyMode: String,
         obfProfile: String,
         obfKey: String
     ) {
@@ -321,7 +352,7 @@ class SettingsViewModel(
                 s.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    opts = s.opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                    opts = s.opts.copy(proxyMode = proxyMode, obfProfile = obfProfile, obfKey = effKey)
                 )
             }
             if (changed) {
@@ -340,6 +371,7 @@ class SettingsViewModel(
         id: String,
         listen: String,
         connect: String,
+        proxyMode: String,
         obfProfile: String,
         obfKey: String
     ) {
@@ -353,7 +385,7 @@ class SettingsViewModel(
                 target.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    opts = target.opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                    opts = target.opts.copy(proxyMode = proxyMode, obfProfile = obfProfile, obfKey = effKey)
                 )
             }
         }

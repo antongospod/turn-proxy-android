@@ -45,16 +45,22 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.config.TunnelTransport
+import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.components.ApplyFab
+import com.freeturn.app.ui.components.FabClearance
+import com.freeturn.app.ui.components.InlineNoticeCard
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsEntryRow
+import com.freeturn.app.ui.components.SettingsFieldSlot
+import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
@@ -78,6 +84,7 @@ fun ConnectionModeScreen(
 
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
     val saved = server?.client ?: activeClient
+    val savedOpts = server?.opts ?: snapshot.active?.opts ?: ServerOpts()
     val isActive = serverId == null || serverId == snapshot.activeId
 
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
@@ -98,6 +105,23 @@ fun ConnectionModeScreen(
     val fieldsKey = serverId ?: snapshot.activeId
     var wgConfig by remember(fieldsKey) { mutableStateOf(saved.wireGuardConfig) }
     var wgName by remember(fieldsKey) { mutableStateOf(saved.wireGuardTunnelName) }
+
+    // Проброс и ARQ - черновики: рестарт пары клиент+сервер идёт по "Применить".
+    var isTcp by remember(fieldsKey, savedOpts.proxyMode) { mutableStateOf(savedOpts.tcpMode) }
+    var kcpDraft by remember(fieldsKey, savedOpts.kcp) { mutableStateOf(savedOpts.kcp) }
+    val forwardDirty = isTcp != savedOpts.tcpMode || kcpDraft != savedOpts.kcp
+    val forwardVisible = !isVpn && forwardDirty
+    val applyBlocked = if (isTcp && !kcpDraft.valid) stringResource(R.string.apply_blocked_arq) else null
+
+    fun applyForward() {
+        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+        settingsViewModel.applyForwardConfig(
+            serverId,
+            if (isTcp) ProxyMode.TCP else ProxyMode.UDP,
+            kcpDraft
+        )
+        onBack?.invoke()
+    }
 
     fun persistWg(vpn: Boolean = isVpn) {
         clientEdit {
@@ -169,6 +193,9 @@ fun ConnectionModeScreen(
                 scrollBehavior = scrollBehavior
             )
         },
+        floatingActionButton = {
+            ApplyFab(visible = forwardVisible, blockedReason = applyBlocked, onApply = { applyForward() })
+        },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -202,6 +229,10 @@ fun ConnectionModeScreen(
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
                             userPickedVpn = true
                             persistWg(vpn = true)
+                            // Встроенный туннель живёт только поверх udp: иначе сервер
+                            // остался бы поднят в tcp и отклонял бы наши сессии.
+                            isTcp = false
+                            if (savedOpts.tcpMode) settingsViewModel.setProxyMode(serverId, ProxyMode.UDP)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) { Text(stringResource(R.string.mode_vpn)) }
@@ -213,7 +244,35 @@ fun ConnectionModeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (isVpn) {
+                if (!isVpn) {
+                    SectionLabel(stringResource(R.string.forward_section))
+                    SettingsCard {
+                        SettingsFieldSlot {
+                            UdpTcpSegmented(
+                                tcp = isTcp,
+                                onTcp = { isTcp = it },
+                                label = stringResource(R.string.tcp_forward_mode)
+                            )
+                            Text(
+                                stringResource(
+                                    if (isTcp) R.string.forward_tcp_desc else R.string.forward_udp_desc
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                stringResource(R.string.forward_server_match),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (isTcp) InlineNoticeCard(stringResource(R.string.forward_tcp_foreign_vpn))
+                        }
+                    }
+
+                    if (isTcp) {
+                        KcpCard(profile = kcpDraft, onProfile = { kcpDraft = it })
+                    }
+                } else {
                     WireGuardConfigCard(
                         wgConfig = wgConfig,
                         onWgConfig = { wgConfig = it; wgDirty = true },
@@ -235,7 +294,7 @@ fun ConnectionModeScreen(
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(if (forwardVisible) FabClearance else Spacing.xxl))
             }
         }
     }

@@ -29,15 +29,19 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.util.redact
 
 /**
- * Синхронные серверные настройки (apply-модель): профиль обфускации и obf-ключ
- * (черновик). Регенерация/копирование ключа - через колбэки; рестарт случается
+ * Синхронные серверные настройки (apply-модель): проброс UDP/TCP, профиль обфускации и
+ * obf-ключ (черновик). Регенерация/копирование ключа - через колбэки; рестарт случается
  * по общей кнопке "Применить" на экране.
  */
 @Composable
 internal fun ServerSyncCard(
+    tcp: Boolean,
+    onTcp: (Boolean) -> Unit,
+    tcpBlocked: Boolean,
     obfProfile: String,
     onObfProfile: (String) -> Unit,
     keyDraft: String,
@@ -49,7 +53,16 @@ internal fun ServerSyncCard(
 ) {
     SectionLabel(stringResource(R.string.server_sync_section))
     SettingsCard {
-        // Профиль обфускации.
+        SettingsFieldSlot {
+            UdpTcpSegmented(
+                tcp = tcp,
+                onTcp = onTcp,
+                label = stringResource(R.string.tcp_forward_mode),
+                // Ядро поднимает туннель только поверх udp-проброса.
+                tcpDisabledReason = if (tcpBlocked) stringResource(R.string.tcp_blocked_by_tunnel) else null
+            )
+        }
+        SettingsRowDivider()
         SettingsFieldSlot {
             SettingsControlLabel(stringResource(R.string.obf_profile_title))
             ObfProfileDropdown(obfProfile = obfProfile, onObfProfile = onObfProfile)

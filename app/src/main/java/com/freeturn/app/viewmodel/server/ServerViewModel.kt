@@ -52,6 +52,7 @@ class ServerViewModel(
                     ServerHubState.Online(
                         running = server.running,
                         installed = server.installed,
+                        mode = server.mode,
                         obfProfile = server.obfProfile,
                         version = server.version,
                         sshIp = ssh.ip
@@ -116,6 +117,8 @@ class ServerViewModel(
             val opts = prefs.serverOptsFlow.first()
             sshRepository.startServer(
                 listen = l, connect = c,
+                proxyMode = opts.proxyMode,
+                kcp = opts.kcp,
                 obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
                 obfKey = if (opts.obfEnabled) opts.obfKey else "",
                 clientId = prefs.ownClientId()
