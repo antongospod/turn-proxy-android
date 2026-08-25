@@ -46,9 +46,10 @@ import kotlin.random.Random
 
 /**
  * Сезонное оформление героя: вращение фигуры кнопки пальцем, тёплый ореол и разлёт
- * листвы по нажатию. Сезон кончится - ставим false, и весь код ниже перестаёт попадать
- * в composition. Форму и палитру кнопки не трогаем: на Material You цвета приходят
- * с обоев, и своя пара выбивалась бы из темы пользователя.
+ * листвы по нажатию. Флаг про сезон, а не про вкус пользователя: вкус живёт тумблером
+ * в настройках, а этим снимается вся тема целиком, когда осень прошла. Форму и палитру
+ * кнопки не трогаем: на Material You цвета приходят с обоев, и своя пара выбивалась бы
+ * из темы пользователя.
  */
 internal const val AUTUMN_VIBE = true
 
@@ -95,8 +96,7 @@ private class Leaf(
     val colorIndex: Int,
 )
 
-// Угол не случайный, а свой сектор на лист с джиттером внутри: на семи чисто случайных
-// углах листья сбиваются в кучу и наезжают друг на друга.
+// Свой сектор на лист с джиттером внутри: на случайных углах листья сбиваются в кучу.
 private fun leafBatch(seed: Int, colorCount: Int): List<Leaf> {
     val rnd = Random(seed)
     val sector = (SPREAD_TO_DEG - SPREAD_FROM_DEG) / LEAF_COUNT
@@ -132,8 +132,7 @@ internal fun AutumnHeroGlow(
         animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
         label = "hero_glow"
     )
-    // Ореол шире слоя и рисуется за его границами - радиус задаём явно, иначе градиент
-    // растянулся бы по границам Canvas и обрезался ровно по кругу кнопки.
+    // Радиус явный: по умолчанию градиент тянется по границам Canvas и обрезается по кнопке.
     val radiusPx = with(LocalDensity.current) { buttonSize.toPx() * 0.85f }
     val brush = remember(color, radiusPx) {
         Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), radius = radiusPx)
@@ -156,7 +155,6 @@ internal fun AutumnLeafBurst(
 ) {
     val colors = autumnLeafColors()
     val painter = painterResource(R.drawable.eco_24px)
-    // 1 - разлёта нет: пока прогресс на единице, слой не рисует и не считает.
     val progress = remember { Animatable(1f) }
     var batch by remember { mutableStateOf(emptyList<Leaf>()) }
 
@@ -186,7 +184,7 @@ internal fun AutumnLeafBurst(
             val y = center.y + sin(leaf.angleRad) * dist + radius * 1.1f * lt * lt
             val fade = if (lt < 0.5f) 1f else 1f - (lt - 0.5f) * 2f
             // Размер вектора всегда один, разница в масштабе - матрицей: вектор растеризуется
-            // под запрошенный размер, и семь меняющихся сторон перестраивали кэш каждый кадр.
+            // под запрошенный размер, и меняющиеся стороны перестраивали кэш каждый кадр.
             val k = leaf.scale * (1f - 0.25f * lt)
             withTransform({
                 translate(x - leafSize.width / 2f, y - leafSize.height / 2f)

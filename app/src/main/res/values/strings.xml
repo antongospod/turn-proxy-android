@@ -309,6 +309,8 @@
     <string name="dynamic_theme_desc">Использовать системные цвета (Material You)</string>
     <string name="privacy_mode_title">Приватный режим</string>
     <string name="privacy_mode_desc">Скрывает IP и порты</string>
+    <string name="seasonal_decor_title">Сезонный декор</string>
+    <string name="seasonal_decor_desc">Листва и свечение вокруг кнопки подключения</string>
 
     <!-- Notifications -->
     <string name="notif_proxy_title">FreeTurn</string>

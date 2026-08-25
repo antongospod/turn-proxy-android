@@ -40,6 +40,7 @@ class AppPreferences(context: Context) {
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val PRIVACY_MODE = booleanPreferencesKey("privacy_mode")
+        val SEASONAL_DECOR = booleanPreferencesKey("seasonal_decor")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
         val SUPPRESS_UPDATE_PROMPT = booleanPreferencesKey("suppress_update_prompt")
         val SUPPRESS_TG_PROMPT = booleanPreferencesKey("suppress_tg_prompt")
@@ -101,6 +102,10 @@ class AppPreferences(context: Context) {
     val nerdModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[NERD_MODE] ?: true }
 
     val privacyModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[PRIVACY_MODE] ?: false }
+
+    // Сезонное оформление главного экрана. По умолчанию включено: это часть облика
+    // приложения, а не сюрприз - выключают его те, кому мешает.
+    val seasonalDecorFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SEASONAL_DECOR] ?: true }
 
     val restartServerOnSwitchFlow: Flow<Boolean> =
         prefFlow { prefs -> prefs[RESTART_SERVER_ON_SWITCH] ?: false }
@@ -265,6 +270,10 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs -> prefs[PRIVACY_MODE] = enabled }
     }
 
+    suspend fun setSeasonalDecor(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SEASONAL_DECOR] = enabled }
+    }
+
     suspend fun setRestartServerOnSwitch(enabled: Boolean) {
         context.dataStore.edit { it[RESTART_SERVER_ON_SWITCH] = enabled }
     }
@@ -318,6 +327,7 @@ class AppPreferences(context: Context) {
             dynamicTheme = dynamicThemeFlow.first(),
             nerdMode = nerdModeFlow.first(),
             privacyMode = privacyModeFlow.first(),
+            seasonalDecor = seasonalDecorFlow.first(),
             restartServerOnSwitch = restartServerOnSwitchFlow.first(),
             hotspotProxy = hotspotProxyEnabledFlow.first(),
             suppressUpdatePrompt = suppressUpdatePromptFlow.first(),
@@ -345,6 +355,7 @@ class AppPreferences(context: Context) {
             prefs[DYNAMIC_THEME] = data.dynamicTheme
             prefs[NERD_MODE] = data.nerdMode
             prefs[PRIVACY_MODE] = data.privacyMode
+            prefs[SEASONAL_DECOR] = data.seasonalDecor
             prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
             prefs[HOTSPOT_PROXY] = data.hotspotProxy
             prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt

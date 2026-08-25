@@ -92,6 +92,7 @@ fun AppScreen(
     val context = LocalContext.current
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
+    val seasonalDecor by settingsViewModel.seasonalDecor.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
     val suppressTgPrompt by settingsViewModel.suppressTgPrompt.collectAsStateWithLifecycle()
     val autoConnect by settingsViewModel.autoConnect.collectAsStateWithLifecycle()
@@ -145,7 +146,7 @@ fun AppScreen(
             ) {
                 SectionLabel(stringResource(R.string.app_section_interface))
                 SettingsGroup {
-                    SettingsGroupItem(0, 2) {
+                    SettingsGroupItem(0, 3) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.privacy_mode_title),
                             subtitle = stringResource(R.string.privacy_mode_desc),
@@ -154,13 +155,22 @@ fun AppScreen(
                             onCheckedChange = { settingsViewModel.setPrivacyMode(it) }
                         )
                     }
-                    SettingsGroupItem(1, 2) {
+                    SettingsGroupItem(1, 3) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.dynamic_theme_title),
                             subtitle = stringResource(R.string.dynamic_theme_desc),
                             iconRes = R.drawable.palette_24px,
                             checked = dynamicTheme,
                             onCheckedChange = { settingsViewModel.setDynamicTheme(it) }
+                        )
+                    }
+                    SettingsGroupItem(2, 3) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.seasonal_decor_title),
+                            subtitle = stringResource(R.string.seasonal_decor_desc),
+                            iconRes = R.drawable.eco_outlined_24px,
+                            checked = seasonalDecor,
+                            onCheckedChange = { settingsViewModel.setSeasonalDecor(it) }
                         )
                     }
                 }

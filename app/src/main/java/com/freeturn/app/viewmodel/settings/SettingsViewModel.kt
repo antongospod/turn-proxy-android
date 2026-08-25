@@ -103,6 +103,9 @@ class SettingsViewModel(
     val privacyMode: StateFlow<Boolean> = prefs.privacyModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val seasonalDecor: StateFlow<Boolean> = prefs.seasonalDecorFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     val restartServerOnSwitch: StateFlow<Boolean> = prefs.restartServerOnSwitchFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -131,6 +134,10 @@ class SettingsViewModel(
 
     fun setPrivacyMode(enabled: Boolean) {
         viewModelScope.launch { prefs.setPrivacyMode(enabled) }
+    }
+
+    fun setSeasonalDecor(enabled: Boolean) {
+        viewModelScope.launch { prefs.setSeasonalDecor(enabled) }
     }
 
     fun setRestartServerOnSwitch(enabled: Boolean) {

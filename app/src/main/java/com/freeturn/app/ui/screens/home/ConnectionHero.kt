@@ -72,12 +72,14 @@ import kotlin.math.ceil
 internal fun ConnectionHero(
     status: ProxyStatus,
     uptimeText: String?,
+    decorEnabled: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val kind = status.phase.heroKind()
     val reducedMotion = LocalReducedMotion.current
-    // Ключ разлёта листвы: каждое нажатие - новая пачка, ноль означает "ещё не жали".
+    val decor = AUTUMN_VIBE && decorEnabled
+    // Ноль - ещё не жали: с него разлёт не запускается.
     var burstKey by remember { mutableIntStateOf(0) }
 
     Column(
@@ -88,9 +90,10 @@ internal fun ConnectionHero(
             kind = kind,
             tunnelActive = status.tunnelUp,
             reducedMotion = reducedMotion,
+            decor = decor,
             burstKey = burstKey,
             onClick = {
-                if (AUTUMN_VIBE && !reducedMotion) burstKey++
+                if (decor && !reducedMotion) burstKey++
                 onToggle()
             }
         )
@@ -122,6 +125,7 @@ private fun HeroToggleButton(
     kind: HeroKind,
     tunnelActive: Boolean,
     reducedMotion: Boolean,
+    decor: Boolean,
     burstKey: Int,
     onClick: () -> Unit
 ) {
@@ -178,9 +182,8 @@ private fun HeroToggleButton(
     )
     val rotation = rememberHeroSpin(spinning = kind == HeroKind.Busy && !reducedMotion)
 
-    // Угол от пальца живёт отдельно от служебного спина и складывается с ним.
     val handSpin = remember { Animatable(0f) }
-    val spinnable = AUTUMN_VIBE && kind == HeroKind.Idle
+    val spinnable = decor && kind == HeroKind.Idle
     val settleSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     LaunchedEffect(spinnable) {
         if (spinnable || handSpin.value == 0f) return@LaunchedEffect
@@ -190,7 +193,7 @@ private fun HeroToggleButton(
     }
 
     Box(contentAlignment = Alignment.Center) {
-        if (AUTUMN_VIBE) {
+        if (decor) {
             AutumnHeroGlow(
                 color = containerColor,
                 strong = kind == HeroKind.Running,
@@ -239,7 +242,7 @@ private fun HeroToggleButton(
         }
 
         // Поверх кнопки: слой без pointerInput, тап проходит насквозь в Surface.
-        if (AUTUMN_VIBE) {
+        if (decor) {
             AutumnLeafBurst(burstKey = burstKey, buttonSize = HeroButtonSize)
         }
     }

@@ -60,6 +60,7 @@ fun HomeScreen(
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
+    val seasonalDecor by settingsViewModel.seasonalDecor.collectAsStateWithLifecycle()
     val serversSnapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
 
     RequestStartupPermissions(settingsViewModel)
@@ -154,6 +155,7 @@ fun HomeScreen(
                     ConnectionHero(
                         status = status,
                         uptimeText = uptimeText,
+                        decorEnabled = seasonalDecor,
                         onToggle = {
                             // Любая непокоящаяся фаза (включая капчу и старт) - остановка.
                             if (status.busy) {

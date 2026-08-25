@@ -16,6 +16,7 @@ data class BackupData(
     val dynamicTheme: Boolean,
     val nerdMode: Boolean,
     val privacyMode: Boolean,
+    val seasonalDecor: Boolean,
     val restartServerOnSwitch: Boolean,
     val hotspotProxy: Boolean,
     val suppressUpdatePrompt: Boolean,
@@ -24,7 +25,7 @@ data class BackupData(
 
 /** Сериализация [BackupData] в JSON (серверы - через тот же [ServerJson], что и в DataStore). */
 object SettingsBackup {
-    private const val FORMAT_VERSION = 3
+    private const val FORMAT_VERSION = 4
 
     fun encode(data: BackupData): String = JSONObject().apply {
         put("v", FORMAT_VERSION)
@@ -34,6 +35,7 @@ object SettingsBackup {
         put("dynamicTheme", data.dynamicTheme)
         put("nerdMode", data.nerdMode)
         put("privacyMode", data.privacyMode)
+        put("seasonalDecor", data.seasonalDecor)
         put("restartServerOnSwitch", data.restartServerOnSwitch)
         put("hotspotProxy", data.hotspotProxy)
         put("suppressUpdatePrompt", data.suppressUpdatePrompt)
@@ -58,6 +60,7 @@ object SettingsBackup {
             dynamicTheme = o.optBoolean("dynamicTheme", true),
             nerdMode = o.optBoolean("nerdMode", true),
             privacyMode = o.optBoolean("privacyMode", false),
+            seasonalDecor = o.optBoolean("seasonalDecor", true),
             restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false),
             hotspotProxy = o.optBoolean("hotspotProxy", false),
             suppressUpdatePrompt = o.optBoolean("suppressUpdatePrompt", false),
