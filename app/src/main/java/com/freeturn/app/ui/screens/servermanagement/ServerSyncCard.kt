@@ -29,8 +29,10 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.components.SettingsSliderRow
 import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.util.redact
+import kotlin.math.roundToInt
 
 /**
  * Синхронные серверные настройки (apply-модель): проброс UDP/TCP, профиль обфускации и
@@ -47,9 +49,12 @@ internal fun ServerSyncCard(
     keyDraft: String,
     onKeyDraft: (String) -> Unit,
     savedObfKey: String,
+    timingMs: Int,
+    onTimingMs: (Int) -> Unit,
     privacyMode: Boolean,
     onCopyKey: () -> Unit,
-    onRegenKey: () -> Unit
+    onRegenKey: () -> Unit,
+    onTick: () -> Unit
 ) {
     SectionLabel(stringResource(R.string.server_sync_section))
     SettingsCard {
@@ -106,6 +111,25 @@ internal fun ServerSyncCard(
                         Text(stringResource(R.string.obf_key_regen))
                     }
                 }
+            }
+            SettingsRowDivider()
+            SettingsFieldSlot {
+                SettingsSliderRow(
+                    valueLabel = if (timingMs == ObfProfile.TIMING_OFF) {
+                        stringResource(R.string.obf_timing_off)
+                    } else {
+                        stringResource(R.string.obf_timing_format, timingMs)
+                    },
+                    hint = stringResource(R.string.obf_timing_hint),
+                    value = timingMs.toFloat(),
+                    valueRange = 0f..ObfProfile.TIMING_MAX.toFloat(),
+                    // Шаг 5 мс: разницу в 1 мс на глаз не отличить, а слайдер дёрганый.
+                    onValueChange = { v ->
+                        val step = ObfProfile.TIMING_STEP
+                        onTimingMs((v / step).roundToInt() * step)
+                    },
+                    onTick = onTick
+                )
             }
         } else {
             // obfProfile == NONE - подсказка выбрать профиль.

@@ -292,7 +292,8 @@ private fun serverCommandLine(server: Server, privacy: Boolean): String {
         proxyMode = server.opts.proxyMode,
         kcp = server.opts.kcp,
         obfProfile = if (server.opts.obfEnabled) server.opts.obfProfile else ObfProfile.NONE,
-        obfKey = if (server.opts.obfEnabled) server.opts.obfKey else ""
+        obfKey = if (server.opts.obfEnabled) server.opts.obfKey else "",
+        obfTimingMs = server.opts.obfTimingMs
     )
     // Серверные флаги в форме --flag=value: маскируем хвост после '=' у секретов.
     val shown = ServerCommand.Start(opts).toArgv().joinToString(" ") { tok ->

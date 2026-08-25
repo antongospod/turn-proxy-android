@@ -207,6 +207,9 @@
     <string name="tcp_forward_mode">Режим</string>
     <string name="tcp_blocked_by_tunnel">Туннель работает только поверх UDP-проброса</string>
     <string name="obf_profile_title">Обфускация</string>
+    <string name="obf_timing_off">Пейсинг: выкл</string>
+    <string name="obf_timing_format">Пейсинг: %1$d мс</string>
+    <string name="obf_timing_hint">Пауза между пакетами на обеих сторонах. 20 мс - как у голосового звонка; чем больше, тем ниже потолок скорости.</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
     <string name="obf_rtpopus2">rtpopus2</string>

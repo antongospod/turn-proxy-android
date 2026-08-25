@@ -191,6 +191,7 @@ class SshRepository(
         kcp: KcpProfile = KcpProfile.DEFAULT,
         obfProfile: String = "none",
         obfKey: String = "",
+        obfTimingMs: Int = 0,
         clientId: String = ""
     ): Boolean = mutex.withLock {
         val cfg = activeSshConfig ?: return@withLock false
@@ -207,6 +208,7 @@ class SshRepository(
                     kcp = kcp,
                     obfProfile = obfProfile,
                     obfKey = obfKey,
+                    obfTimingMs = obfTimingMs,
                     clientId = clientId
                 )
             )

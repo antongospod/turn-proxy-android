@@ -121,6 +121,17 @@ class CoreConfigJsonTest {
         assertEquals(key, ok["key"]!!.jsonPrimitive.content)
     }
 
+    // Пейсинг без профиля ядро отвергает - и с невалидным ключом профиль тоже гаснет.
+    @Test
+    fun obfTimingNeedsProfile() {
+        val key = "a".repeat(64)
+        val on = parse(base, ServerOpts(obfProfile = ObfProfile.RTPOPUS, obfKey = key, obfTimingMs = 20))
+        assertEquals(20, on["obf"]!!.jsonObject["timingMs"]!!.jsonPrimitive.content.toInt())
+
+        val off = parse(base, ServerOpts(obfTimingMs = 20))
+        assertEquals(0, off["obf"]!!.jsonObject["timingMs"]!!.jsonPrimitive.content.toInt())
+    }
+
     @Test
     fun magicTurnOnlyWithSwitch() {
         val off = parse(base.copy(magicTurn = "turn.example:3478"))["turn"]!!.jsonObject

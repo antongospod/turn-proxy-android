@@ -35,6 +35,19 @@ setup() {
     [[ "$output" == *'-kcp-acknodelay=false'* ]]
 }
 
+@test "run.args: -obf-timing только вместе с профилем" {
+    ARG_OBF_TIMING="20ms"
+    _write_args_file
+    run cat "$ARGSFILE"
+    [[ "$output" != *"-obf-timing"* ]]
+
+    ARG_OBF_PROFILE="rtpopus3"
+    ARG_OBF_KEY=$(printf 'a%.0s' {1..64})
+    _write_args_file
+    run cat "$ARGSFILE"
+    [[ "$output" == *$'-obf-timing\n20ms'* ]]
+}
+
 @test "parse_args: --kcp-interval -> argv-пара" {
     parse_args --listen=0.0.0.0:56000 --connect=127.0.0.1:443 --mode=tcp --kcp-interval=40
     [ "$ARG_MODE" = "tcp" ]

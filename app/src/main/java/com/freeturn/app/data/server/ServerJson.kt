@@ -74,6 +74,7 @@ internal object ServerJson {
         put("opts", JSONObject().apply {
             put("obfProfile", p.opts.obfProfile)
             put("obfKey", p.opts.obfKey)
+            put("obfTimingMs", p.opts.obfTimingMs)
             put("proxyMode", p.opts.proxyMode)
             put("kcp", encodeKcp(p.opts.kcp))
         })
@@ -137,6 +138,7 @@ internal object ServerJson {
                     if (it in ObfProfile.VALUES) it else ObfProfile.NONE
                 },
                 obfKey = optsO.optString("obfKey", ""),
+                obfTimingMs = optsO.optInt("obfTimingMs", 0).coerceIn(0, ObfProfile.TIMING_MAX),
                 proxyMode = optsO.optString("proxyMode", ProxyMode.UDP).let {
                     if (it in ProxyMode.VALUES) it else ProxyMode.UDP
                 },

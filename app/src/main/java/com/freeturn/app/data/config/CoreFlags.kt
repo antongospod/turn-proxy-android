@@ -21,6 +21,12 @@ object ObfProfile {
     const val RTPOPUS3 = "rtpopus3"
     val VALUES = listOf(NONE, RTPOPUS, RTPOPUS2, RTPOPUS3)
 
+    // Пейсинг (-obf-timing), мс. 20 = ptime Opus, эталон для мимикрии; выше 60 поток
+    // уже не похож на живой звонок и упирается в потолок ~1 пакет на интервал.
+    const val TIMING_OFF = 0
+    const val TIMING_MAX = 60
+    const val TIMING_STEP = 5
+
     private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
 
     fun isValidKey(key: String): Boolean = key.matches(KEY_REGEX)

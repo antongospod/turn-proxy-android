@@ -338,7 +338,8 @@ class SettingsViewModel(
         connect: String,
         proxyMode: String,
         obfProfile: String,
-        obfKey: String
+        obfKey: String,
+        obfTimingMs: Int
     ) {
         viewModelScope.launch {
             val sync = prefs.clientConfigFlow.first().syncServerSwitches
@@ -352,7 +353,12 @@ class SettingsViewModel(
                 s.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    opts = s.opts.copy(proxyMode = proxyMode, obfProfile = obfProfile, obfKey = effKey)
+                    opts = s.opts.copy(
+                        proxyMode = proxyMode,
+                        obfProfile = obfProfile,
+                        obfKey = effKey,
+                        obfTimingMs = obfTimingMs
+                    )
                 )
             }
             if (changed) {
@@ -373,7 +379,8 @@ class SettingsViewModel(
         connect: String,
         proxyMode: String,
         obfProfile: String,
-        obfKey: String
+        obfKey: String,
+        obfTimingMs: Int
     ) {
         viewModelScope.launch {
             prefs.updateServer(id) { target ->
@@ -385,7 +392,12 @@ class SettingsViewModel(
                 target.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
-                    opts = target.opts.copy(proxyMode = proxyMode, obfProfile = obfProfile, obfKey = effKey)
+                    opts = target.opts.copy(
+                        proxyMode = proxyMode,
+                        obfProfile = obfProfile,
+                        obfKey = effKey,
+                        obfTimingMs = obfTimingMs
+                    )
                 )
             }
         }

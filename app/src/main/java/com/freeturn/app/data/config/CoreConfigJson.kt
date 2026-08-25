@@ -136,7 +136,8 @@ fun ClientConfig.toCoreJson(
             obf = CoreConfigJson.Obf(
                 profile = if (obfOn) srv.obfProfile else ObfProfile.NONE,
                 key = if (obfOn) srv.obfKey else "",
-                timingMs = 0,
+                // Без профиля ядро отвергает ненулевой пейсинг.
+                timingMs = if (obfOn) srv.obfTimingMs else 0,
             ),
             dns = CoreConfigJson.Dns(mode = dnsMode, servers = dnsServers),
             log = CoreConfigJson.Log(debug = debugMode),

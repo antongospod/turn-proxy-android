@@ -38,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -100,6 +101,7 @@ fun ServerManagementScreen(
     var tcpDraft by rememberSaveable(effServer.tcpMode) { mutableStateOf(effServer.tcpMode) }
     var obfDraft by rememberSaveable(effServer.obfProfile) { mutableStateOf(effServer.obfProfile) }
     var keyDraft by rememberSaveable(effServer.obfKey) { mutableStateOf(effServer.obfKey) }
+    var timingDraft by rememberSaveable(effServer.obfTimingMs) { mutableIntStateOf(effServer.obfTimingMs) }
 
 
     val context = LocalContext.current
@@ -115,7 +117,8 @@ fun ServerManagementScreen(
     val configDirty = proxyDirty ||
         tcpDraft != effServer.tcpMode ||
         obfDraft != effServer.obfProfile ||
-        keyDraft != effServer.obfKey
+        keyDraft != effServer.obfKey ||
+        timingDraft != effServer.obfTimingMs
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
     val addressesOk = HostPort.isValid(listenFull) && HostPort.isValid(proxyConnect)
@@ -131,11 +134,13 @@ fun ServerManagementScreen(
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
         // Активный - apply в живой рантайм (один рестарт). Неактивный - пишем только снимок сервера.
         val mode = if (tcpDraft) ProxyMode.TCP else ProxyMode.UDP
+        // Пейсинг без профиля ядро отвергает.
+        val timing = if (obfDraft == ObfProfile.NONE) 0 else timingDraft
         if (isActive) {
-            settingsViewModel.applyServerConfig(listenFull, proxyConnect, mode, obfDraft, keyDraft)
+            settingsViewModel.applyServerConfig(listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
         } else {
             // !isActive ⇒ serverId != null (см. isActive выше) - smart cast.
-            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, mode, obfDraft, keyDraft)
+            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
         }
         onBack()
     }
@@ -285,6 +290,8 @@ fun ServerManagementScreen(
                         keyDraft = keyDraft,
                         onKeyDraft = { keyDraft = it },
                         savedObfKey = effServer.obfKey,
+                        timingMs = timingDraft,
+                        onTimingMs = { timingDraft = it },
                         privacyMode = privacyMode,
                         onCopyKey = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -293,7 +300,8 @@ fun ServerManagementScreen(
                         onRegenKey = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                             keyDraft = ObfProfile.generateKey()
-                        }
+                        },
+                        onTick = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) }
                     )
                 }
 

@@ -10,6 +10,8 @@ data class ServerOpts(
     val obfProfile: String = ObfProfile.NONE,
     /** 64-hex obf-ключ (-obf-key). Должен совпадать на клиенте и сервере. */
     val obfKey: String = "",
+    /** Межпакетная задержка мимикрии (-obf-timing), мс; 0 - выкл. Требует профиля. */
+    val obfTimingMs: Int = 0,
     /** Режим проброса (-mode). Сервер отвергает сессию с другим режимом. */
     val proxyMode: String = ProxyMode.UDP,
     /** ARQ tcp-режима (-kcp-*); в udp не используется. */

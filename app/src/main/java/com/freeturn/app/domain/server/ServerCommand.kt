@@ -59,6 +59,8 @@ sealed class ServerCommand {
             if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
                 add("--obf-profile=${opts.obfProfile}")
                 add("--obf-key=${opts.obfKey}")
+                // Пейсинг без профиля ядро отвергает - только внутри этой ветки.
+                if (opts.obfTimingMs > 0) add("--obf-timing=${opts.obfTimingMs}ms")
             }
             if (opts.clientId.isNotBlank()) add("--client-id=${opts.clientId}")
         }
@@ -96,6 +98,7 @@ data class ServerStartOptions(
     val kcp: KcpProfile = KcpProfile.DEFAULT,
     val obfProfile: String = "none",
     val obfKey: String = "",
+    val obfTimingMs: Int = 0,
     val clientId: String = ""
 )
 

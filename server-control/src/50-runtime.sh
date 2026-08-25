@@ -130,6 +130,8 @@ _write_args_file() {
         if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
             echo "-obf-profile"; echo "$ARG_OBF_PROFILE"
             echo "-obf-key";     echo "$ARG_OBF_KEY"
+            # Пейсинг без профиля ядро отвергает - только внутри этой ветки.
+            if [ -n "$ARG_OBF_TIMING" ]; then echo "-obf-timing"; echo "$ARG_OBF_TIMING"; fi
         fi
         # Авторизация включается только когда владелец передал cid (cmd_start уже
         # посадил его в allowlist - иначе lockout самого себя).
@@ -195,6 +197,7 @@ _rt_start_nohup() {
     if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
         ( umask 077; printf '%s' "$ARG_OBF_KEY" > "$OBFFILE" ); chmod 600 "$OBFFILE"
         args+=(-obf-profile "$ARG_OBF_PROFILE" -obf-key "$ARG_OBF_KEY")
+        [ -n "$ARG_OBF_TIMING" ] && args+=(-obf-timing "$ARG_OBF_TIMING")
     fi
     ( cd "$PREFIX" && nohup "$bin" "${args[@]}" >"$LOGFILE" 2>&1 & echo $! > "$PIDFILE" )
     local pid

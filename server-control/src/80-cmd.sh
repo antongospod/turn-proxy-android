@@ -5,6 +5,7 @@ ARG_MODE="udp"
 ARG_KCP=()
 ARG_OBF_PROFILE="none"
 ARG_OBF_KEY=""
+ARG_OBF_TIMING=""
 ARG_TAIL=80
 ARG_WG_PORT=""
 ARG_WG_ENDPOINT=""
@@ -43,6 +44,9 @@ parse_args() {
             --obf-profile=*)
                 ARG_OBF_PROFILE="${1#*=}"
                 [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2|rtpopus3)$ ]] || fail bad_arg "bad --obf-profile" ;;
+            --obf-timing=*)
+                ARG_OBF_TIMING="${1#*=}"
+                [[ "$ARG_OBF_TIMING" =~ ^[0-9]{1,5}ms$ ]] || fail bad_arg "bad --obf-timing (need <N>ms)" ;;
             --obf-key=*)
                 ARG_OBF_KEY="${1#*=}"
                 [[ "$ARG_OBF_KEY" =~ ^[0-9a-fA-F]{64}$ ]] || fail bad_arg "bad --obf-key (need 64 hex)" ;;
