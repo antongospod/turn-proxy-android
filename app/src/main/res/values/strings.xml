@@ -56,6 +56,8 @@
     <string name="share_revoke_title">Отозвать доступ?</string>
     <string name="share_revoke_desc">Пользователь \"%1$s\" будет удалён с сервера, его подключение перестанет работать. Действие необратимо.</string>
     <string name="share_revoke_confirm">Отозвать</string>
+    <string name="share_include_vk_link">Вложить ссылку на звонок</string>
+    <string name="share_include_vk_link_desc">Получателю не нужен свой аккаунт</string>
     <string name="share_no_address">У сервера не указан адрес - добавьте его в настройках сервера</string>
     <string name="error_ssh_generic">Ошибка SSH</string>
 
@@ -64,6 +66,7 @@
     <string name="import_default_name">Импортированный сервер</string>
     <string name="import_vk_link_label">Ссылка на звонок VK</string>
     <string name="import_vk_link_helper">Укажите ссылку на звонок VK для установки соединения</string>
+    <string name="import_vk_link_from_owner">Ссылка пришла вместе с доступом - можно заменить своей</string>
     <string name="import_duplicate_address">Сервер с данным адресом уже существует</string>
     <string name="import_duplicate_conf">Конфигурация уже импортирована</string>
     <string name="import_confirm">Импортировать</string>

@@ -69,6 +69,7 @@ class ImportViewModel(
                 _uiState.value = ImportUiState(
                     link = link,
                     serverName = link.name.ifBlank { link.peer.substringBefore(':') },
+                    vkLink = link.vkLink.trim(),
                     duplicateAddress = servers.any {
                         it.client.serverAddress.equals(link.peer, ignoreCase = true)
                     },

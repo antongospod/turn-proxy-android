@@ -7,7 +7,8 @@ import com.freeturn.app.data.server.Server
 
 /**
  * Собирает freeturn://-ссылку для пользователя.
- * vkLink в ссылку не входит, получатель вводит свой.
+ * vkLink передаётся вызывающим только по явному согласию владельца,
+ * иначе получатель вводит свой.
  */
 object ShareLinkBuilder {
 
@@ -16,7 +17,8 @@ object ShareLinkBuilder {
         info: ShareInfo,
         userName: String,
         wgConf: String?,
-        clientId: String = ""
+        clientId: String = "",
+        vkLink: String = ""
     ): String {
         val obfProfile = if (info.hasRunArgs) info.obfProfile else server.opts.obfProfile
         val obfKey = if (info.hasRunArgs) info.obfKey else server.opts.obfKey
@@ -34,6 +36,7 @@ object ShareLinkBuilder {
             streamsPerCred = server.client.streamsPerCred,
             clientId = clientId.trim(),
             name = userName.trim(),
+            vkLink = vkLink.trim(),
             wgConf = wgConf?.let(::normalizeConf).orEmpty()
         ).encode()
     }

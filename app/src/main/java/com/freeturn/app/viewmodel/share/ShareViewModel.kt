@@ -37,6 +37,8 @@ data class ShareUiState(
     val userName: String = "",
     val manualClientId: String = "",
     val shareAsProxy: Boolean = false,
+    val shareVkLink: Boolean = false,
+    val vkLinkToShare: String = "",
     val creating: Boolean = false,
     val createError: String? = null,
     val result: ShareResult? = null,
@@ -52,6 +54,10 @@ data class ShareUiState(
     val selectedServer: Server? get() = servers.firstOrNull { it.id == selectedServerId }
 
     val localOnly: Boolean get() = selectedServer?.ssh?.ip?.isBlank() == true
+
+    val ownerVkLink: String get() = selectedServer?.client?.vkLink?.trim().orEmpty()
+
+    val sharedVkLink: String get() = if (shareVkLink) vkLinkToShare.trim() else ""
 
     val canManageUsers: Boolean get() = selectedServer != null && !localOnly
 
@@ -112,6 +118,8 @@ class ShareViewModel(
         shareInfo = null,
         manualClientId = "",
         shareAsProxy = false,
+        shareVkLink = false,
+        vkLinkToShare = "",
         infoError = null,
         createError = null,
         peers = emptyList(),
@@ -136,6 +144,19 @@ class ShareViewModel(
 
     fun setShareMode(proxy: Boolean) =
         _uiState.update { it.copy(shareAsProxy = proxy, createError = null) }
+
+    fun setShareVkLink(enabled: Boolean) =
+        _uiState.update {
+            // Включили - подставляем ссылку сервера как заготовку, её можно перебить своей.
+            it.copy(
+                shareVkLink = enabled,
+                vkLinkToShare = if (enabled) it.ownerVkLink else "",
+                createError = null
+            )
+        }
+
+    fun setVkLinkToShare(value: String) =
+        _uiState.update { it.copy(vkLinkToShare = value, createError = null) }
 
     fun retryInfo() {
         val id = _uiState.value.selectedServerId ?: return
@@ -217,7 +238,9 @@ class ShareViewModel(
             commitCreated(
                 serverId = server.id,
                 userName = userName,
-                link = ShareLinkBuilder.build(server, info, userName, null, st.manualClientId.trim()),
+                link = ShareLinkBuilder.build(
+                    server, info, userName, null, st.manualClientId.trim(), st.sharedVkLink
+                ),
                 wg = false
             )
             return
@@ -232,7 +255,9 @@ class ShareViewModel(
                         commitCreated(
                             serverId = server.id,
                             userName = userName,
-                            link = ShareLinkBuilder.build(server, info, userName, peer.clientConf, cid),
+                            link = ShareLinkBuilder.build(
+                                server, info, userName, peer.clientConf, cid, st.sharedVkLink
+                            ),
                             wg = true,
                             newPeer = WgPeer(
                                 pubkey = peer.pubkey,
@@ -251,7 +276,9 @@ class ShareViewModel(
                         commitCreated(
                             serverId = server.id,
                             userName = userName,
-                            link = ShareLinkBuilder.build(server, info, userName, null, cid),
+                            link = ShareLinkBuilder.build(
+                                server, info, userName, null, cid, st.sharedVkLink
+                            ),
                             wg = false,
                             newClient = SharedClient(clientId = cid, name = userName)
                         )
@@ -335,7 +362,8 @@ class ShareViewModel(
                             result = ShareResult(
                                 userName = peer.name,
                                 link = ShareLinkBuilder.build(
-                                    server, info, peer.name, access.clientConf, access.clientId
+                                    server, info, peer.name, access.clientConf,
+                                    access.clientId, st.sharedVkLink
                                 ),
                                 isWg = true
                             )
@@ -359,7 +387,9 @@ class ShareViewModel(
             it.copy(
                 result = ShareResult(
                     userName = client.name,
-                    link = ShareLinkBuilder.build(server, info, client.name, null, client.clientId),
+                    link = ShareLinkBuilder.build(
+                        server, info, client.name, null, client.clientId, it.sharedVkLink
+                    ),
                     isWg = false
                 )
             )

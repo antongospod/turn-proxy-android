@@ -25,6 +25,8 @@ data class FreeturnLink(
     /** ARQ tcp-режима; null - у получателя останется дефолт ядра. */
     val kcp: KcpProfile? = null,
     val name: String = "",
+    /** Ссылка на звонок владельца - опционально, иначе получатель вводит свою. */
+    val vkLink: String = "",
     val wgConf: String = ""
 ) {
     fun encode(): String {
@@ -47,6 +49,7 @@ data class FreeturnLink(
         if (manualCaptcha) sb.field("mcap", "true")
         if (kcp != null) sb.field("kcp", kcpJson(kcp))
         if (name.isNotEmpty()) sb.field("name", jsonString(name))
+        if (vkLink.isNotEmpty()) sb.field("vk", jsonString(vkLink))
         if (wgConf.isNotEmpty()) sb.field("wg", jsonString(wgConf))
         sb.append('}')
         return SCHEME + Base64.getUrlEncoder().withoutPadding()
@@ -88,6 +91,7 @@ data class FreeturnLink(
                 manualCaptcha = o.optBoolean("mcap", false),
                 kcp = o.optJSONObject("kcp")?.let(::parseKcp),
                 name = o.optString("name"),
+                vkLink = o.optString("vk"),
                 wgConf = o.optString("wg")
             )
         }

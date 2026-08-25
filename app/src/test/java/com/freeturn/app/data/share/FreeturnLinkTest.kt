@@ -71,6 +71,7 @@ class FreeturnLinkTest {
             dnsServers = "8.8.8.8,8.8.4.4",
             manualCaptcha = true,
             name = "Тест Юзер",
+            vkLink = "https://vk.com/call/abc",
             wgConf = wgConf
         )
         assertEquals(original, FreeturnLink.parse(original.encode()).getOrThrow())

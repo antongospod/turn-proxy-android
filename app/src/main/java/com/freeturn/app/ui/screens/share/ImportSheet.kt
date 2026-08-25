@@ -143,7 +143,14 @@ fun ImportSheet(
                 value = state.vkLink,
                 onValueChange = viewModel::setVkLink,
                 label = { Text(stringResource(R.string.import_vk_link_label)) },
-                supportingText = { Text(stringResource(R.string.import_vk_link_helper)) },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (link.vkLink.isNotBlank()) R.string.import_vk_link_from_owner
+                            else R.string.import_vk_link_helper
+                        )
+                    )
+                },
                 singleLine = true,
                 enabled = !state.saving,
                 modifier = Modifier.fillMaxWidth()

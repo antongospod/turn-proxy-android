@@ -32,7 +32,9 @@ import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsFieldSlot
+import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.components.SettingsRowIcon
+import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.viewmodel.share.ShareUiState
 import com.freeturn.app.viewmodel.share.ShareViewModel
 import com.freeturn.app.ui.theme.Spacing
@@ -49,6 +51,8 @@ fun ShareConnectionTab(
     onUserNameChange: (String) -> Unit,
     onClientIdChange: (String) -> Unit,
     onSetMode: (Boolean) -> Unit,
+    onSetShareVkLink: (Boolean) -> Unit,
+    onVkLinkChange: (String) -> Unit,
     onRetryInfo: () -> Unit
 ) {
     val context = LocalContext.current
@@ -129,6 +133,34 @@ fun ShareConnectionTab(
                 }
             }
             ShareProtocolCard(state = state, onRetryInfo = onRetryInfo)
+        }
+
+        // Ссылка на звонок уходит вместе с доступом - только по явному согласию владельца.
+        if (state.ownerVkLink.isNotBlank()) {
+            SettingsCard {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.share_include_vk_link),
+                    subtitle = stringResource(R.string.share_include_vk_link_desc),
+                    iconRes = R.drawable.link_24px,
+                    checked = state.shareVkLink,
+                    onCheckedChange = onSetShareVkLink,
+                    enabled = !state.creating
+                )
+                if (state.shareVkLink) {
+                    SettingsRowDivider()
+                    SettingsFieldSlot {
+                        OutlinedTextField(
+                            value = state.vkLinkToShare,
+                            onValueChange = onVkLinkChange,
+                            label = { Text(stringResource(R.string.call_link_label)) },
+                            placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
+                            singleLine = true,
+                            enabled = !state.creating,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
         }
 
         if (state.missingAddress) {

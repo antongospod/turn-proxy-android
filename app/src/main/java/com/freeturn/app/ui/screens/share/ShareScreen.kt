@@ -204,6 +204,8 @@ fun ShareScreen(
                                 onUserNameChange = viewModel::setUserName,
                                 onClientIdChange = viewModel::setManualClientId,
                                 onSetMode = viewModel::setShareMode,
+                                onSetShareVkLink = viewModel::setShareVkLink,
+                                onVkLinkChange = viewModel::setVkLinkToShare,
                                 onRetryInfo = viewModel::retryInfo
                             )
                             TAB_USERS -> ShareUsersTab(
