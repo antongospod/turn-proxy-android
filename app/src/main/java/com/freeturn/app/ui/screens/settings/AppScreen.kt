@@ -319,16 +319,6 @@ private fun UpdateCard(
     onDownload: () -> Unit,
     onInstall: () -> Unit
 ) {
-    val statusText = when (state) {
-        is UpdateState.Idle -> stringResource(R.string.update_current_version, "v$appVersion")
-        is UpdateState.Checking -> stringResource(R.string.update_checking)
-        is UpdateState.Available -> stringResource(R.string.update_available, state.version)
-        is UpdateState.Downloading -> stringResource(R.string.update_downloading, state.progress)
-        is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready_desc_short)
-        is UpdateState.NoUpdate -> stringResource(R.string.update_no_update)
-        is UpdateState.Error -> stringResource(R.string.update_error, state.message)
-    }
-
     SettingsCard {
         Column(
             modifier = Modifier
@@ -345,14 +335,15 @@ private fun UpdateCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.update_title), style = MaterialTheme.typography.bodyLarge)
                     AnimatedContent(
-                        targetState = statusText,
+                        targetState = state,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        contentKey = { it::class },
                         label = "update_status"
-                    ) { text ->
+                    ) { target ->
                         Text(
-                            text,
+                            updateStatusText(target, appVersion),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (state is UpdateState.Error) MaterialTheme.colorScheme.error
+                            color = if (target is UpdateState.Error) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -387,6 +378,17 @@ private fun UpdateCard(
             }
         }
     }
+}
+
+@Composable
+private fun updateStatusText(state: UpdateState, appVersion: String): String = when (state) {
+    is UpdateState.Idle -> stringResource(R.string.update_current_version, "v$appVersion")
+    is UpdateState.Checking -> stringResource(R.string.update_checking)
+    is UpdateState.Available -> stringResource(R.string.update_available, state.version)
+    is UpdateState.Downloading -> stringResource(R.string.update_downloading, state.progress)
+    is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready_desc_short)
+    is UpdateState.NoUpdate -> stringResource(R.string.update_no_update)
+    is UpdateState.Error -> stringResource(R.string.update_error, state.message)
 }
 
 /** Строка сброса: error-тинт иконки и заголовка, без trailing-шеврона. */
