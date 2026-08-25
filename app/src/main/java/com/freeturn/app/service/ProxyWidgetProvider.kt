@@ -111,16 +111,23 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
                 views.setContentDescription(R.id.widget_toggle, context.getString(R.string.widget_action_start))
             }
 
-            val toggleAction = if (running) ProxyActions.STOP else ProxyActions.START
-            views.setOnClickPendingIntent(
-                R.id.widget_toggle,
+            // START - через activity-трамплин: согласие на VPN спрашивается только оттуда.
+            val toggle = if (running) {
                 PendingIntent.getBroadcast(
                     context,
-                    if (running) 1 else 2,
-                    Intent(context, ProxyReceiver::class.java).setAction(toggleAction),
+                    1,
+                    Intent(context, ProxyReceiver::class.java).setAction(ProxyActions.STOP),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-            )
+            } else {
+                PendingIntent.getActivity(
+                    context,
+                    2,
+                    ProxyShortcutActivity.startIntent(context),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            views.setOnClickPendingIntent(R.id.widget_toggle, toggle)
 
             views.setOnClickPendingIntent(
                 R.id.widget_body,

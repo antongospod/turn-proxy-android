@@ -1,7 +1,9 @@
 package com.freeturn.app.service
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.freeturn.app.R
@@ -45,9 +47,24 @@ class ProxyTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val action = if (running) ProxyActions.STOP else ProxyActions.START
-        sendBroadcast(Intent(this, ProxyReceiver::class.java).setAction(action))
+        if (running) {
+            sendBroadcast(Intent(this, ProxyReceiver::class.java).setAction(ProxyActions.STOP))
+            return
+        }
+        // START - через activity-трамплин: согласие на VPN спрашивается только оттуда.
+        val intent = ProxyShortcutActivity.startIntent(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startActivityAndCollapse(
+                PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+            )
+        } else {
+            startActivityAndCollapseLegacy(intent)
+        }
     }
+
+    /** PendingIntent-перегрузка появилась только в API 34, ниже другого способа свернуть шторку нет. */
+    @Suppress("DEPRECATION")
+    private fun startActivityAndCollapseLegacy(intent: Intent) = startActivityAndCollapse(intent)
 
     private fun render() {
         val tile = qsTile ?: return

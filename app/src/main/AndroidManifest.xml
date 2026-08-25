@@ -74,7 +74,7 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- Трамплин App Shortcuts (long-press иконки): шлёт START/STOP в ProxyReceiver. -->
+        <!-- Трамплин внешних входов (ярлыки, виджет, тайл): START с запросом согласия на VPN. -->
         <activity
             android:name=".service.ProxyShortcutActivity"
             android:exported="true"

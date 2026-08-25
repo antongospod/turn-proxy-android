@@ -322,6 +322,7 @@
     <string name="notif_proxy_connect_error">Ошибка подключения</string>
     <string name="notif_proxy_wireguard_error">Ошибка WireGuard</string>
     <string name="notif_proxy_vpn_permission">Нужно разрешение VPN - откройте приложение</string>
+    <string name="notif_proxy_vpn_denied">Разрешение VPN не выдано - прокси не запущен</string>
 
     <!-- CaptchaWebViewDialog -->
     <string name="captcha_title">Проверка VK</string>
